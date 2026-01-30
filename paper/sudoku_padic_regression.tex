@@ -1,0 +1,223 @@
+
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\title{Solving Sudoku the Hard Way Using Integer-Valued $p$-adic Linear Regression\\with Positive and Negative Regularisation}
+\author{(Author details omitted for review)}
+\date{\today}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note explores a deliberately perverse modelling choice: encoding a $9\times 9$ Sudoku as a linear regression problem over the $p$-adic integers, with the \emph{coefficients themselves} representing the Sudoku digits. The modelling goal is not computational efficiency, but conceptual compression: avoid one-hot / indicator encodings (e.g.\ $729$ binary variables) and instead use $81$ integer-valued parameters directly.
+We use two kinds of synthetic regression observations: (i) \emph{positive} regularisation terms that ``snap'' each coefficient to the set $\{1,\dots,9\}$; and (ii) \emph{negative} regularisation terms that reward nonzero pairwise differences inside each row, column, and $3\times 3$ box. For primes $p>9$, the $p$-adic norm makes every nonzero digit difference have norm $1$, eliminating magnitude bias and turning ``difference'' into a clean proxy for ``not equal''.
+We then implement a stepwise/coordinate-descent heuristic (row-wise swap moves) and report small-scale experiments showing that the approach can solve randomly carved puzzles with moderate clue counts.
+\end{abstract}
+
+\section{Motivation and prior work}
+The construction here builds on two pieces of prior work by the author:
+\begin{itemize}
+    \item A geometric result on best-fit hyperplanes in $\mathbb{R}^n$ (Journal of Applications): the hyperplane of best fit must pass through $n+1$ points.
+    \item A complexity result on $p$-adic linear regression (Information Processing Letters): $p$-adic regression is NP-complete, via an embedding of \textsc{Max-Cut} using regularisation points that snap coefficients to $\{0,1\}$.
+\end{itemize}
+This paper is not a re-proof of those results. Instead, it applies the same ``regularise-to-snap'' trick to Sudoku, while insisting on an integer-level representation (one coefficient per cell).
+
+\section{Preliminaries}
+
+\subsection{Sudoku}
+A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
+\begin{enumerate}
+    \item each row contains all digits $1,\dots,9$ exactly once;
+    \item each column contains all digits $1,\dots,9$ exactly once; and
+    \item each $3\times 3$ box contains all digits $1,\dots,9$ exactly once.
+\end{enumerate}
+Equivalently, in each unit (row, column, box) all entries are \emph{pairwise distinct} and each entry lies in $\{1,\dots,9\}$.
+
+\subsection{$p$-adic integers and norms}
+Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the exponent of $p$ in its factorisation, and the $p$-adic absolute value is
+\[
+|n|_p = p^{-v_p(n)}, \qquad |0|_p = 0.
+\]
+We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|x|_p\le 1$. The key choice is to take $p>9$ (e.g.\ $p=11$).
+
+\section{Positive regularisation: snapping coefficients to digits}
+
+Let $D=\{1,2,\dots,9\}\subset \mathbb{Z}_p$, and write the Sudoku variables as a vector
+\[
+x \in \mathbb{Z}_p^{81},
+\]
+with one coefficient per cell.
+
+\begin{definition}[Digit-snapping penalty]
+For $p>9$, define the digit-snapping penalty
+\[
+R_p(t) := \sum_{k=1}^9 |t-k|_p.
+\]
+\end{definition}
+
+\begin{lemma}[Snapping to $D$ for $p>9$]
+Assume $p>9$ and $t\in \mathbb{Z}_p$. Then $R_p(t)$ is minimised precisely when $t\in D$. Moreover, $R_p(k)=8$ for $k\in D$ and $R_p(t)>8$ for $t\notin D$.
+\end{lemma}
+
+\begin{proof}
+If $t=k\in D$, then the $k$th term is $|k-k|_p=0$ and for any $k'\neq k$ we have $1\le |k-k'| \le 8 < p$, so $p\nmid (k-k')$ and hence $|k-k'|_p=1$. Thus $R_p(k)=8$.
+
+Now take $t\notin D$. If $t\not\equiv k \pmod p$ for every $k\in D$, then $p\nmid (t-k)$ for all $k$, so $|t-k|_p=1$ for all $k$ and $R_p(t)=9>8$.
+Otherwise, $t\equiv k_0 \pmod p$ for exactly one $k_0\in D$ (distinct digits differ by $<p$ so the residue classes are distinct). Then $|t-k_0|_p=p^{-m}$ for some $m\ge 1$, while for $k\neq k_0$ we still have $|t-k|_p=1$. Hence $R_p(t)=8+p^{-m}>8$.
+\end{proof}
+
+This lemma is the $9$-valued analogue of the author's earlier ``snap to $\{0,1\}$'' construction: the synthetic observations $t=k$ for all $k\in D$ create a multiwell objective with minima exactly at $D$.
+
+\section{Negative regularisation: rewarding inequality via $p$-adic norms}
+
+The remaining Sudoku constraints are that entries in each row/column/box are pairwise unequal. Pairwise inequality can be encoded using differences $x_i-x_j$.
+
+\begin{lemma}[Differences as inequality indicators for $p>9$]
+Let $p>9$ and $a,b\in D$. Then
+\[
+|a-b|_p =
+\begin{cases}
+0 & a=b,\\
+1 & a\neq b.
+\end{cases}
+\]
+\end{lemma}
+
+\begin{proof}
+If $a=b$ the difference is zero. If $a\neq b$, then $1\le |a-b|\le 8<p$, so $p\nmid(a-b)$ and $v_p(a-b)=0$, hence $|a-b|_p=1$.
+\end{proof}
+
+\subsection{Regression objective}
+Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share a unit (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
+
+We construct a linear regression objective by treating each constraint as a synthetic observation of a linear form $a^\top x$ with target $b$ and $p$-adic residual norm:
+\begin{align}
+L(x) &=
+\alpha\sum_{i=1}^{81}\sum_{k=1}^9 |x_i - k|_p
+\;+\;
+\alpha_{\mathrm{clue}}\sum_{i\in\mathcal{C}} |x_i - g_i|_p
+\;-\;
+\beta\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
+\label{eq:objective}
+\end{align}
+The first two sums are \emph{positive} regularisation that encourage $x_i\in D$ and enforce the clues. The final sum is \emph{negative} regularisation that rewards inequality: for digit-valued assignments it contributes $-\beta$ for every pair of unequal entries and $0$ for equal entries.
+
+\begin{theorem}[Sudoku solutions minimise the objective in the strong-snapping regime (informal)]
+Fix a prime $p>9$. In the regime $\alpha,\alpha_{\mathrm{clue}}\gg \beta>0$, any global minimiser of \eqref{eq:objective} corresponds to a valid Sudoku completion (and vice versa).
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By Lemma 1, the $\alpha$-term forces $x_i\in D$ at any global optimum when $\alpha$ is sufficiently dominant. The clue term forces $x_i=g_i$ for $i\in\mathcal{C}$.
+Once $x$ is digit-valued, Lemma 2 shows $|x_i-x_j|_p$ is exactly an indicator for inequality. Maximising the number of unequal pairs in each unit is equivalent to enforcing pairwise distinctness. With $9$ digit-valued entries per unit, pairwise distinctness implies the unit contains all digits $1,\dots,9$ exactly once. \qedhere
+\end{proof}
+
+\paragraph{Why $p$-adics help with negative weights.}
+If one tries to do this with an ordinary squared-loss term $-(x_i-x_j)^2$ in $\mathbb{R}$, the optimiser is perversely incentivised to make some differences \emph{large}, not merely nonzero, and the objective can become unstable unless heavily bounded. With $p>9$ and digit-valued variables, $|x_i-x_j|_p\in\{0,1\}$, removing magnitude bias.
+
+\section{A stepwise/coordinate-descent heuristic}
+
+The objective \eqref{eq:objective} induces an NP-hard global optimisation problem (consistent with the author's IPL NP-completeness result for $p$-adic regression). The goal here is not a polynomial-time solver, but a proof-of-concept heuristic.
+
+In implementation we take the ``$\alpha\to\infty$'' limit by restricting search to digit-valued assignments consistent with clues. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss (column/box conflicts). This is a form of coordinate descent on an integer lattice.
+
+\begin{algorithm}[t]
+\caption{Row-swap stepwise regression (heuristic)}
+\begin{algorithmic}[1]
+\Require Puzzle with clues $\mathcal{C}$, max steps $T$, restarts $R$
+\For{$r=1$ to $R$}
+    \State Initialise each row as a permutation of $1,\dots,9$ consistent with its clues
+    \For{$t=1$ to $T$}
+        \If{no column/box conflicts} \State \Return solution \EndIf
+        \State Choose a row involved in a conflict
+        \State Find the best swap of two non-clue cells in that row (largest loss decrease)
+        \State Apply the swap (or a random swap if no improving swap exists)
+    \EndFor
+\EndFor
+\State \Return best assignment found
+\end{algorithmic}
+\end{algorithm}
+
+This ``stepwise regression'' view matches the informal idea: at each step, choose the coefficient change that gives the largest incremental loss improvement.
+
+\section{Experiments}
+
+We implemented the above heuristic in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters.
+
+\subsection{Experimental setup}
+To obtain a quick, reproducible testbed, we generated random puzzles by:
+\begin{enumerate}
+    \item sampling a random solved grid; then
+    \item \emph{carving} it down to a specified clue count by removing entries uniformly at random.
+\end{enumerate}
+This procedure does \emph{not} enforce uniqueness of the resulting puzzle (it is a fast stress test rather than a curated Sudoku benchmark). Each carved puzzle was then solved with up to $T=60{,}000$ steps and $R=15$ random restarts.
+
+\subsection{Results}
+Table~\ref{tab:results} summarises 18 runs (six puzzles at each clue count). The solver succeeded on all instances in this small sample; runtimes are noisy because the puzzles are randomly carved, not difficulty-normalised.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+Clues & Puzzles & Solved & Median steps & Median time (s) \\
+\midrule
+36 & 6 & 6 & 670  & 0.222 \\
+30 & 6 & 6 & 1334 & 0.469 \\
+26 & 6 & 6 & 1502 & 0.628 \\
+\bottomrule
+\end{tabular}
+\caption{Heuristic performance on randomly carved puzzles (not uniqueness-checked).}
+\label{tab:results}
+\end{table}
+
+Figure~\ref{fig:loss} shows a representative loss trajectory, where the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to additive and multiplicative constants in the digit-restricted regime).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.75\linewidth]{loss_curve.pdf}
+\caption{Loss/conflict trajectory for a representative instance (saved from the solver trace).}
+\label{fig:loss}
+\end{figure}
+
+\section{Discussion and extensions}
+The model is intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly.
+
+Several extensions are immediate:
+\begin{itemize}
+    \item \textbf{Uniqueness-checked benchmarks.} Replace fast carving with uniqueness-preserving puzzle generation (or standard public datasets).
+    \item \textbf{Beyond the $\alpha\to\infty$ limit.} Allow coefficients to range over $\mathbb{Z}_p$ more generally and solve \eqref{eq:objective} as a true $p$-adic regression problem, rather than restricting to digit-valued assignments.
+    \item \textbf{Alternative constraint encodings.} One can replace the inequality reward with (i) powers-of-two encodings and sum constraints, or (ii) difference regularisation over the finite set $\{\pm 1,\dots,\pm 8\}$, at the cost of a more complicated objective landscape.
+\end{itemize}
+
+\section*{References (placeholders)}
+\begin{thebibliography}{9}
+
+\bibitem{author-hyperplane}
+Author.
+\newblock \emph{Hyperplanes of best fit pass through $n+1$ points}.
+\newblock Journal of Applications, (details to be filled).
+
+\bibitem{author-padic-npcomplete}
+Author.
+\newblock \emph{$p$-adic linear regression is NP-complete}.
+\newblock Information Processing Letters, (details to be filled).
+
+\bibitem{yato-seta}
+T.~Yato and T.~Seta.
+\newblock Complexity and completeness of finding another solution and its application to puzzles.
+\newblock \emph{IEICE Transactions on Fundamentals}, 86-A(5):1052--1060, 2003.
+
+\end{thebibliography}
+
+\end{document}
