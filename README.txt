@@ -16,6 +16,7 @@ Solve a puzzle (81 chars, 0 or . for blanks):
   python3 code/padic_sudoku_regression.py solve \
     --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
     --seed 0 --max-steps 60000 --restarts 15
+    # add --moves 8 to print the first few swap steps
 
 Generate a *unique-solution* puzzle (slower):
 

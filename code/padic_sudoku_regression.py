@@ -341,7 +341,10 @@ class SolveResult:
     restarts: int
     seconds: float
     final_conflicts: int
+    initial_conflicts: int = 0
     trace: Optional[List[int]] = None  # conflicts over time (optional)
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = None
+    # moves entries are (step, row, col1, col2, conf_before, conf_after, kind)
 
 
 def initialise_by_rows(puzzle: Grid, rng: random.Random) -> Tuple[Grid, List[bool]]:
@@ -371,6 +374,7 @@ def solve_stepwise_swap(
     restarts: int = 30,
     record_trace: bool = False,
     trace_every: int = 200,
+    record_moves: int = 0,
 ) -> SolveResult:
     """
     Local search using within-row swaps (keeps each row a permutation of 1..9).
@@ -382,15 +386,27 @@ def solve_stepwise_swap(
     best_conf = 10**9
 
     trace = [] if record_trace else None
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
 
     for restart in range(restarts):
         grid, fixed = initialise_by_rows(puzzle, rng)
         conf = conflicts_cols_boxes(grid)
+        initial_conf = conf
         if record_trace:
             trace.append(conf)
 
         if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
-            return SolveResult(True, grid, 0, restart, time.time() - t0, 0, trace)
+            return SolveResult(
+                solved=True,
+                grid=grid,
+                steps=0,
+                restarts=restart,
+                seconds=time.time() - t0,
+                final_conflicts=0,
+                initial_conflicts=initial_conf,
+                trace=trace,
+                moves=moves,
+            )
 
         # Precompute non-fixed positions per row for swap candidates
         row_free = []
@@ -400,7 +416,17 @@ def solve_stepwise_swap(
 
         for step in range(1, max_steps + 1):
             if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
-                return SolveResult(True, grid, step, restart, time.time() - t0, 0, trace)
+                return SolveResult(
+                    solved=True,
+                    grid=grid,
+                    steps=step,
+                    restarts=restart,
+                    seconds=time.time() - t0,
+                    final_conflicts=0,
+                    initial_conflicts=initial_conf,
+                    trace=trace,
+                    moves=moves,
+                )
 
             # pick a row that is "involved" in conflicts (heuristic):
             # sample rows until we find one whose free cells participate in a conflicting col/box
@@ -434,6 +460,8 @@ def solve_stepwise_swap(
             # Evaluate all swaps in that row (36 max). Choose the best delta.
             best_delta = 0
             best_pair = None
+
+            conf_before = conf
 
             # Precompute affected unit indices for each cell quickly
             # (only columns and boxes matter due to row-permutation invariant)
@@ -488,12 +516,20 @@ def solve_stepwise_swap(
             # If no improving swap, do a random swap to escape local minima.
             if best_pair is None:
                 i1, i2 = rng.sample(free, 2)
+                kind = "random"
             else:
                 i1, i2 = best_pair
+                kind = "best"
 
             # apply swap
             grid[i1], grid[i2] = grid[i2], grid[i1]
             conf = conflicts_cols_boxes(grid)
+            if moves is not None and restart == 0 and len(moves) < record_moves:
+                r1, c1 = i_to_rc(i1)
+                r2, c2 = i_to_rc(i2)
+                # i1/i2 should always be in the chosen row, but record both rows defensively.
+                row = chosen_r if (r1 == chosen_r and r2 == chosen_r) else r1
+                moves.append((step, row, c1, c2, conf_before, conf, kind))
 
             if record_trace and step % trace_every == 0:
                 trace.append(conf)
@@ -506,7 +542,17 @@ def solve_stepwise_swap(
 
     # finished restarts
     final_grid = best_grid if best_grid is not None else puzzle[:]
-    return SolveResult(False, final_grid, max_steps, restarts, time.time() - t0, best_conf, trace)
+    return SolveResult(
+        solved=False,
+        grid=final_grid,
+        steps=max_steps,
+        restarts=restarts,
+        seconds=time.time() - t0,
+        final_conflicts=best_conf,
+        initial_conflicts=0,
+        trace=trace,
+        moves=moves,
+    )
 
 
 # -------------------------
@@ -527,6 +573,7 @@ def main() -> None:
     ap_solve.add_argument("--max-steps", type=int, default=200_000)
     ap_solve.add_argument("--restarts", type=int, default=30)
     ap_solve.add_argument("--trace", action="store_true")
+    ap_solve.add_argument("--moves", type=int, default=0, help="Record and print the first N swap moves (restart 0).")
 
     args = ap.parse_args()
 
@@ -546,10 +593,21 @@ def main() -> None:
             restarts=args.restarts,
             record_trace=args.trace,
             trace_every=200,
+            record_moves=args.moves,
         )
         print("Solved:", res.solved)
         print("Steps:", res.steps, "Restarts:", res.restarts, "Seconds:", f"{res.seconds:.3f}")
         print("Final conflicts (cols+boxes):", res.final_conflicts)
+        if args.moves and res.moves is not None:
+            print("Initial conflicts (cols+boxes):", res.initial_conflicts)
+            print()
+            print(f"First {min(args.moves, len(res.moves))} swap moves (restart 0):")
+            for (step, r, c1, c2, before, after, kind) in res.moves[: args.moves]:
+                # Display using 1-based indices.
+                rr = r + 1
+                cc1 = c1 + 1
+                cc2 = c2 + 1
+                print(f"  step {step:>5}: row {rr}, swap c{cc1}<->c{cc2} ({kind}), {before} -> {after}")
         print()
         print(pretty(res.grid))
         return

@@ -5,9 +5,9 @@
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{hyperref}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{hyperref}
 
 \title{Solving Sudoku the Hard Way Using Integer-Valued $p$-adic Linear Regression\\with Positive and Negative Regularisation}
 \author{(Author details omitted for review)}
@@ -151,6 +151,35 @@ In implementation we take the ``$\alpha\to\infty$'' limit by restricting search 
 
 This ``stepwise regression'' view matches the informal idea: at each step, choose the coefficient change that gives the largest incremental loss improvement.
 
+\subsection{A short trace on a standard puzzle}
+To make the row-swap heuristic more concrete, consider the standard example puzzle
+\[
+530070000600195000098000060800060003400803001700020006060000280000419005000080079,
+\]
+where $0$ denotes a blank. With seed $0$ (restart $0$), the initial row-consistent filling has $56$ column+box conflict pairs. Table~\ref{tab:trace} shows the first few swaps; note that the algorithm occasionally applies a random swap when no improving swap is available, to escape local minima.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{@{}rlllrr@{}}
+\toprule
+Step & Row & Swap (columns) & Type & Conflicts (before) & (after) \\
+\midrule
+1 & 5 & $7\leftrightarrow 8$ & best   & 56 & 53 \\
+2 & 6 & $3\leftrightarrow 6$ & best   & 53 & 49 \\
+3 & 2 & $2\leftrightarrow 3$ & best   & 49 & 45 \\
+4 & 4 & $7\leftrightarrow 6$ & random & 45 & 47 \\
+5 & 7 & $1\leftrightarrow 5$ & best   & 47 & 40 \\
+6 & 4 & $6\leftrightarrow 7$ & best   & 40 & 38 \\
+7 & 2 & $2\leftrightarrow 9$ & best   & 38 & 36 \\
+8 & 1 & $3\leftrightarrow 4$ & best   & 36 & 35 \\
+\bottomrule
+\end{tabular}
+\caption{First eight swap steps for the example puzzle (seed 0). Rows/columns are 1-indexed.}
+\label{tab:trace}
+\end{table}
+
+For this instance the solver reaches a full solution after $228$ swaps on the same restart.
+
 \section{Experiments}
 
 We implemented the above heuristic in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters.
@@ -193,11 +222,34 @@ Figure~\ref{fig:loss} shows a representative loss trajectory, where the loss is 
 \section{Discussion and extensions}
 The model is intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly.
 
+\subsection{An alternative sparse encoding: powers-of-two sum constraints (archived)}
+The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: every unit contributes $\binom{9}{2}=36$ pairs, for a total of $27\cdot 36=972$ pairwise terms (with heavy overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation.
+
+Map digits $d\in\{1,\dots,9\}$ to powers of two,
+\[
+d \longmapsto 2^{d-1} \in A := \{1,2,4,\dots,256\}.
+\]
+If every cell variable is restricted to $A$, then the condition ``a unit contains each digit exactly once'' is equivalent to a \emph{single} sum constraint:
+\[
+\sum_{(r,c)\in g} \beta_{r,c} = 1+2+\cdots+256 = 2^9-1 = 511,
+\]
+for each row/column/box $g$. This collapses the Sudoku constraints to $27$ residuals of the form
+\[
+r_g(\beta) := 511 - \sum_{(r,c)\in g}\beta_{r,c}.
+\]
+For a prime $p$, one can then study the extremely parameter-sparse $p$-adic objective
+\[
+L_p(\beta) := \sum_g |r_g(\beta)|_p,
+\]
+optionally together with a (soft or hard) regulariser that encourages $\beta_{r,c}\in A$ and enforces the clues.
+
+This encoding also suggests a ``Hensel-ish'' lifting perspective: a constraint is satisfied at lift level $k$ when $r_g(\beta)\equiv 0\pmod{p^k}$ (equivalently $v_p(r_g(\beta))\ge k$), and a heuristic tries to increase the minimum valuation across groups. Once $p^k > 9\cdot 256 = 2304$, having all residuals divisible by $p^k$ forces every residual to be zero, yielding an actual integer solution. In archived experiments with simple local-search moves (greedy single-cell changes and simulated annealing), this objective exhibited abundant local minima and did not reliably solve standard benchmark puzzles; however, the representation remains conceptually attractive because it uses so few structural constraints.
+
 Several extensions are immediate:
 \begin{itemize}
     \item \textbf{Uniqueness-checked benchmarks.} Replace fast carving with uniqueness-preserving puzzle generation (or standard public datasets).
     \item \textbf{Beyond the $\alpha\to\infty$ limit.} Allow coefficients to range over $\mathbb{Z}_p$ more generally and solve \eqref{eq:objective} as a true $p$-adic regression problem, rather than restricting to digit-valued assignments.
-    \item \textbf{Alternative constraint encodings.} One can replace the inequality reward with (i) powers-of-two encodings and sum constraints, or (ii) difference regularisation over the finite set $\{\pm 1,\dots,\pm 8\}$, at the cost of a more complicated objective landscape.
+    \item \textbf{Alternative constraint encodings.} Beyond the powers-of-two sum encoding above, one can replace the inequality reward with difference regularisation over the finite set $\{\pm 1,\dots,\pm 8\}$, at the cost of a more complicated objective landscape.
 \end{itemize}
 
 \section*{References (placeholders)}
