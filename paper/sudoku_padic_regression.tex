@@ -112,7 +112,9 @@ L(x) &=
 \beta\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective}
 \end{align}
-The first two sums are \emph{positive} regularisation that encourage $x_i\in D$ and enforce the clues. The final sum is \emph{negative} regularisation that rewards inequality: for digit-valued assignments it contributes $-\beta$ for every pair of unequal entries and $0$ for equal entries.
+Equation \eqref{eq:objective} can be read as a regression problem with an explicit set of synthetic observations: $81$ multiwell ``snap to digit'' terms (implemented as $81\cdot 9=729$ residuals $x_i-k$), $|\mathcal{C}|$ clue residuals $x_i-g_i$, and $|\mathcal{P}|=810$ pairwise-difference residuals $x_i-x_j$ (each cell has $20$ peers, counted once). Equivalently, counting pairs per unit gives $27\binom{9}{2}=972$ terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall.
+
+The first two sums are \emph{positive} regularisation that encourage $x_i\in D$ and enforce the clues. The final sum is \emph{negative} regularisation that rewards inequality: for digit-valued assignments it contributes $-\beta$ for every pair of unequal entries and $0$ for equal entries. The $810$ pairwise terms are essentially irreducible if one insists on \emph{pairwise} penalties: omitting a single peer-pair $(i,j)$ removes the only residual that directly distinguishes $x_i=x_j$ from $x_i\neq x_j$ once $x$ is digit-valued, and no linear ``hash'' of the remaining differences can substitute because nonvanishing is not preserved under linear combinations (e.g.\ $a-b\neq 0$ and $b-c\neq 0$ does not prevent $a-c=0$).
 
 \begin{theorem}[Sudoku solutions minimise the objective in the strong-snapping regime (informal)]
 Fix a prime $p>9$. In the regime $\alpha,\alpha_{\mathrm{clue}}\gg \beta>0$, any global minimiser of \eqref{eq:objective} corresponds to a valid Sudoku completion (and vice versa).
@@ -223,7 +225,7 @@ Figure~\ref{fig:loss} shows a representative loss trajectory, where the loss is 
 The model is intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly.
 
 \subsection{An alternative sparse encoding: powers-of-two sum constraints (archived)}
-The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: every unit contributes $\binom{9}{2}=36$ pairs, for a total of $27\cdot 36=972$ pairwise terms (with heavy overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation.
+The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: $|\mathcal{P}|=810$ distinct peer pairs (equivalently $27\binom{9}{2}=972$ pairs if counted per unit, with overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation.
 
 Map digits $d\in\{1,\dots,9\}$ to powers of two,
 \[
