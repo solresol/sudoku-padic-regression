@@ -18,6 +18,13 @@ Solve a puzzle (81 chars, 0 or . for blanks):
     --seed 0 --max-steps 60000 --restarts 15
     # add --moves 8 to print the first few swap steps
 
+Solve using Zubarev-style stochastic walk (softmax over swap moves):
+
+  python3 code/padic_sudoku_regression.py solve \
+    --method zubarev --beta0 0.5 --beta1 6.0 --beta-schedule linear \
+    --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
+    --seed 0 --max-steps 60000 --restarts 15
+
 Generate a *unique-solution* puzzle (slower):
 
   python3 code/padic_sudoku_regression.py generate --clues 30 --seed 42

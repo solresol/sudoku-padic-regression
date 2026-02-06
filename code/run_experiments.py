@@ -19,7 +19,10 @@ from pathlib import Path
 import random
 import statistics
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+except ImportError:  # pragma: no cover
+    plt = None
 
 from padic_sudoku_regression import (
     generate_unique_puzzle,
@@ -27,6 +30,7 @@ from padic_sudoku_regression import (
     grid_to_string,
     parse_puzzle,
     solve_stepwise_swap,
+    solve_zubarev_walk,
     pretty,
 )
 
@@ -47,6 +51,10 @@ def main() -> None:
     ap.add_argument("--clues", type=str, default="36,30,26", help="comma-separated clue counts")
     ap.add_argument("--max-steps", type=int, default=200000)
     ap.add_argument("--restarts", type=int, default=30)
+    ap.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "zubarev"])
+    ap.add_argument("--beta0", type=float, default=0.5, help="Zubarev walk: initial beta (inverse temperature).")
+    ap.add_argument("--beta1", type=float, default=6.0, help="Zubarev walk: final beta (ignored if schedule=constant).")
+    ap.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
     ap.add_argument("--unique", action="store_true", help="enforce uniqueness (slower)")
     args = ap.parse_args()
 
@@ -77,20 +85,34 @@ def main() -> None:
             puzzle_str = grid_to_string(puzzle)
 
             record_trace = (not trace_saved) and (clues == trace_target) and (j == 0)
-            res = solve_stepwise_swap(
-                puzzle,
-                seed=seed ^ 0xA5A5A5A5,
-                max_steps=args.max_steps,
-                restarts=args.restarts,
-                record_trace=record_trace,
-                trace_every=200,
-            )
+            if args.method == "stepwise":
+                res = solve_stepwise_swap(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
+            else:
+                res = solve_zubarev_walk(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    beta0=args.beta0,
+                    beta1=args.beta1,
+                    beta_schedule=args.beta_schedule,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
 
             results_rows.append({
                 "clues": clues,
                 "puzzle_seed": seed,
                 "solve_seed": seed ^ 0xA5A5A5A5,
                 "unique_enforced": int(args.unique),
+                "method": args.method,
                 "puzzle": puzzle_str,
                 "solved": int(res.solved),
                 "steps": res.steps,
@@ -101,17 +123,20 @@ def main() -> None:
 
             if record_trace and res.trace is not None:
                 # Save trace plot
-                fig = plt.figure()
-                plt.plot([200*k for k in range(len(res.trace))], res.trace)
-                plt.xlabel("Iteration (approx.)")
-                plt.ylabel("Column+box conflict pairs")
-                plt.title(f"Loss trajectory (clues={clues}, seed={seed})")
-                fig.tight_layout()
-                png_path = outdir / "loss_curve.png"
-                pdf_path = outdir / "loss_curve.pdf"
-                fig.savefig(png_path, dpi=200)
-                fig.savefig(pdf_path)
-                plt.close(fig)
+                if plt is None:
+                    print("Note: matplotlib not installed; skipping loss_curve plot.")
+                else:
+                    fig = plt.figure()
+                    plt.plot([200*k for k in range(len(res.trace))], res.trace)
+                    plt.xlabel("Iteration (approx.)")
+                    plt.ylabel("Column+box conflict pairs")
+                    plt.title(f"Loss trajectory (clues={clues}, seed={seed})")
+                    fig.tight_layout()
+                    png_path = outdir / "loss_curve.png"
+                    pdf_path = outdir / "loss_curve.pdf"
+                    fig.savefig(png_path, dpi=200)
+                    fig.savefig(pdf_path)
+                    plt.close(fig)
 
                 # also save the puzzle and (if solved) its solution
                 (outdir / "trace_puzzle.txt").write_text(pretty(parse_puzzle(puzzle_str)))

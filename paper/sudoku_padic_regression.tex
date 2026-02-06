@@ -23,7 +23,7 @@
 \begin{abstract}
 This note explores a deliberately perverse modelling choice: encoding a $9\times 9$ Sudoku as a linear regression problem over the $p$-adic integers, with the \emph{coefficients themselves} representing the Sudoku digits. The modelling goal is not computational efficiency, but conceptual compression: avoid one-hot / indicator encodings (e.g.\ $729$ binary variables) and instead use $81$ integer-valued parameters directly.
 We use two kinds of synthetic regression observations: (i) \emph{positive} regularisation terms that ``snap'' each coefficient to the set $\{1,\dots,9\}$; and (ii) \emph{negative} regularisation terms that reward nonzero pairwise differences inside each row, column, and $3\times 3$ box. For primes $p>9$, the $p$-adic norm makes every nonzero digit difference have norm $1$, eliminating magnitude bias and turning ``difference'' into a clean proxy for ``not equal''.
-We then implement a stepwise/coordinate-descent heuristic (row-wise swap moves) and report small-scale experiments showing that the approach can solve randomly carved puzzles with moderate clue counts.
+We then ``train'' the resulting regression instance using two generic optimisers: a stepwise/coordinate-descent heuristic (row-wise swap moves) and a Zubarev-style stochastic walk that samples updates with probability proportional to $\exp(-\beta\,\Delta L)$. Despite the layered absurdity---solving Sudoku by first forcing it into a $p$-adic regression mould and then applying generic regression training rules---both heuristics can solve moderate-clue puzzles in small-scale experiments.
 \end{abstract}
 
 \section{Motivation and prior work}
@@ -182,9 +182,85 @@ Step & Row & Swap (columns) & Type & Conflicts (before) & (after) \\
 
 For this instance the solver reaches a full solution after $228$ swaps on the same restart.
 
+\section{A Zubarev-style stochastic walk}
+The ``stepwise regression'' heuristic above is tailored to the strong-snapping Sudoku setting: evaluate all within-row swaps and greedily choose the best improving move (or a random move when stuck). Once we take seriously the idea that Sudoku is being treated as a regression instance, it is natural---if delightfully over the top---to also try a generic training method from the $p$-adic regression literature.
+
+\subsection{Zubarev's proposal in the regression setting}
+Zubarev notes that in the $p$-adic case, loss functions built from sums of $p$-adic norms are locally constant almost everywhere, so gradient methods are uninformative. He therefore suggests a stochastic alternative: ``we can propose a stochastic optimization algorithm for the function (9) based on a random walk in the parameter space $w$''~\cite{zubarev2025padic}.
+
+Concretely, the proposed training dynamics is a discrete-time random process
+\begin{equation}
+w_{t+1} = w_t + \xi_t(w_t,\beta_t),
+\label{eq:zubarev-walk}
+\end{equation}
+where $\beta_t>0$ is a ``continuity'' (inverse temperature) parameter and $\xi_t$ is sampled from a distribution biased toward loss-decreasing moves. In Zubarev's formulation the conditional law has density (with respect to the $p$-adic Haar measure)
+\begin{equation}
+P(\xi \mid w,\beta)\ \propto\ \exp\!\bigl(-\beta\,(L(w+\xi)-L(w))\bigr).
+\label{eq:zubarev-boltzmann}
+\end{equation}
+Under mild conditions (in particular, that the set of improving moves has nonzero measure), Zubarev shows there is a regime of $\beta$ values for which the expected loss decreases, i.e.\ $L(w_t)$ is a strict supermartingale~\cite{zubarev2025padic}.
+
+\subsection{A discrete Sudoku analogue}
+In our ``$\alpha\to\infty$'' implementation, the state is already digit-valued and clue-consistent. We therefore treat the Zubarev walk as a \emph{finite-move} stochastic optimiser:
+\begin{itemize}
+    \item The parameter vector $w$ is the current Sudoku filling $x\in D^{81}$.
+    \item The loss $L(x)$ is the number of conflicting pairs in columns and boxes (equivalently, \eqref{eq:objective} up to constants in the digit-restricted regime).
+    \item A move $\xi$ is a swap of two non-clue cells within a single row (preserving each row as a permutation of $1,\dots,9$).
+\end{itemize}
+
+For a chosen row $r$ and current state $x$, let $\Xi_r(x)$ be the set of all such swaps, and let $\Delta L(\xi) := L(x\oplus\xi)-L(x)$ be the change in loss after applying swap $\xi$ (where $x\oplus\xi$ denotes ``apply the swap''). Replacing the Haar measure in \eqref{eq:zubarev-boltzmann} with the counting measure on the finite set $\Xi_r(x)$ gives the discrete sampling rule
+\begin{equation}
+\Pr(\xi \mid x,\beta_t) = \frac{\exp\!\bigl(-\beta_t\,\Delta L(\xi)\bigr)}{\sum_{\xi'\in\Xi_r(x)} \exp\!\bigl(-\beta_t\,\Delta L(\xi')\bigr)}.
+\label{eq:zubarev-discrete}
+\end{equation}
+When $\beta_t\to 0$ this is uniform random swapping; when $\beta_t\to\infty$ it concentrates on the best (most loss-decreasing) swap, recovering a soft version of the greedy stepwise algorithm. In practice we use a simple annealing schedule: $\beta_t$ increases linearly from $\beta_0$ to $\beta_1$ over the allotted steps, gradually shifting from exploration to exploitation.
+
+\begin{algorithm}[t]
+\caption{Zubarev walk over row swaps (heuristic)}
+\begin{algorithmic}[1]
+\Require Puzzle with clues $\mathcal{C}$, max steps $T$, restarts $R$, schedule $\{\beta_t\}_{t=1}^T$
+\For{$r=1$ to $R$}
+    \State Initialise each row as a permutation of $1,\dots,9$ consistent with its clues
+    \For{$t=1$ to $T$}
+        \If{no column/box conflicts} \State \Return solution \EndIf
+        \State Choose a row involved in a conflict
+        \State Enumerate row swaps $\Xi_r(x)$ and compute $\Delta L(\xi)$ for each $\xi\in\Xi_r(x)$
+        \State Sample $\xi\in\Xi_r(x)$ with probability $\propto \exp(-\beta_t\,\Delta L(\xi))$
+        \State Apply swap $\xi$
+    \EndFor
+\EndFor
+\State \Return best assignment found
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{A short trace on the standard puzzle}
+Using the same example puzzle as above, the Zubarev walk (seed $0$, restart $0$, $\beta_0=0.5$, $\beta_1=6.0$ linear schedule) starts from the same row-consistent initialisation with $56$ column+box conflict pairs. Unlike the greedy stepwise method, the walk sometimes accepts loss-increasing or loss-neutral swaps early on; Table~\ref{tab:trace-zubarev} shows the first few moves.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{@{}rllrr@{}}
+\toprule
+Step & Row & Swap (columns) & Conflicts (before) & (after) \\
+\midrule
+1 & 5 & $2\leftrightarrow 8$ & 56 & 56 \\
+2 & 6 & $7\leftrightarrow 8$ & 56 & 56 \\
+3 & 2 & $3\leftrightarrow 7$ & 56 & 55 \\
+4 & 8 & $2\leftrightarrow 8$ & 55 & 51 \\
+5 & 4 & $2\leftrightarrow 3$ & 51 & 50 \\
+6 & 4 & $6\leftrightarrow 7$ & 50 & 51 \\
+7 & 2 & $7\leftrightarrow 8$ & 51 & 52 \\
+8 & 8 & $3\leftrightarrow 7$ & 52 & 49 \\
+\bottomrule
+\end{tabular}
+\caption{First eight Zubarev-walk swap steps for the example puzzle (seed 0). Rows/columns are 1-indexed.}
+\label{tab:trace-zubarev}
+\end{table}
+
+For this instance the Zubarev walk reaches a full solution after $10{,}030$ swaps on the same restart. It is far less efficient than the greedy solver on this particular instance---which is exactly the point: once Sudoku has been reduced to a regression loss landscape, even an unreasonably generic training rule can ``learn'' a satisfying assignment.
+
 \section{Experiments}
 
-We implemented the above heuristic in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters.
+We implemented both heuristics above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters.
 
 \subsection{Experimental setup}
 To obtain a quick, reproducible testbed, we generated random puzzles by:
@@ -193,22 +269,26 @@ To obtain a quick, reproducible testbed, we generated random puzzles by:
     \item \emph{carving} it down to a specified clue count by removing entries uniformly at random.
 \end{enumerate}
 This procedure does \emph{not} enforce uniqueness of the resulting puzzle (it is a fast stress test rather than a curated Sudoku benchmark). Each carved puzzle was then solved with up to $T=60{,}000$ steps and $R=15$ random restarts.
+All results reported below use a fixed RNG seed ($123$) for reproducibility.
 
 \subsection{Results}
-Table~\ref{tab:results} summarises 18 runs (six puzzles at each clue count). The solver succeeded on all instances in this small sample; runtimes are noisy because the puzzles are randomly carved, not difficulty-normalised.
+Table~\ref{tab:results} summarises 36 runs (six puzzles at each clue count, for each heuristic). Both solvers succeeded on all instances in this small sample; runtimes are noisy because the puzzles are randomly carved, not difficulty-normalised.
 
 \begin{table}[t]
 \centering
-\begin{tabular}{@{}rrrrr@{}}
+\begin{tabular}{@{}lrrrrr@{}}
 \toprule
-Clues & Puzzles & Solved & Median steps & Median time (s) \\
+Method & Clues & Puzzles & Solved & Median steps & Median time (s) \\
 \midrule
-36 & 6 & 6 & 670  & 0.222 \\
-30 & 6 & 6 & 1334 & 0.469 \\
-26 & 6 & 6 & 1502 & 0.628 \\
+Stepwise & 36 & 6 & 6 & 538  & 0.107 \\
+Stepwise & 30 & 6 & 6 & 2785 & 0.734 \\
+Stepwise & 26 & 6 & 6 & 7041 & 2.027 \\
+Zubarev walk & 36 & 6 & 6 & 4534 & 0.800 \\
+Zubarev walk & 30 & 6 & 6 & 8752 & 1.987 \\
+Zubarev walk & 26 & 6 & 6 & 9912 & 2.929 \\
 \bottomrule
 \end{tabular}
-\caption{Heuristic performance on randomly carved puzzles (not uniqueness-checked).}
+\caption{Heuristic performance on randomly carved puzzles (not uniqueness-checked), using $T=60{,}000$ steps and $R=15$ restarts. The Zubarev walk uses a linear schedule $\beta_0=0.5$ to $\beta_1=6.0$.}
 \label{tab:results}
 \end{table}
 
@@ -223,6 +303,9 @@ Figure~\ref{fig:loss} shows a representative loss trajectory, where the loss is 
 
 \section{Discussion and extensions}
 The model is intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly.
+
+\paragraph{Training Sudoku as a regression model.}
+The most absurd aspect of the construction is arguably not the loss itself, but the fact that once we write down \eqref{eq:objective}, we can treat Sudoku completion as a \emph{training problem} and import generic training dynamics from the $p$-adic regression setting. The Zubarev walk is a particularly clean example: a loss-biased random walk that is not designed for Sudoku in any way, yet still finds valid completions when run over the row-swap move set.
 
 \subsection{An alternative sparse encoding: powers-of-two sum constraints (archived)}
 The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: $|\mathcal{P}|=810$ distinct peer pairs (equivalently $27\binom{9}{2}=972$ pairs if counted per unit, with overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation.
@@ -271,6 +354,11 @@ Author.
 T.~Yato and T.~Seta.
 \newblock Complexity and completeness of finding another solution and its application to puzzles.
 \newblock \emph{IEICE Transactions on Fundamentals}, 86-A(5):1052--1060, 2003.
+
+\bibitem{zubarev2025padic}
+A.~P. Zubarev.
+\newblock \emph{$p$-Adic Polynomial Regression as Alternative to Neural Network for Approximating $p$-Adic Functions of Many Variables}.
+\newblock arXiv:2503.23488v2, 2025.
 
 \end{thebibliography}
 

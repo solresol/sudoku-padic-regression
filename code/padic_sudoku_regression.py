@@ -330,7 +330,7 @@ def conflicts_cols_boxes(grid: Grid) -> int:
 
 
 # -------------------------
-# Stepwise / local search solver
+# Stepwise / local search solvers
 # -------------------------
 
 @dataclass
@@ -555,6 +555,233 @@ def solve_stepwise_swap(
     )
 
 
+def _delta_conflicts_swap_cols_boxes(grid: Grid, i1: int, i2: int) -> int:
+    """
+    Compute Δ = conflicts_after - conflicts_before for a swap of cells i1 and i2,
+    counting conflicts in columns+boxes only.
+
+    Assumes only positions i1 and i2 change value.
+    """
+    if i1 == i2:
+        return 0
+    v1 = grid[i1]
+    v2 = grid[i2]
+    if v1 == v2:
+        return 0
+
+    r1, c1 = i_to_rc(i1)
+    r2, c2 = i_to_rc(i2)
+    b1 = box_index(r1, c1)
+    b2 = box_index(r2, c2)
+
+    affected_units = [("C", c1), ("C", c2), ("B", b1), ("B", b2)]
+    seen = set()
+    deduped = []
+    for typ, idxu in affected_units:
+        key = (typ, idxu)
+        if key not in seen:
+            seen.add(key)
+            deduped.append((typ, idxu))
+
+    old = 0
+    for typ, idxu in deduped:
+        unit = (COLS[idxu] if typ == "C" else BOXS[idxu])
+        old += unit_conflict_pairs([grid[j] for j in unit])
+
+    grid[i1], grid[i2] = v2, v1
+    new = 0
+    for typ, idxu in deduped:
+        unit = (COLS[idxu] if typ == "C" else BOXS[idxu])
+        new += unit_conflict_pairs([grid[j] for j in unit])
+    grid[i1], grid[i2] = v1, v2
+
+    return new - old
+
+
+def _sample_from_log_weights(log_weights: List[float], rng: random.Random) -> int:
+    """Sample an index proportional to exp(log_weight)."""
+    if not log_weights:
+        raise ValueError("log_weights must be non-empty")
+    m = max(log_weights)
+    ws = [math.exp(lw - m) for lw in log_weights]
+    tot = sum(ws)
+    if tot <= 0.0 or not math.isfinite(tot):
+        # Extremely degenerate numeric case; fall back to argmax.
+        return max(range(len(log_weights)), key=lambda i: log_weights[i])
+    r = rng.random() * tot
+    acc = 0.0
+    for i, w in enumerate(ws):
+        acc += w
+        if r <= acc:
+            return i
+    return len(ws) - 1
+
+
+def _beta_schedule(step: int, max_steps: int, beta0: float, beta1: float, schedule: str) -> float:
+    if schedule == "constant":
+        return beta0
+    if max_steps <= 1:
+        return beta1
+    t = (step - 1) / (max_steps - 1)
+    if schedule == "linear":
+        return beta0 * (1.0 - t) + beta1 * t
+    if schedule == "exp":
+        if beta0 <= 0 or beta1 <= 0:
+            raise ValueError("beta0 and beta1 must be > 0 for exp schedule.")
+        return beta0 * ((beta1 / beta0) ** t)
+    raise ValueError(f"Unknown beta schedule: {schedule}")
+
+
+def solve_zubarev_walk(
+    puzzle: Grid,
+    seed: int = 0,
+    max_steps: int = 200_000,
+    restarts: int = 30,
+    beta0: float = 0.5,
+    beta1: float = 6.0,
+    beta_schedule: str = "linear",
+    record_trace: bool = False,
+    trace_every: int = 200,
+    record_moves: int = 0,
+) -> SolveResult:
+    """
+    Stochastic optimizer inspired by Zubarev's random process (Eq. 16-17 in the paper):
+
+      w_{i+1} = w_i + ξ_i,   P(ξ | w,β) ∝ exp(-β (L(w+ξ) - L(w)))
+
+    Here we use a discrete analogue:
+    - state is a Sudoku grid with each row a permutation (initialised by rows)
+    - loss L is the number of conflicting pairs in columns+boxes
+    - move ξ is a within-row swap of two non-clue cells
+    - for a chosen row, we sample a swap with probability ∝ exp(-β ΔL)
+    """
+    if beta0 < 0 or beta1 < 0:
+        raise ValueError("beta0 and beta1 must be >= 0.")
+    if trace_every <= 0:
+        raise ValueError("trace_every must be > 0")
+
+    rng = random.Random(seed)
+    t0 = time.time()
+
+    best_grid: Optional[Grid] = None
+    best_conf = 10**9
+    trace = [] if record_trace else None
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
+
+    for restart in range(restarts):
+        grid, fixed = initialise_by_rows(puzzle, rng)
+        conf = conflicts_cols_boxes(grid)
+        initial_conf = conf
+        if record_trace:
+            trace.append(conf)
+
+        if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+            return SolveResult(
+                solved=True,
+                grid=grid,
+                steps=0,
+                restarts=restart,
+                seconds=time.time() - t0,
+                final_conflicts=0,
+                initial_conflicts=initial_conf,
+                trace=trace,
+                moves=moves,
+            )
+
+        row_free = []
+        for r in range(9):
+            free = [i for i in ROWS[r] if not fixed[i]]
+            row_free.append(free)
+
+        for step in range(1, max_steps + 1):
+            if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                return SolveResult(
+                    solved=True,
+                    grid=grid,
+                    steps=step,
+                    restarts=restart,
+                    seconds=time.time() - t0,
+                    final_conflicts=0,
+                    initial_conflicts=initial_conf,
+                    trace=trace,
+                    moves=moves,
+                )
+
+            beta = _beta_schedule(step, max_steps, beta0, beta1, beta_schedule)
+
+            # pick a row "involved" in conflicts, falling back to a random row.
+            candidate_rows = list(range(9))
+            rng.shuffle(candidate_rows)
+            chosen_r = None
+            for r in candidate_rows:
+                free = row_free[r]
+                if len(free) < 2:
+                    continue
+                for i in free:
+                    rr, cc = i_to_rc(i)
+                    b = box_index(rr, cc)
+                    v = grid[i]
+                    col_vals = [grid[j] for j in COLS[cc]]
+                    box_vals = [grid[j] for j in BOXS[b]]
+                    if col_vals.count(v) > 1 or box_vals.count(v) > 1:
+                        chosen_r = r
+                        break
+                if chosen_r is not None:
+                    break
+            if chosen_r is None:
+                chosen_r = rng.randrange(9)
+
+            free = row_free[chosen_r]
+            if len(free) < 2:
+                continue
+
+            # enumerate swaps in the chosen row; sample by exp(-beta * delta)
+            candidates: List[Tuple[int, int, int]] = []
+            log_ws: List[float] = []
+            for a_idx in range(len(free) - 1):
+                i1 = free[a_idx]
+                for b_idx in range(a_idx + 1, len(free)):
+                    i2 = free[b_idx]
+                    delta = _delta_conflicts_swap_cols_boxes(grid, i1, i2)
+                    candidates.append((i1, i2, delta))
+                    log_ws.append(-beta * delta)
+
+            idx = _sample_from_log_weights(log_ws, rng)
+            i1, i2, delta = candidates[idx]
+
+            conf_before = conf
+            grid[i1], grid[i2] = grid[i2], grid[i1]
+            conf = conf + delta
+
+            if moves is not None and restart == 0 and len(moves) < record_moves:
+                r1, c1 = i_to_rc(i1)
+                r2, c2 = i_to_rc(i2)
+                row = chosen_r if (r1 == chosen_r and r2 == chosen_r) else r1
+                moves.append((step, row, c1, c2, conf_before, conf, "zubarev"))
+
+            if record_trace and step % trace_every == 0:
+                trace.append(conf)
+
+            if conf < best_conf:
+                best_conf = conf
+                best_grid = grid[:]
+
+        # end steps
+
+    final_grid = best_grid if best_grid is not None else puzzle[:]
+    return SolveResult(
+        solved=False,
+        grid=final_grid,
+        steps=max_steps,
+        restarts=restarts,
+        seconds=time.time() - t0,
+        final_conflicts=best_conf,
+        initial_conflicts=0,
+        trace=trace,
+        moves=moves,
+    )
+
+
 # -------------------------
 # CLI
 # -------------------------
@@ -569,9 +796,13 @@ def main() -> None:
 
     ap_solve = sub.add_parser("solve", help="Solve a puzzle given as an 81-char string with 0 or . for blanks.")
     ap_solve.add_argument("--puzzle", type=str, required=True)
+    ap_solve.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "zubarev"])
     ap_solve.add_argument("--seed", type=int, default=0)
     ap_solve.add_argument("--max-steps", type=int, default=200_000)
     ap_solve.add_argument("--restarts", type=int, default=30)
+    ap_solve.add_argument("--beta0", type=float, default=0.5, help="Zubarev walk: initial beta (inverse temperature).")
+    ap_solve.add_argument("--beta1", type=float, default=6.0, help="Zubarev walk: final beta (ignored if schedule=constant).")
+    ap_solve.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
     ap_solve.add_argument("--trace", action="store_true")
     ap_solve.add_argument("--moves", type=int, default=0, help="Record and print the first N swap moves (restart 0).")
 
@@ -586,15 +817,29 @@ def main() -> None:
 
     if args.cmd == "solve":
         puzzle = parse_puzzle(args.puzzle)
-        res = solve_stepwise_swap(
-            puzzle,
-            seed=args.seed,
-            max_steps=args.max_steps,
-            restarts=args.restarts,
-            record_trace=args.trace,
-            trace_every=200,
-            record_moves=args.moves,
-        )
+        if args.method == "stepwise":
+            res = solve_stepwise_swap(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
+        else:
+            res = solve_zubarev_walk(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                beta0=args.beta0,
+                beta1=args.beta1,
+                beta_schedule=args.beta_schedule,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
         print("Solved:", res.solved)
         print("Steps:", res.steps, "Restarts:", res.restarts, "Seconds:", f"{res.seconds:.3f}")
         print("Final conflicts (cols+boxes):", res.final_conflicts)
