@@ -555,6 +555,141 @@ def solve_stepwise_swap(
     )
 
 
+def solve_greedy_descent_swap(
+    puzzle: Grid,
+    seed: int = 0,
+    max_steps: int = 200_000,
+    restarts: int = 30,
+    record_trace: bool = False,
+    trace_every: int = 200,
+    record_moves: int = 0,
+) -> SolveResult:
+    """
+    Pure greedy / steepest-descent walk on the full within-row swap graph.
+
+    At each step we enumerate *all* within-row swaps of non-clue cells (across all rows)
+    and apply the one with the most negative Δ(conflicts). We stop when there is no
+    improving swap (a local minimum).
+
+    This is the closest analogue to "start anywhere, repeatedly take the best improving edge".
+    """
+    if trace_every <= 0:
+        raise ValueError("trace_every must be > 0")
+
+    rng = random.Random(seed)
+    t0 = time.time()
+
+    best_grid: Optional[Grid] = None
+    best_conf = 10**9
+    best_steps = 0
+
+    trace = [] if record_trace else None
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
+
+    for restart in range(restarts):
+        grid, fixed = initialise_by_rows(puzzle, rng)
+        conf = conflicts_cols_boxes(grid)
+        initial_conf = conf
+        if record_trace:
+            trace.append(conf)
+
+        if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+            return SolveResult(
+                solved=True,
+                grid=grid,
+                steps=0,
+                restarts=restart,
+                seconds=time.time() - t0,
+                final_conflicts=0,
+                initial_conflicts=initial_conf,
+                trace=trace,
+                moves=moves,
+            )
+
+        row_free = []
+        for r in range(9):
+            free = [i for i in ROWS[r] if not fixed[i]]
+            row_free.append(free)
+
+        step = 0
+        while step < max_steps:
+            if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                return SolveResult(
+                    solved=True,
+                    grid=grid,
+                    steps=step,
+                    restarts=restart,
+                    seconds=time.time() - t0,
+                    final_conflicts=0,
+                    initial_conflicts=initial_conf,
+                    trace=trace,
+                    moves=moves,
+                )
+
+            best_delta = 0
+            best_pair: Optional[Tuple[int, int]] = None
+            best_row: int = -1
+            conf_before = conf
+
+            # Evaluate all swaps across all rows (<= 9*36 candidates).
+            for r in range(9):
+                free = row_free[r]
+                if len(free) < 2:
+                    continue
+                for a_idx in range(len(free) - 1):
+                    i1 = free[a_idx]
+                    for b_idx in range(a_idx + 1, len(free)):
+                        i2 = free[b_idx]
+                        delta = _delta_conflicts_swap_cols_boxes(grid, i1, i2)
+                        if delta < best_delta:
+                            best_delta = delta
+                            best_pair = (i1, i2)
+                            best_row = r
+
+            if best_pair is None:
+                # local minimum
+                break
+
+            i1, i2 = best_pair
+            grid[i1], grid[i2] = grid[i2], grid[i1]
+            conf = conf + best_delta
+            step += 1
+
+            if moves is not None and restart == 0 and len(moves) < record_moves:
+                r1, c1 = i_to_rc(i1)
+                r2, c2 = i_to_rc(i2)
+                row = best_row if (r1 == best_row and r2 == best_row) else r1
+                moves.append((step, row, c1, c2, conf_before, conf, "greedy"))
+
+            if record_trace and step % trace_every == 0:
+                trace.append(conf)
+
+            if conf < best_conf:
+                best_conf = conf
+                best_grid = grid[:]
+                best_steps = step
+
+        # end greedy loop for restart
+
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+            best_steps = step
+
+    final_grid = best_grid if best_grid is not None else puzzle[:]
+    return SolveResult(
+        solved=False,
+        grid=final_grid,
+        steps=best_steps,
+        restarts=restarts,
+        seconds=time.time() - t0,
+        final_conflicts=best_conf,
+        initial_conflicts=0,
+        trace=trace,
+        moves=moves,
+    )
+
+
 def _delta_conflicts_swap_cols_boxes(grid: Grid, i1: int, i2: int) -> int:
     """
     Compute Δ = conflicts_after - conflicts_before for a swap of cells i1 and i2,
@@ -796,7 +931,7 @@ def main() -> None:
 
     ap_solve = sub.add_parser("solve", help="Solve a puzzle given as an 81-char string with 0 or . for blanks.")
     ap_solve.add_argument("--puzzle", type=str, required=True)
-    ap_solve.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "zubarev"])
+    ap_solve.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "greedy", "zubarev"])
     ap_solve.add_argument("--seed", type=int, default=0)
     ap_solve.add_argument("--max-steps", type=int, default=200_000)
     ap_solve.add_argument("--restarts", type=int, default=30)
@@ -819,6 +954,16 @@ def main() -> None:
         puzzle = parse_puzzle(args.puzzle)
         if args.method == "stepwise":
             res = solve_stepwise_swap(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
+        elif args.method == "greedy":
+            res = solve_greedy_descent_swap(
                 puzzle,
                 seed=args.seed,
                 max_steps=args.max_steps,

@@ -30,6 +30,7 @@ from padic_sudoku_regression import (
     grid_to_string,
     parse_puzzle,
     solve_stepwise_swap,
+    solve_greedy_descent_swap,
     solve_zubarev_walk,
     pretty,
 )
@@ -51,7 +52,7 @@ def main() -> None:
     ap.add_argument("--clues", type=str, default="36,30,26", help="comma-separated clue counts")
     ap.add_argument("--max-steps", type=int, default=200000)
     ap.add_argument("--restarts", type=int, default=30)
-    ap.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "zubarev"])
+    ap.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "greedy", "zubarev"])
     ap.add_argument("--beta0", type=float, default=0.5, help="Zubarev walk: initial beta (inverse temperature).")
     ap.add_argument("--beta1", type=float, default=6.0, help="Zubarev walk: final beta (ignored if schedule=constant).")
     ap.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
@@ -87,6 +88,15 @@ def main() -> None:
             record_trace = (not trace_saved) and (clues == trace_target) and (j == 0)
             if args.method == "stepwise":
                 res = solve_stepwise_swap(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
+            elif args.method == "greedy":
+                res = solve_greedy_descent_swap(
                     puzzle,
                     seed=seed ^ 0xA5A5A5A5,
                     max_steps=args.max_steps,
