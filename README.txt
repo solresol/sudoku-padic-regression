@@ -5,7 +5,6 @@ This project contains:
 - paper/sudoku_padic_regression.pdf : compiled PDF
 - code/padic_sudoku_regression.py : solver + (slow) unique generator
 - code/run_experiments.py : generates quick experiment CSV and loss plot
-- code/padic_linear_regression.py : synthetic p-adic linear regression + hyperplane-graph greedy walk experiments
 - outputs/experiment_results.csv : results from a small run
 - outputs/loss_curve.pdf/png : example loss trajectory
 
@@ -41,20 +40,10 @@ Reproduce experiments (fast carving, not uniqueness-checked):
 
   python3 code/run_experiments.py --outdir outputs --seed 123 --n 3 --clues 36,30,26
 
-Monte Carlo: synthetic p-adic linear regression (enumerate all (d+1)-point hyperplanes, *deduplicate identical coefficient vectors*, then analyse descent policies on the induced neighbour graph):
-
-  python3 code/padic_linear_regression.py mc \
-    --trials 50 --n 20 --d 3 --p 3 --loss l1 \
-    --coef-model p_power --coef-exp-min 0 --coef-exp-max 4 \
-    --noise-model haar --noise-k0 1 --noise-kmax 6 \
-    --policies steepest,uniform,proportional,softmax --temperature 1.0
-
-Landscape snapshot for a single dataset (basins, barriers, plateaus, local-optima network, support-point counts):
-
-  python3 code/padic_linear_regression.py landscape \
-    --seed 0 --n 20 --d 3 --p 3 --loss l1 \
-    --coef-model p_power --coef-exp-min 0 --coef-exp-max 4 \
-    --noise-model haar --noise-k0 0 --noise-kmax 6
+Related
+-------
+- The neighbour-hyperplane landscape code lives in the sibling repo: ../padic-landscapes
+- Website: sudoku.symmachus.org
 
 Notes
 -----

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sudoku via p-adic Regression</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b1020;
+        --fg: #e8eaf2;
+        --muted: #a9b0c3;
+        --card: #141b33;
+        --link: #8ab4ff;
+        --border: #253057;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff;
+          --fg: #0f172a;
+          --muted: #475569;
+          --card: #f8fafc;
+          --link: #2563eb;
+          --border: #e2e8f0;
+        }
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+      }
+      a {
+        color: var(--link);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 60px;
+      }
+      header h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+        letter-spacing: 0.2px;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 78ch;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 22px;
+      }
+      @media (min-width: 920px) {
+        .grid {
+          grid-template-columns: 1.05fr 0.95fr;
+          align-items: start;
+        }
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 16px;
+      }
+      .card h2 {
+        font-size: 16px;
+        margin: 0 0 10px;
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      .img {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.05);
+      }
+      footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Sudoku via p-adic Regression</h1>
+        <p>
+          A local-search Sudoku solver framed as an integer $p$-adic regression problem (81 variables, no one-hot). The
+          implementation uses within-row swaps and several descent / stochastic-walk dynamics.
+        </p>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Links</h2>
+          <ul>
+            <li><a href="sudoku_padic_regression.pdf">Paper (PDF)</a></li>
+            <li><a href="sudoku_solve_rate.png">Solve-rate plot (PNG)</a></li>
+          </ul>
+          <footer>
+            Solver code: <code>code/padic_sudoku_regression.py</code>. Experiments: <code>code/run_experiments.py</code>.
+          </footer>
+        </section>
+
+        <section class="card">
+          <h2>Solve rate on carved instances</h2>
+          <img class="img" src="sudoku_solve_rate.png" alt="Sudoku solve rate plot" />
+        </section>
+      </div>
+    </div>
+  </body>
+</html>
