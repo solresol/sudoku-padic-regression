@@ -50,15 +50,6 @@ The central proposition below isolates the general mechanism behind the Sudoku c
 
 \section{Preliminaries}
 
-\subsection{Sudoku}
-A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
-\begin{enumerate}
-    \item each row contains all digits $1,\dots,9$ exactly once;
-    \item each column contains all digits $1,\dots,9$ exactly once; and
-    \item each $3\times 3$ box contains all digits $1,\dots,9$ exactly once.
-\end{enumerate}
-Equivalently, in each unit (row, column, box) all entries are \emph{pairwise distinct} and each entry lies in $\{1,\dots,9\}$.
-
 \subsection{$p$-adic integers and norms}
 Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the exponent of $p$ in its factorisation, and the $p$-adic absolute value is
 \[
@@ -158,6 +149,15 @@ Given an all-different constraint system, form its primal graph: the vertices ar
 \end{proof}
 
 \section{Sudoku as a special case}
+\subsection{Sudoku}
+A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
+\begin{enumerate}
+    \item each row contains all digits $1,\dots,9$ exactly once;
+    \item each column contains all digits $1,\dots,9$ exactly once; and
+    \item each $3\times 3$ box contains all digits $1,\dots,9$ exactly once.
+\end{enumerate}
+Equivalently, in each unit (row, column, box) all entries are \emph{pairwise distinct} and each entry lies in $\{1,\dots,9\}$.
+
 Standard Sudoku fits Corollary~\ref{cor:all-different-csp} in the most literal possible way. The vertices are the $81$ cells, two vertices are adjacent when the corresponding cells share a row, column, or $3\times 3$ box, unclued cells have domain $\{1,\dots,9\}$, and clue cells have singleton domains. A proper list-colouring of this graph is exactly a valid Sudoku completion.
 
 The objective used in the experiments below is a deliberately expanded version of this general construction. Instead of keeping one compact unary penalty \(R_i\) per variable, it exposes the individual synthetic residuals that build those penalties. This makes the regression interpretation more transparent and is the form most convenient for counting residuals and describing the heuristics.
@@ -446,12 +446,12 @@ Zubarev walk & 26 & 6 & 6 & 9912 & 2.929 \\
 \label{tab:results}
 \end{table}
 
-Figure~\ref{fig:loss} shows a representative loss trajectory, where the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to additive and multiplicative constants in the digit-restricted regime).
+Figure~\ref{fig:loss} shows the loss trajectory for the stepwise row-swap heuristic on the specific fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), using the row-wise random initialiser described above, $T=60{,}000$, and $R=15$. The plotted run is restart $0$, and the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to additive and multiplicative constants in the digit-restricted regime).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.75\linewidth]{loss_curve.pdf}
-\caption{Loss/conflict trajectory for a representative instance (saved from the solver trace).}
+\caption{Loss/conflict trajectory for the stepwise row-swap heuristic on the fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), from the row-wise random initialisation on restart $0$.}
 \label{fig:loss}
 \end{figure}
 
