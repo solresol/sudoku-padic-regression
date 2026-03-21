@@ -32,6 +32,27 @@ Solve using *pure greedy* steepest descent (stops at local minima; useful for ba
     --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
     --seed 0 --max-steps 60000 --restarts 15
 
+Solve using greedy single-cell edits with the best improving local change each step:
+
+  python3 code/padic_sudoku_regression.py solve \
+    --method local-best \
+    --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
+    --seed 0 --max-steps 60000 --restarts 15
+
+Solve using greedy single-cell edits with the first improving local change each step:
+
+  python3 code/padic_sudoku_regression.py solve \
+    --method local-first \
+    --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
+    --seed 0 --max-steps 60000 --restarts 15
+
+Solve using noisy single-cell edits with uphill moves allowed via a Zubarev-style softmax:
+
+  python3 code/padic_sudoku_regression.py solve \
+    --method local-zubarev --beta0 0.5 --beta1 6.0 --beta-schedule linear \
+    --puzzle 530070000600195000098000060800060003400803001700020006060000280000419005000080079 \
+    --seed 0 --max-steps 60000 --restarts 15
+
 Generate a *unique-solution* puzzle (slower):
 
   python3 code/padic_sudoku_regression.py generate --clues 30 --seed 42
@@ -49,4 +70,6 @@ Notes
 -----
 - The solver uses only 81 integer variables (one per cell). It is intentionally not a 729-variable one-hot CSP.
 - The paper frames the objective as p-adic regression with positive digit-snapping regularisation and negative inequality regularisation.
-- In the implementation we take the "strong snapping" limit, restricting the search to digit assignments and using row-wise swap moves.
+- In the implementation we take the "strong snapping" limit, restricting the search to digit assignments.
+- Swap-based methods preserve row permutations and therefore optimise column+box conflicts.
+- The `local-best`, `local-first`, and `local-zubarev` methods allow arbitrary non-clue digit edits, so they optimise row+column+box conflicts.

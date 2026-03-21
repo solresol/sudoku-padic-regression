@@ -19,8 +19,11 @@ That makes the p-adic norm of a difference behave like an indicator of inequalit
 
 The solver is a heuristic "stepwise regression" / coordinate descent:
 - initialise each row as a permutation of 1..9 consistent with clues (strong row snapping),
-- repeatedly swap two non-clue entries within a row to reduce the regression loss
-  (equivalently, reduce column+box conflict pairs).
+- then optimise either by within-row swaps or by direct single-cell digit changes.
+
+For swap-based methods the row permutation invariant is preserved, so the loss reduces to the
+number of conflicting pairs in columns and boxes. For direct cell-edit methods rows must also
+be penalised, so we count conflicts in all three unit types.
 
 This file also contains a generator for random *unique-solution* puzzles (moderate clue counts),
 using a simple backtracking uniqueness checker.
@@ -329,6 +332,34 @@ def conflicts_cols_boxes(grid: Grid) -> int:
     return total
 
 
+def conflicts_all_units(grid: Grid) -> int:
+    """Conflict pairs counted across rows, columns, and boxes."""
+    total = 0
+    for unit in ROWS + COLS + BOXS:
+        total += unit_conflict_pairs([grid[i] for i in unit])
+    return total
+
+
+def _unit_cells_for_ref(unit_type: str, idx: int) -> List[int]:
+    if unit_type == "R":
+        return ROWS[idx]
+    if unit_type == "C":
+        return COLS[idx]
+    if unit_type == "B":
+        return BOXS[idx]
+    raise ValueError(f"Unknown unit type: {unit_type}")
+
+
+def _dedupe_unit_refs(unit_refs: Iterable[Tuple[str, int]]) -> List[Tuple[str, int]]:
+    seen = set()
+    deduped = []
+    for ref in unit_refs:
+        if ref not in seen:
+            seen.add(ref)
+            deduped.append(ref)
+    return deduped
+
+
 # -------------------------
 # Stepwise / local search solvers
 # -------------------------
@@ -342,9 +373,33 @@ class SolveResult:
     seconds: float
     final_conflicts: int
     initial_conflicts: int = 0
+    objective_label: str = "cols+boxes"
     trace: Optional[List[int]] = None  # conflicts over time (optional)
+    trace_steps: Optional[List[int]] = None  # exact step indices for recorded trace samples
     moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = None
-    # moves entries are (step, row, col1, col2, conf_before, conf_after, kind)
+    # swap moves use (step, row, col1, col2, conf_before, conf_after, kind)
+    # local-edit moves use (step, row, col, new_digit, conf_before, conf_after, kind)
+
+
+def _init_trace(record_trace: bool) -> Tuple[Optional[List[int]], Optional[List[int]]]:
+    if not record_trace:
+        return None, None
+    return [], []
+
+
+def _append_trace_point(
+    trace: Optional[List[int]],
+    trace_steps: Optional[List[int]],
+    step: int,
+    conflicts: int,
+) -> None:
+    if trace is None or trace_steps is None:
+        return
+    if trace_steps and trace_steps[-1] == step:
+        trace[-1] = conflicts
+        return
+    trace_steps.append(step)
+    trace.append(conflicts)
 
 
 def initialise_by_rows(puzzle: Grid, rng: random.Random) -> Tuple[Grid, List[bool]]:
@@ -384,16 +439,21 @@ def solve_stepwise_swap(
     t0 = time.time()
     best_grid = None
     best_conf = 10**9
+    first_initial_conf = 0
 
-    trace = [] if record_trace else None
+    trace, trace_steps = _init_trace(record_trace)
     moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
 
     for restart in range(restarts):
         grid, fixed = initialise_by_rows(puzzle, rng)
         conf = conflicts_cols_boxes(grid)
         initial_conf = conf
-        if record_trace:
-            trace.append(conf)
+        if restart == 0:
+            first_initial_conf = initial_conf
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+        _append_trace_point(trace, trace_steps, 0, conf)
 
         if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
             return SolveResult(
@@ -404,7 +464,9 @@ def solve_stepwise_swap(
                 seconds=time.time() - t0,
                 final_conflicts=0,
                 initial_conflicts=initial_conf,
+                objective_label="cols+boxes",
                 trace=trace,
+                trace_steps=trace_steps,
                 moves=moves,
             )
 
@@ -416,15 +478,18 @@ def solve_stepwise_swap(
 
         for step in range(1, max_steps + 1):
             if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                _append_trace_point(trace, trace_steps, step - 1, conf)
                 return SolveResult(
                     solved=True,
                     grid=grid,
-                    steps=step,
+                    steps=step - 1,
                     restarts=restart,
                     seconds=time.time() - t0,
                     final_conflicts=0,
                     initial_conflicts=initial_conf,
+                    objective_label="cols+boxes",
                     trace=trace,
+                    trace_steps=trace_steps,
                     moves=moves,
                 )
 
@@ -531,8 +596,8 @@ def solve_stepwise_swap(
                 row = chosen_r if (r1 == chosen_r and r2 == chosen_r) else r1
                 moves.append((step, row, c1, c2, conf_before, conf, kind))
 
-            if record_trace and step % trace_every == 0:
-                trace.append(conf)
+            if step % trace_every == 0:
+                _append_trace_point(trace, trace_steps, step, conf)
 
             if conf < best_conf:
                 best_conf = conf
@@ -549,8 +614,10 @@ def solve_stepwise_swap(
         restarts=restarts,
         seconds=time.time() - t0,
         final_conflicts=best_conf,
-        initial_conflicts=0,
+        initial_conflicts=first_initial_conf,
+        objective_label="cols+boxes",
         trace=trace,
+        trace_steps=trace_steps,
         moves=moves,
     )
 
@@ -582,16 +649,22 @@ def solve_greedy_descent_swap(
     best_grid: Optional[Grid] = None
     best_conf = 10**9
     best_steps = 0
+    first_initial_conf = 0
 
-    trace = [] if record_trace else None
+    trace, trace_steps = _init_trace(record_trace)
     moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
 
     for restart in range(restarts):
         grid, fixed = initialise_by_rows(puzzle, rng)
         conf = conflicts_cols_boxes(grid)
         initial_conf = conf
-        if record_trace:
-            trace.append(conf)
+        if restart == 0:
+            first_initial_conf = initial_conf
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+            best_steps = 0
+        _append_trace_point(trace, trace_steps, 0, conf)
 
         if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
             return SolveResult(
@@ -602,7 +675,9 @@ def solve_greedy_descent_swap(
                 seconds=time.time() - t0,
                 final_conflicts=0,
                 initial_conflicts=initial_conf,
+                objective_label="cols+boxes",
                 trace=trace,
+                trace_steps=trace_steps,
                 moves=moves,
             )
 
@@ -614,6 +689,7 @@ def solve_greedy_descent_swap(
         step = 0
         while step < max_steps:
             if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                _append_trace_point(trace, trace_steps, step, conf)
                 return SolveResult(
                     solved=True,
                     grid=grid,
@@ -622,7 +698,9 @@ def solve_greedy_descent_swap(
                     seconds=time.time() - t0,
                     final_conflicts=0,
                     initial_conflicts=initial_conf,
+                    objective_label="cols+boxes",
                     trace=trace,
+                    trace_steps=trace_steps,
                     moves=moves,
                 )
 
@@ -661,8 +739,8 @@ def solve_greedy_descent_swap(
                 row = best_row if (r1 == best_row and r2 == best_row) else r1
                 moves.append((step, row, c1, c2, conf_before, conf, "greedy"))
 
-            if record_trace and step % trace_every == 0:
-                trace.append(conf)
+            if step % trace_every == 0:
+                _append_trace_point(trace, trace_steps, step, conf)
 
             if conf < best_conf:
                 best_conf = conf
@@ -684,8 +762,10 @@ def solve_greedy_descent_swap(
         restarts=restarts,
         seconds=time.time() - t0,
         final_conflicts=best_conf,
-        initial_conflicts=0,
+        initial_conflicts=first_initial_conf,
+        objective_label="cols+boxes",
         trace=trace,
+        trace_steps=trace_steps,
         moves=moves,
     )
 
@@ -709,28 +789,383 @@ def _delta_conflicts_swap_cols_boxes(grid: Grid, i1: int, i2: int) -> int:
     b1 = box_index(r1, c1)
     b2 = box_index(r2, c2)
 
-    affected_units = [("C", c1), ("C", c2), ("B", b1), ("B", b2)]
-    seen = set()
-    deduped = []
-    for typ, idxu in affected_units:
-        key = (typ, idxu)
-        if key not in seen:
-            seen.add(key)
-            deduped.append((typ, idxu))
+    deduped = _dedupe_unit_refs([("C", c1), ("C", c2), ("B", b1), ("B", b2)])
 
     old = 0
     for typ, idxu in deduped:
-        unit = (COLS[idxu] if typ == "C" else BOXS[idxu])
+        unit = _unit_cells_for_ref(typ, idxu)
         old += unit_conflict_pairs([grid[j] for j in unit])
 
     grid[i1], grid[i2] = v2, v1
     new = 0
     for typ, idxu in deduped:
-        unit = (COLS[idxu] if typ == "C" else BOXS[idxu])
+        unit = _unit_cells_for_ref(typ, idxu)
         new += unit_conflict_pairs([grid[j] for j in unit])
     grid[i1], grid[i2] = v1, v2
 
     return new - old
+
+
+def _delta_conflicts_edit_all_units(grid: Grid, i: int, new_value: int) -> int:
+    """
+    Compute Δ = conflicts_after - conflicts_before for setting cell i to new_value,
+    counting conflicts in rows, columns, and boxes.
+    """
+    old_value = grid[i]
+    if new_value == old_value:
+        return 0
+
+    r, c = i_to_rc(i)
+    b = box_index(r, c)
+    affected_units = _dedupe_unit_refs([("R", r), ("C", c), ("B", b)])
+
+    old = 0
+    for typ, idxu in affected_units:
+        unit = _unit_cells_for_ref(typ, idxu)
+        old += unit_conflict_pairs([grid[j] for j in unit])
+
+    grid[i] = new_value
+    new = 0
+    for typ, idxu in affected_units:
+        unit = _unit_cells_for_ref(typ, idxu)
+        new += unit_conflict_pairs([grid[j] for j in unit])
+    grid[i] = old_value
+
+    return new - old
+
+
+def _cell_has_conflict_all_units(grid: Grid, i: int) -> bool:
+    """Whether cell i participates in a row, column, or box conflict."""
+    r, c = i_to_rc(i)
+    b = box_index(r, c)
+    v = grid[i]
+    return (
+        sum(1 for j in ROWS[r] if grid[j] == v) > 1
+        or sum(1 for j in COLS[c] if grid[j] == v) > 1
+        or sum(1 for j in BOXS[b] if grid[j] == v) > 1
+    )
+
+
+def _solve_greedy_local_edit(
+    puzzle: Grid,
+    seed: int,
+    max_steps: int,
+    restarts: int,
+    record_trace: bool,
+    trace_every: int,
+    record_moves: int,
+    first_improvement: bool,
+    move_kind: str,
+) -> SolveResult:
+    """
+    Greedy local search using direct single-cell digit changes on non-clue cells.
+
+    Because row permutations are no longer preserved, the loss is the full number of
+    conflicting pairs across rows, columns, and boxes.
+    """
+    if trace_every <= 0:
+        raise ValueError("trace_every must be > 0")
+
+    rng = random.Random(seed)
+    t0 = time.time()
+
+    best_grid: Optional[Grid] = None
+    best_conf = 10**9
+    best_steps = 0
+    first_initial_conf = 0
+
+    trace, trace_steps = _init_trace(record_trace)
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
+
+    for restart in range(restarts):
+        grid, fixed = initialise_by_rows(puzzle, rng)
+        conf = conflicts_all_units(grid)
+        initial_conf = conf
+        if restart == 0:
+            first_initial_conf = initial_conf
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+            best_steps = 0
+        _append_trace_point(trace, trace_steps, 0, conf)
+
+        if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+            return SolveResult(
+                solved=True,
+                grid=grid,
+                steps=0,
+                restarts=restart,
+                seconds=time.time() - t0,
+                final_conflicts=0,
+                initial_conflicts=initial_conf,
+                objective_label="rows+cols+boxes",
+                trace=trace,
+                trace_steps=trace_steps,
+                moves=moves,
+            )
+
+        step = 0
+        while step < max_steps:
+            if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                _append_trace_point(trace, trace_steps, step, conf)
+                return SolveResult(
+                    solved=True,
+                    grid=grid,
+                    steps=step,
+                    restarts=restart,
+                    seconds=time.time() - t0,
+                    final_conflicts=0,
+                    initial_conflicts=initial_conf,
+                    objective_label="rows+cols+boxes",
+                    trace=trace,
+                    trace_steps=trace_steps,
+                    moves=moves,
+                )
+
+            best_delta = 0
+            best_move: Optional[Tuple[int, int]] = None
+            conf_before = conf
+
+            for i in range(81):
+                if fixed[i]:
+                    continue
+                current = grid[i]
+                for new_value in range(1, 10):
+                    if new_value == current:
+                        continue
+                    delta = _delta_conflicts_edit_all_units(grid, i, new_value)
+                    if delta < 0:
+                        if first_improvement:
+                            best_delta = delta
+                            best_move = (i, new_value)
+                            break
+                        if delta < best_delta:
+                            best_delta = delta
+                            best_move = (i, new_value)
+                if first_improvement and best_move is not None:
+                    break
+
+            if best_move is None:
+                break
+
+            i, new_value = best_move
+            grid[i] = new_value
+            conf = conf + best_delta
+            step += 1
+
+            if moves is not None and restart == 0 and len(moves) < record_moves:
+                r, c = i_to_rc(i)
+                moves.append((step, r, c, new_value, conf_before, conf, move_kind))
+
+            if step % trace_every == 0:
+                _append_trace_point(trace, trace_steps, step, conf)
+
+            if conf < best_conf:
+                best_conf = conf
+                best_grid = grid[:]
+                best_steps = step
+
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+            best_steps = step
+
+    final_grid = best_grid if best_grid is not None else puzzle[:]
+    return SolveResult(
+        solved=False,
+        grid=final_grid,
+        steps=best_steps,
+        restarts=restarts,
+        seconds=time.time() - t0,
+        final_conflicts=best_conf,
+        initial_conflicts=first_initial_conf,
+        objective_label="rows+cols+boxes",
+        trace=trace,
+        trace_steps=trace_steps,
+        moves=moves,
+    )
+
+
+def solve_greedy_local_edit_best(
+    puzzle: Grid,
+    seed: int = 0,
+    max_steps: int = 200_000,
+    restarts: int = 30,
+    record_trace: bool = False,
+    trace_every: int = 200,
+    record_moves: int = 0,
+) -> SolveResult:
+    """
+    At each step, apply the single non-clue cell change with the largest improvement
+    in the full row+column+box conflict count.
+    """
+    return _solve_greedy_local_edit(
+        puzzle,
+        seed=seed,
+        max_steps=max_steps,
+        restarts=restarts,
+        record_trace=record_trace,
+        trace_every=trace_every,
+        record_moves=record_moves,
+        first_improvement=False,
+        move_kind="local-best",
+    )
+
+
+def solve_greedy_local_edit_first(
+    puzzle: Grid,
+    seed: int = 0,
+    max_steps: int = 200_000,
+    restarts: int = 30,
+    record_trace: bool = False,
+    trace_every: int = 200,
+    record_moves: int = 0,
+) -> SolveResult:
+    """
+    Scan cells in row-major order and apply the first strictly improving single-cell
+    digit change that we find.
+    """
+    return _solve_greedy_local_edit(
+        puzzle,
+        seed=seed,
+        max_steps=max_steps,
+        restarts=restarts,
+        record_trace=record_trace,
+        trace_every=trace_every,
+        record_moves=record_moves,
+        first_improvement=True,
+        move_kind="local-first",
+    )
+
+
+def solve_zubarev_local_edit(
+    puzzle: Grid,
+    seed: int = 0,
+    max_steps: int = 200_000,
+    restarts: int = 30,
+    beta0: float = 0.5,
+    beta1: float = 6.0,
+    beta_schedule: str = "linear",
+    record_trace: bool = False,
+    trace_every: int = 200,
+    record_moves: int = 0,
+) -> SolveResult:
+    """
+    Stochastic local-edit walk with uphill noise.
+
+    At each step we choose a non-clue cell involved in a conflict (falling back to any
+    free cell if needed), then sample a replacement digit with probability
+    proportional to exp(-beta * delta), where delta is the change in the full
+    row+column+box conflict count.
+    """
+    if beta0 < 0 or beta1 < 0:
+        raise ValueError("beta0 and beta1 must be >= 0.")
+    if trace_every <= 0:
+        raise ValueError("trace_every must be > 0")
+
+    rng = random.Random(seed)
+    t0 = time.time()
+
+    best_grid: Optional[Grid] = None
+    best_conf = 10**9
+    best_steps = 0
+    first_initial_conf = 0
+    trace, trace_steps = _init_trace(record_trace)
+    moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
+
+    for restart in range(restarts):
+        grid, fixed = initialise_by_rows(puzzle, rng)
+        free_cells = [i for i in range(81) if not fixed[i]]
+        conf = conflicts_all_units(grid)
+        initial_conf = conf
+        if restart == 0:
+            first_initial_conf = initial_conf
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+            best_steps = 0
+        _append_trace_point(trace, trace_steps, 0, conf)
+
+        if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+            return SolveResult(
+                solved=True,
+                grid=grid,
+                steps=0,
+                restarts=restart,
+                seconds=time.time() - t0,
+                final_conflicts=0,
+                initial_conflicts=initial_conf,
+                objective_label="rows+cols+boxes",
+                trace=trace,
+                trace_steps=trace_steps,
+                moves=moves,
+            )
+
+        for step in range(1, max_steps + 1):
+            if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                _append_trace_point(trace, trace_steps, step - 1, conf)
+                return SolveResult(
+                    solved=True,
+                    grid=grid,
+                    steps=step - 1,
+                    restarts=restart,
+                    seconds=time.time() - t0,
+                    final_conflicts=0,
+                    initial_conflicts=initial_conf,
+                    objective_label="rows+cols+boxes",
+                    trace=trace,
+                    trace_steps=trace_steps,
+                    moves=moves,
+                )
+
+            beta = _beta_schedule(step, max_steps, beta0, beta1, beta_schedule)
+
+            conflicted_free = [i for i in free_cells if _cell_has_conflict_all_units(grid, i)]
+            chosen_i = rng.choice(conflicted_free if conflicted_free else free_cells)
+
+            candidates: List[Tuple[int, int]] = []
+            log_ws: List[float] = []
+            current = grid[chosen_i]
+            for new_value in range(1, 10):
+                if new_value == current:
+                    continue
+                delta = _delta_conflicts_edit_all_units(grid, chosen_i, new_value)
+                candidates.append((new_value, delta))
+                log_ws.append(-beta * delta)
+
+            idx = _sample_from_log_weights(log_ws, rng)
+            new_value, delta = candidates[idx]
+
+            conf_before = conf
+            grid[chosen_i] = new_value
+            conf = conf + delta
+
+            if moves is not None and restart == 0 and len(moves) < record_moves:
+                r, c = i_to_rc(chosen_i)
+                moves.append((step, r, c, new_value, conf_before, conf, "local-zubarev"))
+
+            if step % trace_every == 0:
+                _append_trace_point(trace, trace_steps, step, conf)
+
+            if conf < best_conf:
+                best_conf = conf
+                best_grid = grid[:]
+                best_steps = step
+
+    final_grid = best_grid if best_grid is not None else puzzle[:]
+    return SolveResult(
+        solved=False,
+        grid=final_grid,
+        steps=best_steps,
+        restarts=restarts,
+        seconds=time.time() - t0,
+        final_conflicts=best_conf,
+        initial_conflicts=first_initial_conf,
+        objective_label="rows+cols+boxes",
+        trace=trace,
+        trace_steps=trace_steps,
+        moves=moves,
+    )
 
 
 def _sample_from_log_weights(log_weights: List[float], rng: random.Random) -> int:
@@ -800,15 +1235,20 @@ def solve_zubarev_walk(
 
     best_grid: Optional[Grid] = None
     best_conf = 10**9
-    trace = [] if record_trace else None
+    first_initial_conf = 0
+    trace, trace_steps = _init_trace(record_trace)
     moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = [] if record_moves > 0 else None
 
     for restart in range(restarts):
         grid, fixed = initialise_by_rows(puzzle, rng)
         conf = conflicts_cols_boxes(grid)
         initial_conf = conf
-        if record_trace:
-            trace.append(conf)
+        if restart == 0:
+            first_initial_conf = initial_conf
+        if conf < best_conf:
+            best_conf = conf
+            best_grid = grid[:]
+        _append_trace_point(trace, trace_steps, 0, conf)
 
         if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
             return SolveResult(
@@ -819,7 +1259,9 @@ def solve_zubarev_walk(
                 seconds=time.time() - t0,
                 final_conflicts=0,
                 initial_conflicts=initial_conf,
+                objective_label="cols+boxes",
                 trace=trace,
+                trace_steps=trace_steps,
                 moves=moves,
             )
 
@@ -830,15 +1272,18 @@ def solve_zubarev_walk(
 
         for step in range(1, max_steps + 1):
             if conf == 0 and is_valid_complete(grid) and respects_clues(grid, puzzle):
+                _append_trace_point(trace, trace_steps, step - 1, conf)
                 return SolveResult(
                     solved=True,
                     grid=grid,
-                    steps=step,
+                    steps=step - 1,
                     restarts=restart,
                     seconds=time.time() - t0,
                     final_conflicts=0,
                     initial_conflicts=initial_conf,
+                    objective_label="cols+boxes",
                     trace=trace,
+                    trace_steps=trace_steps,
                     moves=moves,
                 )
 
@@ -894,8 +1339,8 @@ def solve_zubarev_walk(
                 row = chosen_r if (r1 == chosen_r and r2 == chosen_r) else r1
                 moves.append((step, row, c1, c2, conf_before, conf, "zubarev"))
 
-            if record_trace and step % trace_every == 0:
-                trace.append(conf)
+            if step % trace_every == 0:
+                _append_trace_point(trace, trace_steps, step, conf)
 
             if conf < best_conf:
                 best_conf = conf
@@ -911,8 +1356,10 @@ def solve_zubarev_walk(
         restarts=restarts,
         seconds=time.time() - t0,
         final_conflicts=best_conf,
-        initial_conflicts=0,
+        initial_conflicts=first_initial_conf,
+        objective_label="cols+boxes",
         trace=trace,
+        trace_steps=trace_steps,
         moves=moves,
     )
 
@@ -931,7 +1378,12 @@ def main() -> None:
 
     ap_solve = sub.add_parser("solve", help="Solve a puzzle given as an 81-char string with 0 or . for blanks.")
     ap_solve.add_argument("--puzzle", type=str, required=True)
-    ap_solve.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "greedy", "zubarev"])
+    ap_solve.add_argument(
+        "--method",
+        type=str,
+        default="stepwise",
+        choices=["stepwise", "greedy", "zubarev", "local-best", "local-first", "local-zubarev"],
+    )
     ap_solve.add_argument("--seed", type=int, default=0)
     ap_solve.add_argument("--max-steps", type=int, default=200_000)
     ap_solve.add_argument("--restarts", type=int, default=30)
@@ -939,7 +1391,7 @@ def main() -> None:
     ap_solve.add_argument("--beta1", type=float, default=6.0, help="Zubarev walk: final beta (ignored if schedule=constant).")
     ap_solve.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
     ap_solve.add_argument("--trace", action="store_true")
-    ap_solve.add_argument("--moves", type=int, default=0, help="Record and print the first N swap moves (restart 0).")
+    ap_solve.add_argument("--moves", type=int, default=0, help="Record and print the first N moves (restart 0).")
 
     args = ap.parse_args()
 
@@ -972,6 +1424,39 @@ def main() -> None:
                 trace_every=200,
                 record_moves=args.moves,
             )
+        elif args.method == "local-best":
+            res = solve_greedy_local_edit_best(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
+        elif args.method == "local-first":
+            res = solve_greedy_local_edit_first(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
+        elif args.method == "local-zubarev":
+            res = solve_zubarev_local_edit(
+                puzzle,
+                seed=args.seed,
+                max_steps=args.max_steps,
+                restarts=args.restarts,
+                beta0=args.beta0,
+                beta1=args.beta1,
+                beta_schedule=args.beta_schedule,
+                record_trace=args.trace,
+                trace_every=200,
+                record_moves=args.moves,
+            )
         else:
             res = solve_zubarev_walk(
                 puzzle,
@@ -987,17 +1472,19 @@ def main() -> None:
             )
         print("Solved:", res.solved)
         print("Steps:", res.steps, "Restarts:", res.restarts, "Seconds:", f"{res.seconds:.3f}")
-        print("Final conflicts (cols+boxes):", res.final_conflicts)
+        print(f"Final conflicts ({res.objective_label}):", res.final_conflicts)
         if args.moves and res.moves is not None:
-            print("Initial conflicts (cols+boxes):", res.initial_conflicts)
+            print(f"Initial conflicts ({res.objective_label}):", res.initial_conflicts)
             print()
-            print(f"First {min(args.moves, len(res.moves))} swap moves (restart 0):")
+            print(f"First {min(args.moves, len(res.moves))} moves (restart 0):")
             for (step, r, c1, c2, before, after, kind) in res.moves[: args.moves]:
-                # Display using 1-based indices.
                 rr = r + 1
                 cc1 = c1 + 1
-                cc2 = c2 + 1
-                print(f"  step {step:>5}: row {rr}, swap c{cc1}<->c{cc2} ({kind}), {before} -> {after}")
+                if kind.startswith("local-"):
+                    print(f"  step {step:>5}: cell r{rr}c{cc1} -> {c2} ({kind}), {before} -> {after}")
+                else:
+                    cc2 = c2 + 1
+                    print(f"  step {step:>5}: row {rr}, swap c{cc1}<->c{cc2} ({kind}), {before} -> {after}")
         print()
         print(pretty(res.grid))
         return

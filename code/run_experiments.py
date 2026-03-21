@@ -31,6 +31,9 @@ from padic_sudoku_regression import (
     parse_puzzle,
     solve_stepwise_swap,
     solve_greedy_descent_swap,
+    solve_greedy_local_edit_best,
+    solve_greedy_local_edit_first,
+    solve_zubarev_local_edit,
     solve_zubarev_walk,
     pretty,
 )
@@ -52,7 +55,12 @@ def main() -> None:
     ap.add_argument("--clues", type=str, default="36,30,26", help="comma-separated clue counts")
     ap.add_argument("--max-steps", type=int, default=200000)
     ap.add_argument("--restarts", type=int, default=30)
-    ap.add_argument("--method", type=str, default="stepwise", choices=["stepwise", "greedy", "zubarev"])
+    ap.add_argument(
+        "--method",
+        type=str,
+        default="stepwise",
+        choices=["stepwise", "greedy", "zubarev", "local-best", "local-first", "local-zubarev"],
+    )
     ap.add_argument("--beta0", type=float, default=0.5, help="Zubarev walk: initial beta (inverse temperature).")
     ap.add_argument("--beta1", type=float, default=6.0, help="Zubarev walk: final beta (ignored if schedule=constant).")
     ap.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
@@ -104,6 +112,36 @@ def main() -> None:
                     record_trace=record_trace,
                     trace_every=200,
                 )
+            elif args.method == "local-best":
+                res = solve_greedy_local_edit_best(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
+            elif args.method == "local-first":
+                res = solve_greedy_local_edit_first(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
+            elif args.method == "local-zubarev":
+                res = solve_zubarev_local_edit(
+                    puzzle,
+                    seed=seed ^ 0xA5A5A5A5,
+                    max_steps=args.max_steps,
+                    restarts=args.restarts,
+                    beta0=args.beta0,
+                    beta1=args.beta1,
+                    beta_schedule=args.beta_schedule,
+                    record_trace=record_trace,
+                    trace_every=200,
+                )
             else:
                 res = solve_zubarev_walk(
                     puzzle,
@@ -123,6 +161,7 @@ def main() -> None:
                 "solve_seed": seed ^ 0xA5A5A5A5,
                 "unique_enforced": int(args.unique),
                 "method": args.method,
+                "objective": res.objective_label,
                 "puzzle": puzzle_str,
                 "solved": int(res.solved),
                 "steps": res.steps,
@@ -137,9 +176,10 @@ def main() -> None:
                     print("Note: matplotlib not installed; skipping loss_curve plot.")
                 else:
                     fig = plt.figure()
-                    plt.plot([200*k for k in range(len(res.trace))], res.trace)
+                    x_values = res.trace_steps if res.trace_steps is not None else [200 * k for k in range(len(res.trace))]
+                    plt.plot(x_values, res.trace)
                     plt.xlabel("Iteration (approx.)")
-                    plt.ylabel("Column+box conflict pairs")
+                    plt.ylabel(f"{res.objective_label} conflict pairs")
                     plt.title(f"Loss trajectory (clues={clues}, seed={seed})")
                     fig.tight_layout()
                     png_path = outdir / "loss_curve.png"
