@@ -17,6 +17,7 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{construction}[theorem]{Construction}
 \newtheorem{lemma}{Lemma}
 \newtheorem{definition}{Definition}
 \newcommand{\sudokublank}{\phantom{0}}
@@ -39,14 +40,14 @@ We then ``train'' the resulting regression instance using two generic optimisers
 \section{Motivation and prior work}
 There are many sensible ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, and SAT encodings \cite{lynce2006sudoku} are all natural approaches. This paper is not one of them.
 
-Instead, it asks whether modifying the loss landscape of linear regression is sufficient to encode finite-domain all-different systems using digit-valued parameters directly rather than one-hot indicators, with Sudoku as the cleanest worked example. The point is not computational efficiency but conceptual compression: use fewer variables than a typical SAT/CSP encoding, and let the $p$-adic objective enforce both domain membership and pairwise distinctness.
+Instead, it asks whether modifying the loss landscape of linear regression is sufficient to encode finite-domain all-different systems using digit-valued parameters directly rather than one-hot indicators, with Sudoku as the cleanest worked example. The point is not computational efficiency but conceptual compression: use fewer variables than a typical SAT/CSP encoding, have their domains match the problem domains, and let the $p$-adic objective enforce both domain membership and pairwise distinctness.
 
 Two earlier results motivate the construction:
 \begin{itemize}
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using regularisation points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-The central proposition below isolates the general mechanism behind the Sudoku construction.
+The construction below isolates the general mechanism behind the Sudoku example.
 
 \section{Preliminaries}
 
@@ -58,7 +59,9 @@ Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the 
 We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|x|_p\le 1$. The key choice is to take $p>9$ (e.g.\ $p=11$).
 
 \section{A general all-different regression template}
-Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$. Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
+Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$.
+
+Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
 
 To make the regression viewpoint explicit, it is useful to describe the \emph{synthetic dataset} rather than only the resulting loss. In the present construction there is no ambient collection of ordinary feature-response pairs. Every observation is inserted deliberately, either to pin a variable to its allowed values or to reward separation along an edge.
 
@@ -71,7 +74,7 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 to the objective. Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms.
 \end{definition}
 
-\begin{proposition}[Polynomial-time synthetic dataset for list-colouring]
+\begin{construction}[Polynomial-time synthetic dataset for list-colouring]
 \label{prop:list-dataset}
 Let \(V=\{1,\dots,n\}\), let \(G=(V,E)\) be a finite graph, let \(D_i\subseteq \{1,\dots,q\}\) be nonempty allowed sets, and fix a prime \(p>q\). Define
 \[
@@ -91,15 +94,15 @@ let \(\Delta:=\max_{i\in V}\sum_{j=1}^n w_{ij}\), and set \(\lambda:=1+\Delta\).
 \[
 \mathcal S^- := \{(-1,e_i-e_j,0,1): 1\le i<j\le n,\ w_{ij}=1\}.
 \]
-Then the induced objective is
+Define \(\mathcal S:=\mathcal S^+\sqcup\mathcal S^-\), and define the loss for \(\mathcal S\) by
 \[
 L_{\mathcal S}(x)
 =
 \lambda\sum_{i=1}^n \sum_{a\in D_i}|x_i-a|_p
 -\sum_{1\le i<j\le n} w_{ij}|x_i-x_j|_p.
 \]
-The dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). Every observation has a clear combinatorial role: the positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
-\end{proposition}
+We now analyse that construction. The dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). Every observation has a clear combinatorial role: the positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
+\end{construction}
 
 \begin{proof}
 Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\), and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\). Summing them yields the displayed objective. The size bound and runtime are immediate from the explicit construction.
@@ -120,6 +123,8 @@ Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so the m
 \qquad
 \Pi(x):=(\pi_1(x_1),\dots,\pi_n(x_n)).
 \]
+
+We first establish the digit-snapping mechanism that underlies the minimisation argument. The next two lemmas imply that if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\).
 
 \begin{lemma}[Unary wells]
 \label{lem:unary-well}
@@ -205,7 +210,7 @@ If \(x_i=x_j\) then the difference is zero. If \(x_i\neq x_j\), then \(1\le |x_i
 
 \begin{theorem}[Correctness of the synthetic reduction]
 \label{thm:all-different}
-For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Proposition~\ref{prop:list-dataset}, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\). On \(\prod_{i=1}^n D_i\),
+For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Construction~\ref{prop:list-dataset}, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\). On \(\prod_{i=1}^n D_i\),
 \[
 L_{\mathcal S}(x)
 =
@@ -230,7 +235,7 @@ Any finite-domain all-different constraint system can be encoded, in polynomial 
 \end{corollary}
 
 \begin{proof}
-Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists. Apply Proposition~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different}.
+Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists. Apply Construction~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different}.
 \end{proof}
 
 \section{Sudoku as a special case}
