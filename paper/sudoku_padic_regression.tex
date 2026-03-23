@@ -9,6 +9,7 @@
 \usepackage{algpseudocode}
 \usepackage{hyperref}
 \usepackage{sudoku}
+\usepackage{tikz}
 
 \title{Solving Sudoku the Hard Way Using Integer-Valued $p$-adic Linear Regression\\with Positive and Negative Regularisation}
 \author{(Author details omitted for review)}
@@ -62,6 +63,23 @@ We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|
 Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$.
 
 Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[vertex/.style={circle,draw,thick,minimum size=8mm,inner sep=0pt}]
+\node[vertex] (x1) at (0,1.45) {$x_1$};
+\node[vertex] (x2) at (-1.55,-0.95) {$x_2$};
+\node[vertex] (x3) at (1.55,-0.95) {$x_3$};
+\draw (x1) -- (x2) -- (x3) -- cycle;
+\node[font=\footnotesize] at (0,2.15) {$D_1=\{1,2\}$};
+\node[font=\footnotesize] at (-2.45,-1.6) {$D_2=\{2,3\}$};
+\node[font=\footnotesize] at (2.45,-1.6) {$D_3=\{1,3\}$};
+\end{tikzpicture}
+\caption{A tiny list-colouring instance. The assignment \(x_1=1\), \(x_2=2\), \(x_3=3\) respects the domains and makes every edge unequal.}
+\label{fig:list-colouring-example}
+\end{figure}
+
+Figure~\ref{fig:list-colouring-example} gives a concrete toy instance. Its synthetic dataset has six positive observations, one for each allowed value in the three domains, and three negative observations, one for each edge. The proper list-colouring \(x_1=1\), \(x_2=2\), \(x_3=3\) therefore activates every edge reward while incurring only the unavoidable unary baseline.
 
 To make the regression viewpoint explicit, it is useful to describe the \emph{synthetic dataset} rather than only the resulting loss. In the present construction there is no ambient collection of ordinary feature-response pairs. Every observation is inserted deliberately, either to pin a variable to its allowed values or to reward separation along an edge.
 
@@ -124,7 +142,7 @@ Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so the m
 \Pi(x):=(\pi_1(x_1),\dots,\pi_n(x_n)).
 \]
 
-We first establish the digit-snapping mechanism that underlies the minimisation argument. The next two lemmas imply that if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\).
+First we prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
 
 \begin{lemma}[Unary wells]
 \label{lem:unary-well}
@@ -151,12 +169,13 @@ U_i(t)=|D_i|=(|D_i|-1)+1=(|D_i|-1)+|t-a_i^\ast|_p=(|D_i|-1)+|t-\pi_i(t)|_p.
 \]
 \end{proof}
 
-\begin{lemma}[Pinning lemma]
-\label{lem:pinning}
+\begin{lemma}[Digit-snapping lemma]
+\label{lem:digit-snapping}
 Let \(x\in\mathbb Z_p^n\), let \(i\in V\), and suppose \(x_i\notin D_i\). Let \(x^{(i)}\) be obtained from \(x\) by replacing \(x_i\) with \(\Pi(x)_i\). Then
 \[
 L_{\mathcal S}(x^{(i)})<L_{\mathcal S}(x).
 \]
+In particular, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\).
 \end{lemma}
 
 \begin{proof}
@@ -208,6 +227,8 @@ If \(x_i,x_j\in \{1,\dots,q\}\) and \(p>q\), then
 If \(x_i=x_j\) then the difference is zero. If \(x_i\neq x_j\), then \(1\le |x_i-x_j|\le q-1<p\), so \(p\nmid (x_i-x_j)\) and therefore \(|x_i-x_j|_p=1\).
 \end{proof}
 
+Next we analyse the loss on domain-respecting assignments. In that regime it becomes a constant plus a conflict count, so if the list-colouring instance is satisfiable the rightmost sum can be zero.
+
 \begin{theorem}[Correctness of the synthetic reduction]
 \label{thm:all-different}
 For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Construction~\ref{prop:list-dataset}, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\). On \(\prod_{i=1}^n D_i\),
@@ -215,18 +236,19 @@ For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Construction~
 L_{\mathcal S}(x)
 =
 \lambda\sum_{i=1}^n (|D_i|-1)
--\sum_{1\le i<j\le n} w_{ij}\mathbf 1_{x_i\neq x_j}.
+-|E|
++\sum_{1\le i<j\le n} w_{ij}\mathbf 1_{x_i=x_j}.
 \]
-Consequently, the global minimisers are exactly the domain-respecting assignments that maximise the number of unequal edges. In particular, if the list-colouring instance \((G,(D_i)_{i=1}^n)\) is satisfiable, then the global minimisers are exactly its proper list-colourings.
+Consequently, the global minimisers are exactly the domain-respecting assignments that minimise the conflict sum \(\sum_{1\le i<j\le n} w_{ij}\mathbf 1_{x_i=x_j}\), or equivalently maximise the number of unequal edges. In particular, if the list-colouring instance \((G,(D_i)_{i=1}^n)\) is satisfiable, then this minimum conflict sum is \(0\), and the global minimisers are exactly its proper list-colourings.
 \end{theorem}
 
 \begin{proof}
-By Lemma~\ref{lem:pinning}, any point with some coordinate outside its domain can be improved by snapping that coordinate into the domain. Therefore every global minimiser lies in \(\prod_i D_i\). If \(x\in \prod_i D_i\), then Lemma~\ref{lem:unary-well} gives \(U_i(x_i)=|D_i|-1\) for every \(i\), and Lemma~\ref{lem:edge-indicator} gives
+By Lemma~\ref{lem:digit-snapping}, any point with some coordinate outside its domain can be improved by snapping that coordinate into the domain. Therefore every global minimiser lies in \(\prod_i D_i\). If \(x\in \prod_i D_i\), then Lemma~\ref{lem:unary-well} gives \(U_i(x_i)=|D_i|-1\) for every \(i\), and Lemma~\ref{lem:edge-indicator} gives
 \[
 |x_i-x_j|_p=\mathbf 1_{x_i\neq x_j}
 \qquad (1\le i<j\le n).
 \]
-Substituting these identities into \(L_{\mathcal S}\) yields the displayed formula. The final claims follow immediately.
+Since \(\mathbf 1_{x_i\neq x_j}=1-\mathbf 1_{x_i=x_j}\) on every edge, substituting these identities into \(L_{\mathcal S}\) yields the displayed formula. The final claims follow immediately.
 \end{proof}
 
 \begin{corollary}
@@ -305,7 +327,7 @@ This is Lemma~\ref{lem:edge-indicator} with \(q=9\).
 \subsection{Expanded regression objective}
 Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share a unit (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
 
-Specialising Proposition~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different} to the Sudoku graph gives the minimal synthetic dataset
+Specialising Construction~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different} to the Sudoku graph gives the minimal synthetic dataset
 \begin{align}
 L_{\min}(x) &=
 \alpha\sum_{i\notin\mathcal{C}}\sum_{k=1}^9 |x_i-k|_p
