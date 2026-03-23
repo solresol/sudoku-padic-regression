@@ -46,9 +46,9 @@ Instead, it asks whether modifying the loss landscape of linear regression is su
 Two earlier results motivate the construction:
 \begin{itemize}
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
-    \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using regularisation points that snap coefficients to $\{0,1\}$.
+    \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive regularisation points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-The construction below isolates the general mechanism behind the Sudoku example.
+Our contribution in this paper is the use of negative regularisation to enforce pairwise distinctness. The construction below isolates the general mechanism behind the Sudoku example.
 
 \section{Preliminaries}
 
@@ -57,9 +57,10 @@ Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the 
 \[
 |n|_p = p^{-v_p(n)}, \qquad |0|_p = 0.
 \]
-We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|x|_p\le 1$. The key choice is to take $p>9$ (e.g.\ $p=11$).
+We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|x|_p\le 1$. The key choice for Sudoku is to take $p>9$ (e.g.\ $p=11$), so that the $p$-adic absolute value of any Sudoku digit or digit difference is always \(0\) or \(1\).
 
 \section{A general all-different regression template}
+\subsection{List colouring}
 Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$.
 
 Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
@@ -81,6 +82,7 @@ Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this se
 
 Figure~\ref{fig:list-colouring-example} gives a concrete toy instance. Its synthetic dataset has six positive observations, one for each allowed value in the three domains, and three negative observations, one for each edge. The proper list-colouring \(x_1=1\), \(x_2=2\), \(x_3=3\) therefore activates every edge reward while incurring only the unavoidable unary baseline.
 
+\subsection{Regression formulation}
 To make the regression viewpoint explicit, it is useful to describe the \emph{synthetic dataset} rather than only the resulting loss. In the present construction there is no ambient collection of ordinary feature-response pairs. Every observation is inserted deliberately, either to pin a variable to its allowed values or to reward separation along an edge.
 
 \begin{definition}[Signed synthetic $p$-adic regression dataset]
@@ -89,7 +91,7 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 \[
 \ell_{(\sigma,u,b,\gamma)}(x):=\sigma\gamma\,|u^\top x-b|_p
 \]
-to the objective. Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms.
+to the objective; formally, \(\ell_{(\sigma,u,b,\gamma)}\) is the $p$-adic analogue of a weighted Euclidean residual term. Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms. We also use the shorter phrases \emph{positive observations} and \emph{negative observations}.
 \end{definition}
 
 \begin{construction}[Polynomial-time synthetic dataset for list-colouring]
@@ -126,6 +128,7 @@ We now analyse that construction. The dataset has exactly \(\sum_{i=1}^n |D_i|\)
 Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\), and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\). Summing them yields the displayed objective. The size bound and runtime are immediate from the explicit construction.
 \end{proof}
 
+\subsection{Correctness}
 For each \(i\in V\), choose once and for all a reference value \(a_i^\ast\in D_i\), and define the snapping map \(\pi_i:\mathbb Z_p\to D_i\) by
 \[
 \pi_i(t):=
@@ -141,6 +144,7 @@ Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so the m
 \qquad
 \Pi(x):=(\pi_1(x_1),\dots,\pi_n(x_n)).
 \]
+Thus \(\Pi(x)\) is the coordinatewise snapped point in \(\prod_{i=1}^n D_i\).
 
 First we prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
 
@@ -153,9 +157,9 @@ U_i(t):=\sum_{a\in D_i}|t-a|_p
 \]
 Then for every \(t\in\mathbb Z_p\),
 \[
-U_i(t)=(|D_i|-1)+|t-\pi_i(t)|_p.
+U_i(t)=(|D_i|-1)+|t-\pi_i(t)|_p \ge |D_i|-1,
 \]
-In particular, \(U_i\) is minimised exactly on \(D_i\), with minimum value \(|D_i|-1\).
+with equality if and only if \(t\in D_i\).
 \end{lemma}
 
 \begin{proof}
@@ -282,25 +286,14 @@ x \in \mathbb{Z}_p^{81},
 \]
 with one coefficient per cell.
 
-\begin{definition}[Digit-snapping penalty]
+\begin{definition}[Sudoku digit-snapping penalty]
 For $p>9$, define the digit-snapping penalty
 \[
 U_D(t) := \sum_{k=1}^9 |t-k|_p.
 \]
 \end{definition}
 
-\begin{corollary}[Sudoku digit-snapping]
-\label{cor:sudoku-snapping}
-Assume $p>9$ and $t\in \mathbb{Z}_p$. Then
-\[
-U_D(t)=8+|t-\pi_D(t)|_p,
-\]
-where \(\pi_D:\mathbb Z_p\to D\) is the snapping map associated with the common domain \(D\). In particular, \(U_D(t)\) is minimised precisely when \(t\in D\), and the minimum value is \(8\).
-\end{corollary}
-
-\begin{proof}
-This is Lemma~\ref{lem:unary-well} with every domain equal to \(D\).
-\end{proof}
+By Lemma~\ref{lem:unary-well} applied to the common domain \(D\), one has \(U_D(t)\ge 8\) for every \(t\in\mathbb Z_p\), with equality if and only if \(t\in D\).
 
 This is the $9$-valued analogue of the earlier ``snap to $\{0,1\}$'' construction from \cite{baker2026nphard}: the synthetic observations $t=k$ for all $k\in D$ create a multiwell objective with minima exactly at $D$.
 
@@ -334,10 +327,10 @@ L_{\min}(x) &=
 \;+\;
 \alpha\sum_{i\in\mathcal{C}} |x_i-g_i|_p
 \;-\;
-\beta\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
+\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective-minimal}
 \end{align}
-After dividing by the positive scalar \(\beta\), the ratio \(\alpha/\beta\) plays the role of the general pinning weight \(\lambda\). Thus any choice \(\alpha>20\beta\) satisfies the domination condition from Theorem~\ref{thm:all-different}. Every term in \eqref{eq:objective-minimal} is a regularisation term with a specific purpose: the positive terms pin cells to allowed digits or clues, and the negative terms reward unequal peer values. There are no ordinary feature-response observations beyond these synthetic regularisers. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations.
+A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. Every term in \eqref{eq:objective-minimal} is a regularisation term with a specific purpose: the positive terms pin cells to allowed digits or clues, and the negative terms reward unequal peer values. There are no ordinary feature-response observations beyond these synthetic regularisers. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations.
 
 For the experiments, however, we use the slightly more redundant expanded objective
 \begin{align}
@@ -346,10 +339,18 @@ L(x) &=
 \;+\;
 \alpha_{\mathrm{clue}}\sum_{i\in\mathcal{C}} |x_i - g_i|_p
 \;-\;
-\beta\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
+\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective}
 \end{align}
 Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even on clue cells and then adds the clue pins separately. It therefore contains \(729+|\mathcal C|\) positive observations and the same \(810\) negative observations. The first two sums are \emph{positive} regularisation, and the final sum is \emph{negative} regularisation. There is still no ``ordinary'' data in the usual regression sense: every synthetic observation exists only to enforce a Sudoku constraint. Equivalently, counting peer pairs per unit gives $27\binom{9}{2}=972$ negative terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall.
+
+Once \(x\) is digit-valued, the pairwise part is simply
+\[
+-\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p
+=
+-|\mathcal P|+\sum_{(i,j)\in\mathcal{P}}\mathbf 1_{x_i=x_j},
+\]
+so the loss differs from the peer-conflict count only by an additive constant.
 
 The $810$ pairwise terms are essentially irreducible if one insists on \emph{pairwise} penalties: omitting a single peer-pair $(i,j)$ removes the only residual that directly distinguishes $x_i=x_j$ from $x_i\neq x_j$ once $x$ is digit-valued, and no linear ``hash'' of the remaining differences can substitute because nonvanishing is not preserved under linear combinations (e.g.\ $a-b\neq 0$ and $b-c\neq 0$ does not prevent $a-c=0$).
 
@@ -363,23 +364,23 @@ D_i :=
 \{1,\dots,9\}, & i\notin \mathcal{C}.
 \end{cases}
 \]
-Assume \(\alpha>20\beta\). Then the global minimisers of the minimal objective \eqref{eq:objective-minimal} are exactly the valid completions of the Sudoku puzzle.
+Assume \(\alpha>20\). Then the global minimisers of the minimal objective \eqref{eq:objective-minimal} are exactly the valid completions of the Sudoku puzzle.
 \end{corollary}
 
 \begin{proof}
 Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm{Sud}}\). Thus a proper list-colouring assigns pairwise distinct digits in each unit. Since the available values are exactly \(\{1,\dots,9\}\), pairwise distinctness in a unit is equivalent to containing every digit exactly once. The singleton domains enforce the clues. Apply Theorem~\ref{thm:all-different}.
 \end{proof}
 
-For Sudoku, this bookkeeping is completely explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha/\beta>20\) for the minimal objective \eqref{eq:objective-minimal}; equivalently, \(\alpha>20\beta\), and a convenient sufficient choice is \(\alpha=\beta(1+20)\). The same sufficient condition \(\alpha>20\beta\) works for the expanded objective \eqref{eq:objective}, because its extra clue terms only strengthen the positive regularisation. If instead one rewrote the loss as a sum over row, column, and box scopes and counted overlaps separately, each cell would contribute \(8+8+8=24\) incident negative terms, and the corresponding sufficient choice would be \(\alpha>24\beta\). This is the precise place where the negative regularisation has to be dominated by the positive unary weight.
+For Sudoku, this bookkeeping is completely explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; a convenient sufficient choice is \(\alpha=21\). The same sufficient condition \(\alpha>20\) works for the expanded objective \eqref{eq:objective}, because its extra clue terms only strengthen the positive regularisation. If instead one rewrote the loss as a sum over row, column, and box scopes and counted overlaps separately, each cell would contribute \(8+8+8=24\) incident negative terms, and the corresponding sufficient choice would be \(\alpha>24\). This is the precise place where the negative regularisation has to be dominated by the positive unary weight.
 
 \paragraph{Why $p$-adics help with negative weights.}
 If one tries to do this with an ordinary squared-loss term $-(x_i-x_j)^2$ in $\mathbb{R}$, the optimiser is perversely incentivised to make some differences \emph{large}, not merely nonzero, and the objective can become unstable unless heavily bounded. With $p>9$ and digit-valued variables, $|x_i-x_j|_p\in\{0,1\}$, removing magnitude bias.
 
 \section{A stepwise/coordinate-descent heuristic}
 
-The objective \eqref{eq:objective} induces an NP-hard global optimisation problem (consistent with the author's NP-hardness result for $p$-adic regression). The goal here is not a polynomial-time solver, but a proof-of-concept heuristic.
+The objective \eqref{eq:objective} induces an NP-hard global optimisation problem (consistent with the author's NP-hardness result for $p$-adic regression). The goal here is not a worst-case polynomial-time algorithm, but to test whether generic regression-style updates can still solve individual puzzles.
 
-In implementation we take the ``$\alpha\to\infty$'' limit by restricting search to digit-valued assignments consistent with clues. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss (column/box conflicts). This is a form of coordinate descent on an integer lattice.
+Assume now that \(\alpha>20\). On digit-valued assignments consistent with the clues, the two positive sums in \eqref{eq:objective} are constant, so minimising \(L\) is equivalent to minimising the remaining column/box conflict count. In implementation we therefore restrict search to digit-valued assignments consistent with clues. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss (column/box conflicts). This is a form of coordinate descent on an integer lattice.
 
 \begin{algorithm}[t]
 \caption{Row-swap stepwise regression (heuristic)}
@@ -480,7 +481,7 @@ P(\xi \mid w,\beta)\ \propto\ \exp\!\bigl(-\beta\,(L(w+\xi)-L(w))\bigr).
 Under mild conditions (in particular, that the set of improving moves has nonzero measure), Zubarev shows there is a regime of $\beta$ values for which the expected loss decreases, i.e.\ $L(w_t)$ is a strict supermartingale~\cite{zubarev2025padic}.
 
 \subsection{A discrete Sudoku analogue}
-In our ``$\alpha\to\infty$'' implementation, the state is already digit-valued and clue-consistent. We therefore treat the Zubarev walk as a \emph{finite-move} stochastic optimiser:
+In the digit-restricted implementation used here, the state is already digit-valued and clue-consistent. We therefore treat the Zubarev walk as a \emph{finite-move} stochastic optimiser:
 \begin{itemize}
     \item The parameter vector $w$ is the current Sudoku filling $x\in D^{81}$.
     \item The loss $L(x)$ is the number of conflicting pairs in columns and boxes (equivalently, \eqref{eq:objective} up to constants in the digit-restricted regime).
@@ -571,7 +572,7 @@ Zubarev walk & 26 & 6 & 6 & 9912 & 2.929 \\
 \label{tab:results}
 \end{table}
 
-Figure~\ref{fig:loss} shows the loss trajectory for the stepwise row-swap heuristic on the specific fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), using the row-wise random initialiser described above, $T=60{,}000$, and $R=15$. The plotted run is restart $0$, and the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to additive and multiplicative constants in the digit-restricted regime).
+Figure~\ref{fig:loss} shows the loss trajectory for the stepwise row-swap heuristic on the specific fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), using the row-wise random initialiser described above, $T=60{,}000$, and $R=15$. The plotted run is restart $0$, and the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to an additive constant in the digit-restricted regime).
 
 \begin{figure}[t]
 \centering
