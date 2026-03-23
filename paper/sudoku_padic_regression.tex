@@ -18,7 +18,6 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{construction}[theorem]{Construction}
 \newtheorem{lemma}{Lemma}
 \newtheorem{definition}{Definition}
 \newcommand{\sudokublank}{\phantom{0}}
@@ -48,7 +47,7 @@ Two earlier results motivate the construction:
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive regularisation points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Our contribution in this paper is the use of negative regularisation to enforce pairwise distinctness. The construction below isolates the general mechanism behind the Sudoku example.
+Our contribution in this paper is the use of negative regularisation to enforce pairwise distinctness. The construction in Section~\ref{construction} isolates the general mechanism behind the Sudoku example.
 
 \section{Preliminaries}
 
@@ -60,12 +59,13 @@ Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the 
 We will work in the $p$-adic integers $\mathbb{Z}_p$, where all norms satisfy $|x|_p\le 1$. The key choice for Sudoku is to take $p>9$ (e.g.\ $p=11$), so that the $p$-adic absolute value of any Sudoku digit or digit difference is always \(0\) or \(1\).
 
 \section{A general all-different regression template}
+\label{construction}
 \subsection{List colouring}
 Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$.
 
-Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
+Figure~\ref{fig:list-colouring-example} gives a concrete toy instance. Its synthetic dataset has six positive observations, one for each allowed value in the three domains, and three negative observations, one for each edge. The proper list-colouring \(x_1=1\), \(x_2=2\), \(x_3=3\) therefore activates every edge reward while incurring only the unavoidable unary baseline.
 
-\begin{figure}[t]
+\begin{figure}[b]
 \centering
 \begin{tikzpicture}[vertex/.style={circle,draw,thick,minimum size=8mm,inner sep=0pt}]
 \node[vertex] (x1) at (0,1.45) {$x_1$};
@@ -80,22 +80,24 @@ Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this se
 \label{fig:list-colouring-example}
 \end{figure}
 
-Figure~\ref{fig:list-colouring-example} gives a concrete toy instance. Its synthetic dataset has six positive observations, one for each allowed value in the three domains, and three negative observations, one for each edge. The proper list-colouring \(x_1=1\), \(x_2=2\), \(x_3=3\) therefore activates every edge reward while incurring only the unavoidable unary baseline.
-
 \subsection{Regression formulation}
 To make the regression viewpoint explicit, it is useful to describe the \emph{synthetic dataset} rather than only the resulting loss. In the present construction there is no ambient collection of ordinary feature-response pairs. Every observation is inserted deliberately, either to pin a variable to its allowed values or to reward separation along an edge.
+
+Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
 
 \begin{definition}[Signed synthetic $p$-adic regression dataset]
 \label{def:signed-dataset}
 For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a quadruple \((\sigma,u,b,\gamma)\) with \(\sigma\in\{+1,-1\}\), \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(\gamma>0\). It contributes the term
 \[
-\ell_{(\sigma,u,b,\gamma)}(x):=\sigma\gamma\,|u^\top x-b|_p
+\sigma\gamma\,|u^\top x-b|_p
 \]
-to the objective; formally, \(\ell_{(\sigma,u,b,\gamma)}\) is the $p$-adic analogue of a weighted Euclidean residual term. Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms. We also use the shorter phrases \emph{positive observations} and \emph{negative observations}.
+to the loss; formally, this is the $p$-adic analogue of a weighted Euclidean residual term.
 \end{definition}
 
-\begin{construction}[Polynomial-time synthetic dataset for list-colouring]
-\label{prop:list-dataset}
+Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms. We also use the shorter phrases \emph{positive observations} and \emph{negative observations}.
+
+\begin{definition}[Synthetic dataset for list-colouring]
+\label{def:list-dataset}
 Let \(V=\{1,\dots,n\}\), let \(G=(V,E)\) be a finite graph, let \(D_i\subseteq \{1,\dots,q\}\) be nonempty allowed sets, and fix a prime \(p>q\). Define
 \[
 w_{ii}:=0,
@@ -114,37 +116,26 @@ let \(\Delta:=\max_{i\in V}\sum_{j=1}^n w_{ij}\), and set \(\lambda:=1+\Delta\).
 \[
 \mathcal S^- := \{(-1,e_i-e_j,0,1): 1\le i<j\le n,\ w_{ij}=1\}.
 \]
-Define \(\mathcal S:=\mathcal S^+\sqcup\mathcal S^-\), and define the loss for \(\mathcal S\) by
+Set \(\mathcal S:=\mathcal S^+\sqcup\mathcal S^-\).
+\end{definition}
+
+\begin{definition}[Loss associated with the list-colouring dataset]
+\label{def:list-loss}
+For \(\mathcal S\) as in Definition~\ref{def:list-dataset}, define
 \[
 L_{\mathcal S}(x)
 =
 \lambda\sum_{i=1}^n \sum_{a\in D_i}|x_i-a|_p
 -\sum_{1\le i<j\le n} w_{ij}|x_i-x_j|_p.
 \]
-We now analyse that construction. The dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). Every observation has a clear combinatorial role: the positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
-\end{construction}
+\end{definition}
 
-\begin{proof}
-Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\), and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\). Summing them yields the displayed objective. The size bound and runtime are immediate from the explicit construction.
-\end{proof}
+This dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). Every observation has a clear combinatorial role: the positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
+
+Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\), and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\). Summing them yields the displayed loss. The size bound and runtime are immediate from the explicit definitions.
 
 \subsection{Correctness}
-For each \(i\in V\), choose once and for all a reference value \(a_i^\ast\in D_i\), and define the snapping map \(\pi_i:\mathbb Z_p\to D_i\) by
-\[
-\pi_i(t):=
-\begin{cases}
-t, & t\in D_i,\\
-a, & t\notin D_i \text{ and } t\equiv a \pmod p \text{ for the unique } a\in D_i,\\
-a_i^\ast, & t\not\equiv a \pmod p \text{ for all } a\in D_i.
-\end{cases}
-\]
-Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so the middle case is well defined. Let
-\[
-\Pi:\mathbb Z_p^n\to \prod_{i=1}^n D_i,
-\qquad
-\Pi(x):=(\pi_1(x_1),\dots,\pi_n(x_n)).
-\]
-Thus \(\Pi(x)\) is the coordinatewise snapped point in \(\prod_{i=1}^n D_i\).
+For each \(i\in V\), choose once and for all a reference value \(a_i^\ast\in D_i\). Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so for any \(t\in\mathbb Z_p\) there is at most one \(a\in D_i\) with \(t\equiv a\pmod p\).
 
 First we prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
 
@@ -155,27 +146,27 @@ For \(i\in V\), define
 U_i(t):=\sum_{a\in D_i}|t-a|_p
 \qquad (t\in\mathbb Z_p).
 \]
-Then for every \(t\in\mathbb Z_p\),
+For \(t\in\mathbb Z_p\), choose \(a\in D_i\) by taking the unique element congruent to \(t\) modulo \(p\) when such an element exists, and otherwise taking \(a:=a_i^\ast\). Then
 \[
-U_i(t)=(|D_i|-1)+|t-\pi_i(t)|_p \ge |D_i|-1,
+U_i(t)=(|D_i|-1)+|t-a|_p \ge |D_i|-1,
 \]
 with equality if and only if \(t\in D_i\).
 \end{lemma}
 
 \begin{proof}
-If \(t\in D_i\), then \(\pi_i(t)=t\), one summand in \(U_i(t)\) is \(0\), and the remaining \(|D_i|-1\) summands are \(1\), so \(U_i(t)=|D_i|-1\). If \(t\notin D_i\) but \(t\equiv a \pmod p\) for the unique \(a\in D_i\), then \(|t-a|_p<1\), while for every \(b\in D_i\setminus\{a\}\) we have \(t-b\equiv a-b\not\equiv 0\pmod p\), so \(|t-b|_p=1\). Thus
+If \(t\in D_i\), then one summand in \(U_i(t)\) is \(0\), and the remaining \(|D_i|-1\) summands are \(1\), so \(U_i(t)=|D_i|-1\). If \(t\notin D_i\) but \(t\equiv a \pmod p\) for the unique \(a\in D_i\), then \(|t-a|_p<1\), while for every \(b\in D_i\setminus\{a\}\) we have \(t-b\equiv a-b\not\equiv 0\pmod p\), so \(|t-b|_p=1\). Thus
 \[
-U_i(t)=(|D_i|-1)+|t-a|_p=(|D_i|-1)+|t-\pi_i(t)|_p.
+U_i(t)=(|D_i|-1)+|t-a|_p.
 \]
 If \(t\) is congruent modulo \(p\) to no element of \(D_i\), then \(|t-a|_p=1\) for all \(a\in D_i\), hence
 \[
-U_i(t)=|D_i|=(|D_i|-1)+1=(|D_i|-1)+|t-a_i^\ast|_p=(|D_i|-1)+|t-\pi_i(t)|_p.
+U_i(t)=|D_i|=(|D_i|-1)+1=(|D_i|-1)+|t-a_i^\ast|_p.
 \]
 \end{proof}
 
 \begin{lemma}[Digit-snapping lemma]
 \label{lem:digit-snapping}
-Let \(x\in\mathbb Z_p^n\), let \(i\in V\), and suppose \(x_i\notin D_i\). Let \(x^{(i)}\) be obtained from \(x\) by replacing \(x_i\) with \(\Pi(x)_i\). Then
+Let \(x\in\mathbb Z_p^n\), let \(i\in V\), and suppose \(x_i\notin D_i\). Define \(a\in D_i\) by taking the unique element congruent to \(x_i\) modulo \(p\) when such an element exists, and otherwise taking \(a:=a_i^\ast\). Let \(x^{(i)}\) be obtained from \(x\) by replacing \(x_i\) with \(a\). Then
 \[
 L_{\mathcal S}(x^{(i)})<L_{\mathcal S}(x).
 \]
@@ -183,7 +174,7 @@ In particular, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1
 \end{lemma}
 
 \begin{proof}
-Put \(a:=\Pi(x)_i=\pi_i(x_i)\). By Lemma~\ref{lem:unary-well},
+By Lemma~\ref{lem:unary-well},
 \[
 U_i(a)-U_i(x_i)=\bigl(|D_i|-1\bigr)-\bigl((|D_i|-1)+|x_i-a|_p\bigr)=-|x_i-a|_p.
 \]
@@ -235,7 +226,7 @@ Next we analyse the loss on domain-respecting assignments. In that regime it bec
 
 \begin{theorem}[Correctness of the synthetic reduction]
 \label{thm:all-different}
-For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Construction~\ref{prop:list-dataset}, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\). On \(\prod_{i=1}^n D_i\),
+For the dataset \(\mathcal S=\mathcal S^+\sqcup\mathcal S^-\) from Definition~\ref{def:list-dataset} and the loss from Definition~\ref{def:list-loss}, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\). On \(\prod_{i=1}^n D_i\),
 \[
 L_{\mathcal S}(x)
 =
@@ -261,7 +252,7 @@ Any finite-domain all-different constraint system can be encoded, in polynomial 
 \end{corollary}
 
 \begin{proof}
-Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists. Apply Construction~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different}.
+Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists. Apply Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, and Theorem~\ref{thm:all-different}.
 \end{proof}
 
 \section{Sudoku as a special case}
@@ -320,7 +311,7 @@ This is Lemma~\ref{lem:edge-indicator} with \(q=9\).
 \subsection{Expanded regression objective}
 Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share a unit (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
 
-Specialising Construction~\ref{prop:list-dataset} and Theorem~\ref{thm:all-different} to the Sudoku graph gives the minimal synthetic dataset
+Specialising Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, together with Theorem~\ref{thm:all-different}, to the Sudoku graph gives the minimal synthetic dataset
 \begin{align}
 L_{\min}(x) &=
 \alpha\sum_{i\notin\mathcal{C}}\sum_{k=1}^9 |x_i-k|_p
