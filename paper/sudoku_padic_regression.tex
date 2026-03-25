@@ -16,7 +16,6 @@
 \date{\today}
 
 \newtheorem{theorem}{Theorem}
-\newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{corollary}[theorem]{Corollary}
 \newtheorem{lemma}{Lemma}
 \newtheorem{definition}{Definition}
@@ -83,6 +82,27 @@ Figure~\ref{fig:list-colouring-example} gives a concrete toy instance. Its synth
 \subsection{Regression formulation}
 To make the regression viewpoint explicit, it is useful to describe the \emph{synthetic dataset} rather than only the resulting loss. In the present construction there is no ambient collection of ordinary feature-response pairs. Every observation is inserted deliberately, either to pin a variable to its allowed values or to reward separation along an edge.
 
+For the toy instance in Figure~\ref{fig:list-colouring-example}, this equivalence can be written out explicitly. Figure~\ref{fig:list-colouring-regression} shows the corresponding synthetic dataset: six positive observations encode the three domains, and three negative observations encode the three edges.
+
+\begin{figure}[t]
+\centering
+\small
+\begin{tabular}{@{}llp{0.3\linewidth}@{}}
+\toprule
+Type & Synthetic observations & Role \\
+\midrule
+positive & $(+1,e_1,a,\lambda)$ for $a\in\{1,2\}$ & pin $x_1$ to $D_1$ \\
+positive & $(+1,e_2,a,\lambda)$ for $a\in\{2,3\}$ & pin $x_2$ to $D_2$ \\
+positive & $(+1,e_3,a,\lambda)$ for $a\in\{1,3\}$ & pin $x_3$ to $D_3$ \\
+negative & $(-1,e_1-e_2,0,1)$ & reward $x_1\neq x_2$ \\
+negative & $(-1,e_1-e_3,0,1)$ & reward $x_1\neq x_3$ \\
+negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
+\bottomrule
+\end{tabular}
+\caption{Synthetic dataset for the toy list-colouring instance in Figure~\ref{fig:list-colouring-example}.}
+\label{fig:list-colouring-regression}
+\end{figure}
+
 Over $\mathbb{Z}_p$ with $p>q$, the $p$-adic norm is perfectly suited to this setting: once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
 
 \begin{definition}[Signed synthetic $p$-adic regression dataset]
@@ -94,7 +114,9 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 to the loss; formally, this is the $p$-adic analogue of a weighted Euclidean residual term.
 \end{definition}
 
-Observations with \(\sigma=+1\) are \emph{positive regularisation} terms; observations with \(\sigma=-1\) are \emph{negative regularisation} terms. We also use the shorter phrases \emph{positive observations} and \emph{negative observations}.
+\begin{definition}[Positive/negative observations]
+A signed weighted affine observation \((\sigma,u,b,\gamma)\) is \emph{positive} if \(\sigma=+1\) and \emph{negative} if \(\sigma=-1\). We also use the phrases \emph{positive regularisation term} and \emph{negative regularisation term}.
+\end{definition}
 
 \begin{definition}[Synthetic dataset for list-colouring]
 \label{def:list-dataset}
@@ -130,12 +152,12 @@ L_{\mathcal S}(x)
 \]
 \end{definition}
 
-This dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). Every observation has a clear combinatorial role: the positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
+We now analyse that construction. This dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). The positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
 
-Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\), and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\). Summing them yields the displayed loss. The size bound and runtime are immediate from the explicit definitions.
+Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\) to the loss, and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\) to the loss. Summing them yields the displayed loss. The size bound and runtime are immediate from the explicit definitions.
 
 \subsection{Correctness}
-For each \(i\in V\), choose once and for all a reference value \(a_i^\ast\in D_i\). Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\), so for any \(t\in\mathbb Z_p\) there is at most one \(a\in D_i\) with \(t\equiv a\pmod p\).
+Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\). In particular, for any fixed \(i\in V\) and any \(t\in\mathbb Z_p\), there is at most one \(a\in D_i\) with \(t\equiv a\pmod p\).
 
 First we prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
 
@@ -146,61 +168,62 @@ For \(i\in V\), define
 U_i(t):=\sum_{a\in D_i}|t-a|_p
 \qquad (t\in\mathbb Z_p).
 \]
-For \(t\in\mathbb Z_p\), choose \(a\in D_i\) by taking the unique element congruent to \(t\) modulo \(p\) when such an element exists, and otherwise taking \(a:=a_i^\ast\). Then
-\[
-U_i(t)=(|D_i|-1)+|t-a|_p \ge |D_i|-1,
-\]
-with equality if and only if \(t\in D_i\).
+Then \(U_i(t)\ge |D_i|-1\), with equality if and only if \(t\in D_i\).
 \end{lemma}
 
 \begin{proof}
-If \(t\in D_i\), then one summand in \(U_i(t)\) is \(0\), and the remaining \(|D_i|-1\) summands are \(1\), so \(U_i(t)=|D_i|-1\). If \(t\notin D_i\) but \(t\equiv a \pmod p\) for the unique \(a\in D_i\), then \(|t-a|_p<1\), while for every \(b\in D_i\setminus\{a\}\) we have \(t-b\equiv a-b\not\equiv 0\pmod p\), so \(|t-b|_p=1\). Thus
+If \(t\in D_i\), then one summand in \(U_i(t)\) is \(0\), and the remaining \(|D_i|-1\) summands are \(1\), so \(U_i(t)=|D_i|-1\).
+
+If \(t\notin D_i\) but \(t\equiv b \pmod p\) for the unique \(b\in D_i\), then \(|t-b|_p<1\), while for every \(a\in D_i\setminus\{b\}\) we have \(t-a\equiv b-a\not\equiv 0\pmod p\), so \(|t-a|_p=1\). Hence
 \[
-U_i(t)=(|D_i|-1)+|t-a|_p.
+U_i(t)=(|D_i|-1)+|t-b|_p > |D_i|-1.
 \]
-If \(t\) is congruent modulo \(p\) to no element of \(D_i\), then \(|t-a|_p=1\) for all \(a\in D_i\), hence
-\[
-U_i(t)=|D_i|=(|D_i|-1)+1=(|D_i|-1)+|t-a_i^\ast|_p.
-\]
+
+If \(t\) is congruent modulo \(p\) to no element of \(D_i\), then \(|t-a|_p=1\) for all \(a\in D_i\), so \(U_i(t)=|D_i|>|D_i|-1\).
 \end{proof}
 
 \begin{lemma}[Digit-snapping lemma]
 \label{lem:digit-snapping}
-Let \(x\in\mathbb Z_p^n\), let \(i\in V\), and suppose \(x_i\notin D_i\). Define \(a\in D_i\) by taking the unique element congruent to \(x_i\) modulo \(p\) when such an element exists, and otherwise taking \(a:=a_i^\ast\). Let \(x^{(i)}\) be obtained from \(x\) by replacing \(x_i\) with \(a\). Then
+Let \(x\in\mathbb Z_p^n\). Suppose there exists \(i\in V\) with \(x_i\notin D_i\). Choose \(b\in D_i\) as follows: if \(x_i\) is congruent modulo \(p\) to an element of \(D_i\), take that unique element; otherwise choose any \(b\in D_i\). Let \(x'\) be obtained from \(x\) by replacing \(x_i\) with \(b\). Then
 \[
-L_{\mathcal S}(x^{(i)})<L_{\mathcal S}(x).
+L_{\mathcal S}(x')<L_{\mathcal S}(x).
 \]
-In particular, every global minimiser of \(L_{\mathcal S}\) lies in \(\prod_{i=1}^n D_i\).
 \end{lemma}
 
 \begin{proof}
-By Lemma~\ref{lem:unary-well},
+The positive part of the loss changes by
 \[
-U_i(a)-U_i(x_i)=\bigl(|D_i|-1\bigr)-\bigl((|D_i|-1)+|x_i-a|_p\bigr)=-|x_i-a|_p.
+\lambda\left(\sum_{a\in D_i}|b-a|_p-\sum_{a\in D_i}|x_i-a|_p\right).
 \]
-Hence the positive part of the loss changes by
+There are two cases to consider.
+
+If \(x_i\) is congruent modulo \(p\) to no element of \(D_i\), then \(|x_i-a|_p=1\) for every \(a\in D_i\), so \(\sum_{a\in D_i}|x_i-a|_p=|D_i|\). On the other hand, one summand in \(\sum_{a\in D_i}|b-a|_p\) is \(0\) and the remaining \(|D_i|-1\) summands are \(1\), so \(\sum_{a\in D_i}|b-a|_p=|D_i|-1\). Hence the positive change is \(-\lambda\). Since \(|x_i-b|_p=1\) in this case, this is at most \(-\lambda |x_i-b|_p\).
+
+If \(x_i\equiv b \pmod p\) for the unique \(b\in D_i\), then \(\sum_{a\in D_i}|b-a|_p=|D_i|-1\), whereas
 \[
-\lambda\bigl(U_i(a)-U_i(x_i)\bigr)=-\lambda |x_i-a|_p.
+\sum_{a\in D_i}|x_i-a|_p=(|D_i|-1)+|x_i-b|_p.
 \]
+Hence the positive change is \(-\lambda |x_i-b|_p\).
+
 For each \(j\in V\), the corresponding interaction changes by
 \[
-w_{ij}\bigl(|x_i-x_j|_p-|a-x_j|_p\bigr).
+w_{ij}\bigl(|x_i-x_j|_p-|b-x_j|_p\bigr).
 \]
 By the ultrametric inequality,
 \[
-|x_i-x_j|_p \le \max\bigl(|x_i-a|_p,\ |a-x_j|_p\bigr),
+|x_i-x_j|_p \le \max\bigl(|x_i-b|_p,\ |b-x_j|_p\bigr),
 \]
 so
 \[
-|x_i-x_j|_p-|a-x_j|_p \le |x_i-a|_p.
+|x_i-x_j|_p-|b-x_j|_p \le |x_i-b|_p.
 \]
 Summing over all \(j\in V\),
 \[
-L_{\mathcal S}(x^{(i)})-L_{\mathcal S}(x)
+L_{\mathcal S}(x')-L_{\mathcal S}(x)
 \le
-\left(-\lambda+\sum_{j=1}^n w_{ij}\right)|x_i-a|_p
+\left(-\lambda+\sum_{j=1}^n w_{ij}\right)|x_i-b|_p
 \le
--|x_i-a|_p
+-|x_i-b|_p
 <
 0.
 \]
@@ -369,7 +392,7 @@ If one tries to do this with an ordinary squared-loss term $-(x_i-x_j)^2$ in $\m
 
 \section{A stepwise/coordinate-descent heuristic}
 
-The objective \eqref{eq:objective} induces an NP-hard global optimisation problem (consistent with the author's NP-hardness result for $p$-adic regression). The goal here is not a worst-case polynomial-time algorithm, but to test whether generic regression-style updates can still solve individual puzzles.
+The objective \eqref{eq:objective} induces an NP-hard global optimisation problem (consistent with the earlier NP-hardness result for $p$-adic regression). The goal here is not a worst-case polynomial-time algorithm, but to test whether generic regression-style updates can still solve individual puzzles.
 
 Assume now that \(\alpha>20\). On digit-valued assignments consistent with the clues, the two positive sums in \eqref{eq:objective} are constant, so minimising \(L\) is equivalent to minimising the remaining column/box conflict count. In implementation we therefore restrict search to digit-valued assignments consistent with clues. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss (column/box conflicts). This is a form of coordinate descent on an integer lattice.
 
