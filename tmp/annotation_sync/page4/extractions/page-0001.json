@@ -1,0 +1,132 @@
+{
+  "page_number": 1,
+  "section_headers_in_order": [
+    {
+      "header": "Proof.",
+      "location_hint": "top of page"
+    },
+    {
+      "header": "Lemma 2",
+      "location_hint": "middle of page"
+    },
+    {
+      "header": "Proof.",
+      "location_hint": "middle of page"
+    },
+    {
+      "header": "Lemma 3",
+      "location_hint": "bottom of page"
+    }
+  ],
+  "annotations": [
+    {
+      "annotation_id": "1",
+      "ink_color": "blue",
+      "category": "replace",
+      "text_written": "some",
+      "target_description": "",
+      "target_text": "the unique",
+      "context_before": "for",
+      "context_after": "b \\in D_i",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Proof.",
+      "nearest_section_header_after": "Lemma 2",
+      "confidence": 0.95,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    },
+    {
+      "annotation_id": "2",
+      "ink_color": "blue",
+      "category": "insert",
+      "text_written": "0 <",
+      "target_description": "",
+      "target_text": "|t - b|_p",
+      "context_before": "then",
+      "context_after": "|t - b|_p < 1",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Proof.",
+      "nearest_section_header_after": "Lemma 2",
+      "confidence": 0.9,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    },
+    {
+      "annotation_id": "3",
+      "ink_color": "blue",
+      "category": "replace",
+      "text_written": "3",
+      "target_description": "",
+      "target_text": "2",
+      "context_before": "Lemma",
+      "context_after": "(Digit-snapping lemma)",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Lemma 2",
+      "nearest_section_header_after": "Proof.",
+      "confidence": 0.98,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    },
+    {
+      "annotation_id": "4",
+      "ink_color": "blue",
+      "category": "replace",
+      "text_written": "some",
+      "target_description": "",
+      "target_text": "the unique",
+      "context_before": "for",
+      "context_after": "b \\in D_i",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Proof.",
+      "nearest_section_header_after": "Lemma 3",
+      "confidence": 0.95,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    },
+    {
+      "annotation_id": "5",
+      "ink_color": "blue",
+      "category": "replace",
+      "text_written": "negative components",
+      "target_description": "",
+      "target_text": "corresponding interaction",
+      "context_before": "the",
+      "context_after": "changes by",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Proof.",
+      "nearest_section_header_after": "Lemma 3",
+      "confidence": 0.9,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    },
+    {
+      "annotation_id": "6",
+      "ink_color": "blue",
+      "category": "move-or-link",
+      "text_written": "Move this to before lemma 1 and renumber",
+      "target_description": "",
+      "target_text": "Lemma 3",
+      "context_before": "",
+      "context_after": "(Edge terms become inequality indicators on the domain).",
+      "figure_or_table_label": "",
+      "location_hint": "",
+      "section_position": "no-header-visible",
+      "nearest_section_header_before": "Lemma 3",
+      "nearest_section_header_after": "",
+      "confidence": 0.95,
+      "needs_human_confirmation": false,
+      "rationale": ""
+    }
+  ],
+  "page_notes": "The user is correcting Lemma numbering and terminology. Lemma 2 is changed to 3, and the original Lemma 3 is requested to be moved before Lemma 1."
+}

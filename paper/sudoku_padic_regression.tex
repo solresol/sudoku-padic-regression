@@ -159,7 +159,25 @@ Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\
 \subsection{Correctness}
 Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\). In particular, for any fixed \(i\in V\) and any \(t\in\mathbb Z_p\), there is at most one \(a\in D_i\) with \(t\equiv a\pmod p\).
 
-First we prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
+First we record the simple observation that, on \(\{1,\dots,q\}\), the \(p\)-adic norm detects inequality exactly.
+
+\begin{lemma}[Edge terms become inequality indicators on the domain]
+\label{lem:edge-indicator}
+If \(x_i,x_j\in \{1,\dots,q\}\) and \(p>q\), then
+\[
+|x_i-x_j|_p=
+\begin{cases}
+0,&x_i=x_j,\\
+1,&x_i\neq x_j.
+\end{cases}
+\]
+\end{lemma}
+
+\begin{proof}
+If \(x_i=x_j\) then the difference is zero. If \(x_i\neq x_j\), then \(1\le |x_i-x_j|\le q-1<p\), so \(p\nmid (x_i-x_j)\) and therefore \(|x_i-x_j|_p=1\).
+\end{proof}
+
+We next prove a digit-snapping lemma: if \(x\) minimises \(L_{\mathcal S}\), then each coordinate \(x_i\) lies in \(D_i\). The explicit unary-well formula makes that argument transparent.
 
 \begin{lemma}[Unary wells]
 \label{lem:unary-well}
@@ -174,7 +192,7 @@ Then \(U_i(t)\ge |D_i|-1\), with equality if and only if \(t\in D_i\).
 \begin{proof}
 If \(t\in D_i\), then one summand in \(U_i(t)\) is \(0\), and the remaining \(|D_i|-1\) summands are \(1\), so \(U_i(t)=|D_i|-1\).
 
-If \(t\notin D_i\) but \(t\equiv b \pmod p\) for the unique \(b\in D_i\), then \(|t-b|_p<1\), while for every \(a\in D_i\setminus\{b\}\) we have \(t-a\equiv b-a\not\equiv 0\pmod p\), so \(|t-a|_p=1\). Hence
+If \(t\notin D_i\) but \(t\equiv b \pmod p\) for some \(b\in D_i\), then \(0<|t-b|_p<1\), while for every \(a\in D_i\setminus\{b\}\) we have \(t-a\equiv b-a\not\equiv 0\pmod p\), so \(|t-a|_p=1\). Hence
 \[
 U_i(t)=(|D_i|-1)+|t-b|_p > |D_i|-1.
 \]
@@ -199,13 +217,13 @@ There are two cases to consider.
 
 If \(x_i\) is congruent modulo \(p\) to no element of \(D_i\), then \(|x_i-a|_p=1\) for every \(a\in D_i\), so \(\sum_{a\in D_i}|x_i-a|_p=|D_i|\). On the other hand, one summand in \(\sum_{a\in D_i}|b-a|_p\) is \(0\) and the remaining \(|D_i|-1\) summands are \(1\), so \(\sum_{a\in D_i}|b-a|_p=|D_i|-1\). Hence the positive change is \(-\lambda\). Since \(|x_i-b|_p=1\) in this case, this is at most \(-\lambda |x_i-b|_p\).
 
-If \(x_i\equiv b \pmod p\) for the unique \(b\in D_i\), then \(\sum_{a\in D_i}|b-a|_p=|D_i|-1\), whereas
+If \(x_i\equiv b \pmod p\) for some \(b\in D_i\), then \(\sum_{a\in D_i}|b-a|_p=|D_i|-1\), whereas
 \[
 \sum_{a\in D_i}|x_i-a|_p=(|D_i|-1)+|x_i-b|_p.
 \]
 Hence the positive change is \(-\lambda |x_i-b|_p\).
 
-For each \(j\in V\), the corresponding interaction changes by
+For each \(j\in V\), the corresponding negative component changes by
 \[
 w_{ij}\bigl(|x_i-x_j|_p-|b-x_j|_p\bigr).
 \]
@@ -227,22 +245,6 @@ L_{\mathcal S}(x')-L_{\mathcal S}(x)
 <
 0.
 \]
-\end{proof}
-
-\begin{lemma}[Edge terms become inequality indicators on the domain]
-\label{lem:edge-indicator}
-If \(x_i,x_j\in \{1,\dots,q\}\) and \(p>q\), then
-\[
-|x_i-x_j|_p=
-\begin{cases}
-0,&x_i=x_j,\\
-1,&x_i\neq x_j.
-\end{cases}
-\]
-\end{lemma}
-
-\begin{proof}
-If \(x_i=x_j\) then the difference is zero. If \(x_i\neq x_j\), then \(1\le |x_i-x_j|\le q-1<p\), so \(p\nmid (x_i-x_j)\) and therefore \(|x_i-x_j|_p=1\).
 \end{proof}
 
 Next we analyse the loss on domain-respecting assignments. In that regime it becomes a constant plus a conflict count, so if the list-colouring instance is satisfiable the rightmost sum can be zero.
