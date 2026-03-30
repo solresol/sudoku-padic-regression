@@ -11,7 +11,7 @@
 \usepackage{sudoku}
 \usepackage{tikz}
 
-\title{Solving Sudoku the Hard Way Using Integer-Valued $p$-adic Linear Regression\\with Positive and Negative Regularisation}
+\title{Solving Sudoku the Hard Way:\\A Domain-Native Integer-Valued $p$-adic Regression Encoding\\with Positive and Negative Regularisation}
 \author{(Author details omitted for review)}
 \date{\today}
 
@@ -31,22 +31,24 @@
 \maketitle
 
 \begin{abstract}
-This note studies a general $p$-adic encoding of finite-domain all-different systems and then uses Sudoku as a concrete case study. Given a graph whose vertices carry finite allowed sets and whose edges reward unequal assignments, we show that a $p$-adic regression-style objective has global minimisers exactly the domain-respecting assignments that maximise the number of unequal edges. When the corresponding list-colouring instance is satisfiable, the global minimisers are precisely the proper list-colourings.
-Sudoku fits this template by taking one variable per cell, edges between cells that share a row, column, or box, and singleton domains on clue cells. To make the regression viewpoint explicit, we expand the unary penalties into synthetic observations that ``snap'' each coefficient to a digit and use negative regularisation on pairwise differences to reward inequality. For primes $p>9$, the $p$-adic norm makes every nonzero digit difference have norm $1$, eliminating magnitude bias and turning ``difference'' into a clean proxy for ``not equal''.
-We then ``train'' the resulting regression instance using two generic optimisers: a stepwise/coordinate-descent heuristic (row-wise swap moves) and a Zubarev-style stochastic walk that samples updates with probability proportional to $\exp(-\beta\,\Delta L)$. Despite the layered absurdity---solving Sudoku by first forcing it into a $p$-adic regression mould and then applying generic regression training rules---both heuristics can solve moderate-clue puzzles in small-scale experiments.
+This note studies a general $p$-adic encoding of finite-domain all-different systems and then uses Sudoku as a concrete case study. The gain of the encoding is representational rather than algorithmic: it keeps optimisation in the native $81$-cell digit space, avoids a one-hot lift to $729$ Boolean indicators, and makes the objective readable in terms of the puzzle state itself. Given a graph whose vertices carry finite allowed sets and whose edges reward unequal assignments, we show that a signed synthetic $p$-adic regression objective has global minimisers exactly the domain-respecting assignments that maximise the number of unequal edges. When the corresponding list-colouring instance is satisfiable, the global minimisers are precisely the proper list-colourings.
+Sudoku fits this template by taking one variable per cell, edges between cells that share a row, column, or box, and singleton domains on clue cells. To make the regression viewpoint explicit, we write the unary penalties as synthetic observations that ``snap'' each coefficient to a digit and use negative regularisation on pairwise differences to reward inequality. For primes $p>9$, the $p$-adic norm makes every nonzero digit difference have norm $1$, eliminating magnitude bias and turning ``difference'' into a clean proxy for ``not equal''. Once the state is digit-valued, the loss is just an additive constant plus the number of peer conflicts.
+We then ``train'' the resulting regression instance using two generic optimisers: a stepwise/coordinate-descent heuristic (row-wise swap moves) and a Zubarev-style stochastic walk that samples updates with probability proportional to $\exp(-\beta\,\Delta L)$. These heuristics are not competitive with dedicated Sudoku methods, but they make the encoding's central feature concrete: the state is the puzzle itself, and the effect of a local move can be audited directly in the affected columns and boxes without unpacking an auxiliary Boolean representation.
 \end{abstract}
 
 \section{Motivation and prior work}
 There are many sensible ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, and SAT encodings \cite{lynce2006sudoku} are all natural approaches. This paper is not one of them.
 
-Instead, it asks whether modifying the loss landscape of linear regression is sufficient to encode finite-domain all-different systems using digit-valued parameters directly rather than one-hot indicators, with Sudoku as the cleanest worked example. The point is not computational efficiency but conceptual compression: use fewer variables than a typical SAT/CSP encoding, have their domains match the problem domains, and let the $p$-adic objective enforce both domain membership and pairwise distinctness.
+Instead, it asks whether modifying the loss landscape of linear regression is sufficient to encode finite-domain all-different systems using digit-valued parameters directly rather than one-hot indicators, with Sudoku as the cleanest worked example. The point is not computational efficiency but representational parsimony: use one variable per semantic object, keep the domain of each variable aligned with the problem domain, and let a single $p$-adic objective enforce both domain membership and pairwise distinctness. On digit-valued states the loss becomes a constant plus a visible conflict count, so local updates can be followed in the native Sudoku grid rather than through an auxiliary encoding.
+
+This is the sense in which the construction is intended to be hand-traceable. The claim is not that a human would solve Sudoku by imitating the optimiser; it is that once the state is represented by digits directly, the effect of a proposed local move can be checked by hand from the affected units alone.
 
 Two earlier results motivate the construction:
 \begin{itemize}
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive regularisation points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Our contribution in this paper is the use of negative regularisation to enforce pairwise distinctness. The construction in Section~\ref{construction} isolates the general mechanism behind the Sudoku example.
+Our contribution in this paper is the use of negative regularisation to enforce pairwise distinctness, together with a Sudoku case study that makes the native-state and locally auditable character of the encoding concrete. The construction in Section~\ref{construction} isolates the general mechanism behind the Sudoku example.
 
 \section{Preliminaries}
 
@@ -333,7 +335,7 @@ Let $p>9$ and $a,b\in D$. Then
 This is Lemma~\ref{lem:edge-indicator} with \(q=9\).
 \end{proof}
 
-\subsection{Expanded regression objective}
+\subsection{Minimal and expanded regression objectives}
 Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share a unit (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
 
 Specialising Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, together with Theorem~\ref{thm:all-different}, to the Sudoku graph gives the minimal synthetic dataset
@@ -346,7 +348,7 @@ L_{\min}(x) &=
 \sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective-minimal}
 \end{align}
-A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. Every term in \eqref{eq:objective-minimal} is a regularisation term with a specific purpose: the positive terms pin cells to allowed digits or clues, and the negative terms reward unequal peer values. There are no ordinary feature-response observations beyond these synthetic regularisers. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations.
+A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. Every term in \eqref{eq:objective-minimal} is a regularisation term with a specific purpose: the positive terms pin cells to allowed digits or clues, and the negative terms reward unequal peer values. There are no ordinary feature-response observations beyond these synthetic regularisers. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations. This is the conceptual formulation used in the correctness statements and in the parsimony discussion below: a single scalar objective on the native digit state space.
 
 For the experiments, however, we use the slightly more redundant expanded objective
 \begin{align}
@@ -358,7 +360,7 @@ L(x) &=
 \sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective}
 \end{align}
-Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even on clue cells and then adds the clue pins separately. It therefore contains \(729+|\mathcal C|\) positive observations and the same \(810\) negative observations. The first two sums are \emph{positive} regularisation, and the final sum is \emph{negative} regularisation. There is still no ``ordinary'' data in the usual regression sense: every synthetic observation exists only to enforce a Sudoku constraint. Equivalently, counting peer pairs per unit gives $27\binom{9}{2}=972$ negative terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall.
+Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even on clue cells and then adds the clue pins separately. It therefore contains \(729+|\mathcal C|\) positive observations and the same \(810\) negative observations. The first two sums are \emph{positive} regularisation, and the final sum is \emph{negative} regularisation. There is still no ``ordinary'' data in the usual regression sense: every synthetic observation exists only to enforce a Sudoku constraint. Equivalently, counting peer pairs per unit gives $27\binom{9}{2}=972$ negative terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall. We use this expanded form only as an implementation convenience; it should be read as a redundant refinement of \eqref{eq:objective-minimal}, not as the more conceptually fundamental model.
 
 Once \(x\) is digit-valued, the pairwise part is simply
 \[
@@ -398,6 +400,21 @@ The objective \eqref{eq:objective} induces an NP-hard global optimisation proble
 
 Assume now that \(\alpha>20\). On digit-valued assignments consistent with the clues, the two positive sums in \eqref{eq:objective} are constant, so minimising \(L\) is equivalent to minimising the remaining column/box conflict count. In implementation we therefore restrict search to digit-valued assignments consistent with clues. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss (column/box conflicts). This is a form of coordinate descent on an integer lattice.
 
+We will call this move set \emph{hand-traceable}: the state is a filled Sudoku grid, and the effect of a candidate swap can be checked by inspecting only the units that the swap touches, rather than by decoding an auxiliary indicator representation.
+
+\begin{lemma}[Locality of row swaps]
+\label{lem:row-swap-locality}
+Let \(x\) be a digit-valued, clue-consistent Sudoku state in which each row is a permutation of \(1,\dots,9\). Let \(\xi\) swap two non-clue entries in a single row \(r\), at columns \(c_1\neq c_2\). Then the change
+\[
+\Delta L(\xi):=L(x\oplus \xi)-L(x)
+\]
+is determined entirely by the conflict-pair contributions from columns \(c_1\) and \(c_2\), together with the one or two boxes containing \((r,c_1)\) and \((r,c_2)\). No other term of the digit-restricted objective changes.
+\end{lemma}
+
+\begin{proof}
+On digit-valued clue-consistent states, the positive part of \eqref{eq:objective} is constant, so only the column/box conflict count matters. A within-row swap preserves the row permutation, so row conflicts remain zero. Every cell outside row \(r\) is unchanged, and within row \(r\) only the two swapped positions change value. Hence only the two corresponding columns can change their conflict counts. Likewise, only the boxes containing those two cells can change. All other columns and boxes see the same multiset of digits before and after the swap, so their contributions are unchanged.
+\end{proof}
+
 \begin{algorithm}[t]
 \caption{Row-swap stepwise regression (heuristic)}
 \begin{algorithmic}[1]
@@ -415,10 +432,24 @@ Assume now that \(\alpha>20\). On digit-valued assignments consistent with the c
 \end{algorithmic}
 \end{algorithm}
 
-This ``stepwise regression'' view matches the informal idea: at each step, choose the coefficient change that gives the largest incremental loss improvement.
+This ``stepwise regression'' view matches the informal idea: at each step, choose the coefficient change that gives the largest incremental loss improvement. Lemma~\ref{lem:row-swap-locality} is the precise bridge from the $p$-adic formulation to hand-traceability: in the row-permutation regime, a move is scored by a small local audit of the affected columns and boxes.
 
 \subsection{A short trace on a standard puzzle}
 To make the row-swap heuristic more concrete, Figure~\ref{fig:example-puzzle} shows the standard example puzzle. With seed $0$ (restart $0$), the row-wise random initialisation used by the solver produces the filled grid in Figure~\ref{fig:seed-zero-init}; this state has $56$ column+box conflict pairs. Table~\ref{tab:trace} shows the first few swaps from that initial state, and the algorithm occasionally applies a random swap when no improving move is available, to escape local minima.
+
+Step \(2\) illustrates the locality claim. After Step \(1\), row \(6\) contains
+\[
+(7,3,1,8,2,5,4,9,6),
+\]
+and the chosen move swaps the entries in columns \(3\) and \(6\), exchanging \(1\) and \(5\). By Lemma~\ref{lem:row-swap-locality}, only column \(3\), column \(6\), the box on rows \(4\)--\(6\) and columns \(1\)--\(3\), and the box on rows \(4\)--\(6\) and columns \(4\)--\(6\) need to be inspected. Before the swap these four units contribute
+\[
+4+6+1+2=13
+\]
+conflict pairs; afterwards they contribute
+\[
+3+3+2+1=9.
+\]
+Thus \(\Delta L=-4\), exactly as reported in Table~\ref{tab:trace}. No other unit enters the calculation. This is not meant to mimic human Sudoku strategy, but it does show that the optimisation remains locally auditable in the native digit grid.
 
 \begin{figure}[t]
 \centering
@@ -597,7 +628,7 @@ Figure~\ref{fig:loss} shows the loss trajectory for the stepwise row-swap heuris
 \label{fig:loss}
 \end{figure}
 
-\section{Compared with SAT/CSP encodings}
+\section{Parsimony relative to SAT/CSP encodings}
 
 A standard SAT encoding introduces Boolean variables
 \[
@@ -626,7 +657,13 @@ for a total of
 \]
 clauses after adding one unit clause for each clue in $\mathcal{C}$.
 
-The exact-cover / CSP view uses the same $729$ indicator variables, but packages them into $324$ structured constraints rather than flattening them all the way to CNF. By contrast, the $p$-adic regression model works with only $81$ digit-valued variables and the objective
+There are three distinct parsimony claims here, and it helps to keep them separate.
+
+\paragraph{Parameter parsimony.}
+The exact-cover / SAT lift uses $729$ indicator variables, whereas the $p$-adic model keeps the puzzle in its native $81$-cell digit space. This is the cleanest comparison against lifted encodings: one digit-valued variable per semantic object rather than nine Boolean indicators per cell.
+
+\paragraph{Objective form.}
+For Sudoku, the minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that native state space. The expanded implementation \eqref{eq:objective} contains
 \[
 729 \text{ digit-snapping residuals} \;+\; |\mathcal{C}| \text{ clue residuals} \;+\; 810 \text{ pairwise residuals},
 \]
@@ -642,34 +679,19 @@ fewer expanded constraints, together with a factor of
 \[
 \frac{729}{81} = 9
 \]
-fewer variables. Relative to exact cover, it still uses $9\times$ fewer variables, but more scalar terms than the $324$ structured constraints.
+fewer variables. Relative to exact cover, the comparison is subtler: the regression model still avoids the $729$-variable lift, but it has more scalar terms than the $324$ structured constraints.
 
-One simple information-theoretic proxy for model complexity is the entropy of a uniformly random unconstrained assignment. For the Boolean SAT variables this is
-\[
-H_{\mathrm{SAT}} = \log_2(2^{729}) = 729 \text{ bits},
-\]
-whereas for the $p$-adic Sudoku variables restricted to $D=\{1,\dots,9\}$ it is
-\[
-H_{p\text{-adic}} = \log_2(9^{81}) = 81\log_2 9 \approx 256.8 \text{ bits}.
-\]
-This is not a theorem about solver runtime, but it does quantify the sense in which the regression model is a compressed parameterisation: it exposes fewer free degrees of freedom. The row-wise permutation heuristic compresses further to $(9!)^9$, with entropy
-\[
-H_{\mathrm{row\;perm}} = 9\log_2(9!) \approx 166.2 \text{ bits}
-\]
-before clues, or more generally
-\[
-\sum_{r=1}^9 \log_2((9-c_r)!)
-\]
-if row $r$ contains $c_r$ fixed clues. The price of this compression is that the residuals are arithmetic and global rather than local and Boolean.
+\paragraph{Cognitive parsimony.}
+High-level constraint-programming models deserve a separate remark. A structured CP model based on \(81\) cell variables and \emph{alldifferent} constraints is already semantically close to the puzzle, so the present claim is not that the $p$-adic encoding uses fewer variables than every CP formulation. Rather, its advantage is that it packages the problem as a single native-state objective whose digit-restricted form is just a constant plus peer conflicts. In the row-permutation regime, the current search state is literally a Sudoku grid, and a proposed move can be audited by inspecting only the affected columns and boxes, as in Lemma~\ref{lem:row-swap-locality}. That is a claim about representational readability, not a theorem about runtime.
 
 \section{Discussion and extensions}
-The model is intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly.
+The model is still intentionally ``the hard way'': it embeds Sudoku into a (potentially) NP-hard regression-like optimisation problem rather than exploiting Sudoku structure directly. But the point of doing so is representational rather than comic. The interesting feature is that the encoding stays in the puzzle's own digit space while preserving a locally interpretable objective.
 
 \paragraph{Training Sudoku as a regression model.}
-The most absurd aspect of the construction is arguably not the loss itself, but the fact that once we write down \eqref{eq:objective}, we can treat Sudoku completion as a \emph{training problem} and import generic training dynamics from the $p$-adic regression setting. The Zubarev walk is a particularly clean example: a loss-biased random walk that is not designed for Sudoku in any way, yet still finds valid completions when run over the row-swap move set.
+The most striking aspect of the construction is arguably not the loss itself, but the fact that once we write down \eqref{eq:objective}, we can treat Sudoku completion as a \emph{training problem} and import generic training dynamics from the $p$-adic regression setting. The Zubarev walk is a particularly clean example: a loss-biased random walk that is not designed for Sudoku in any way, yet still finds valid completions when run over the row-swap move set. What it preserves from the underlying encoding is not Sudoku expertise, but the native-state viewpoint: the walk moves directly in the space of digit fillings rather than in an auxiliary one-hot lift.
 
-\subsection{An alternative sparse encoding: powers-of-two sum constraints (archived)}
-The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: $|\mathcal{P}|=810$ distinct peer pairs (equivalently $27\binom{9}{2}=972$ pairs if counted per unit, with overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation.
+\subsection{An archived sparse alternative: powers-of-two sums}
+The objective \eqref{eq:objective} uses a large collection of pairwise inequality terms: $|\mathcal{P}|=810$ distinct peer pairs (equivalently $27\binom{9}{2}=972$ pairs if counted per unit, with overlap). An appealing alternative is to enforce all-different constraints \emph{without} pairwise penalties, by changing the digit representation. This gives a useful contrast case: it is structurally sparser in one sense, but much less local and much less hand-traceable.
 
 Map digits $d\in\{1,\dots,9\}$ to powers of two,
 \[
@@ -689,7 +711,7 @@ L_p(\beta) := \sum_g |r_g(\beta)|_p,
 \]
 optionally together with a (soft or hard) regulariser that encourages $\beta_{r,c}\in A$ and enforces the clues.
 
-This encoding also suggests a ``Hensel-ish'' lifting perspective: a constraint is satisfied at lift level $k$ when $r_g(\beta)\equiv 0\pmod{p^k}$ (equivalently $v_p(r_g(\beta))\ge k$), and a heuristic tries to increase the minimum valuation across groups. Once $p^k > 9\cdot 256 = 2304$, having all residuals divisible by $p^k$ forces every residual to be zero, yielding an actual integer solution. In archived experiments with simple local-search moves (greedy single-cell changes and simulated annealing), this objective exhibited abundant local minima and did not reliably solve standard benchmark puzzles; however, the representation remains conceptually attractive because it uses so few structural constraints.
+This encoding also suggests a ``Hensel-ish'' lifting perspective: a constraint is satisfied at lift level $k$ when $r_g(\beta)\equiv 0\pmod{p^k}$ (equivalently $v_p(r_g(\beta))\ge k$), and a heuristic tries to increase the minimum valuation across groups. Once $p^k > 9\cdot 256 = 2304$, having all residuals divisible by $p^k$ forces every residual to be zero, yielding an actual integer solution. In archived experiments with simple local-search moves (greedy single-cell changes and simulated annealing), this objective exhibited abundant local minima and did not reliably solve standard benchmark puzzles. The contrast is instructive: sheer sparsity of structural constraints is not enough. The more successful encoding in the main body of the paper is not merely compact; it is compact while remaining domain-native and locally auditable.
 
 Several extensions are immediate:
 \begin{itemize}
@@ -700,7 +722,7 @@ Several extensions are immediate:
 \section{Conclusion}
 This note takes a deliberately contrarian route to a familiar puzzle: it first shows that finite-domain all-different systems admit tidy $p$-adic regression encodings, and then studies Sudoku as a vivid special case. The construction is mathematically tidy precisely because the $p$-adic norm turns ``different from'' into an indicator-like reward once the variables are digit-valued.
 
-As an optimisation method, this is obviously not competitive with mature Sudoku solvers or SAT/CSP technology. But the construction still earns its keep twice over: it gives a genuinely small model---$81$ digit-valued variables rather than $729$ Boolean indicators---and it shows that the same $p$-adic machinery used in earlier regression work is expressive enough to encode crisp all-different constraint systems in general. Even generic training dynamics such as the Zubarev walk can then recover valid solutions in a concrete case. In that sense the paper is less about Sudoku alone than about the surprising breadth of problems that can be phrased as ultrametric regression landscapes.
+As an optimisation method, this is obviously not competitive with mature Sudoku solvers or SAT/CSP technology. Its interest is representational. The encoding keeps the problem in the native $81$-cell digit space rather than lifting it to $729$ Boolean indicators, yields a single scalar objective whose digit-restricted form is just a constant plus peer conflicts, and supports local move audits such as the row-swap calculations above. Compared with more aggressively compressed alternatives such as the powers-of-two formulation, that locality matters: the successful encoding is not only compact but also readable in the original problem coordinates. In that sense the paper is less about solving Sudoku efficiently than about showing that ultrametric regression can express finite-domain all-different systems in a compact, domain-native, and locally auditable way.
 
 \begin{thebibliography}{9}
 
