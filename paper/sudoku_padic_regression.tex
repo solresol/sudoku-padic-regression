@@ -6,17 +6,17 @@
 \usepackage{booktabs}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{sudoku}
 \usepackage{tikz}
 
-\title{Negative-weight Regularisation of p-adic Linear Regression\\with a Sudoku Case Study}
+\title{Signed p-adic Regression Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study}
 \author{Greg Baker\\\small School of Computing, Australian National University\\\small Canberra, Australia\\\small \href{mailto:greg.baker@anu.edu.au}{greg.baker@anu.edu.au}}
 \date{}
 \hypersetup{
     pdftitle={Signed p-adic Regression Encodings of Finite-Domain All-Different Systems with a Sudoku Case Study},
     pdfauthor={Greg Baker},
-    pdfkeywords={p-adic regression, all-different constraints, list colouring, synthetic datasets, Sudoku}
+    pdfkeywords={p-adic regression, signed residual objectives, all-different constraints, list colouring, Sudoku}
 }
 
 \newtheorem{theorem}{Theorem}
@@ -37,24 +37,26 @@
 \begin{abstract}
 This note studies a signed synthetic p-adic regression encoding of finite-domain all-different systems and uses Sudoku as a worked example. Given a graph whose vertices carry finite allowed sets and whose edges reward unequal assignments, we build positive synthetic observations that create unary domain wells and negative synthetic observations that reward pairwise inequality. For primes $p>q$, every nonzero difference between values in $\{1,\dots,q\}$ has p-adic norm $1$, so on domain-respecting states the loss is an additive constant plus the edge-conflict count. It follows that the global minimisers are exactly the domain-respecting assignments that maximise the number of unequal edges. When the associated list-colouring instance is satisfiable, the minimisers are precisely its proper list-colourings.
 
-Standard Sudoku is an immediate special case: there is one variable per cell, singleton domains on clue cells, and edges between cells that share a row, column, or box. The resulting objective uses the original $81$ cell variables rather than a one-hot lift to $729$ Boolean indicators. The main contribution is the general encoding theorem for finite-domain all-different constraint solving problems as negatively-weighted regularisation terms in $p$-adic linear regression.
+Standard Sudoku is an immediate special case: there is one variable per cell, singleton domains on clue cells, and edges between cells that share a row, column, or box. The resulting construction uses the original $81$ cell variables rather than a one-hot lift to $729$ Boolean indicators. The purpose of the Sudoku section is expository rather than algorithmic: it provides a compact worked example where the variables, domains, and all-different constraints are familiar. The main contribution is the general encoding theorem for finite-domain all-different systems as signed $p$-adic residual objectives; the word ``regression'' refers to the affine residual form of the objective, not to an ordinary positive-weight statistical loss.
 \end{abstract}
 
-\noindent\textbf{Keywords:} p-adic linear regression; all-different constraints; list colouring; synthetic datasets; Sudoku
+\noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
 
 \section{Introduction and prior work}
 
 
-This paper studies finite-domain all-different systems encoded as a single signed synthetic p-adic regression objective on digit-valued variables, with Sudoku as a worked example. The emphasis is representational parsimony: one variable per semantic object, the same finite domain as the original problem, and a single p-adic objective enforcing both domain membership and pairwise distinctness.
+This paper studies finite-domain all-different systems encoded as a single signed synthetic $p$-adic residual objective on digit-valued variables, with Sudoku as a worked example. The emphasis is representational parsimony: one variable per semantic object, the same finite domain as the original problem, and a single $p$-adic objective enforcing both domain membership and pairwise distinctness.
 
 Two earlier results motivate the construction:
 \begin{itemize}
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive regularisation points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Recent work in this journal already connects $p$-adic methods with both regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. The novelty here is the signed construction in Section~\ref{construction}, where negative regularisation is used to enforce pairwise distinctness across arbitrary finite domains. In plain language, the main theorem says that a finite-domain all-different or list-colouring instance can be turned into a signed weighted synthetic $p$-adic regression objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this moves from structural support results and binary forcing gadgets to a polynomial-time finite-domain reduction with an exact global-minimiser description.
+Recent work in this journal already connects $p$-adic methods with both regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. The novelty here is the signed construction in Section~\ref{construction}, where signed residual terms are used to enforce pairwise distinctness across arbitrary finite domains. In plain language, the main theorem says that a finite-domain all-different or list-colouring instance can be turned into a signed weighted synthetic $p$-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this moves from structural support results and binary forcing gadgets to a polynomial-time finite-domain reduction with an exact global-minimiser description.
 
-Negative regularisation is unusual in Euclidean linear regression. Classical work on generalized ridge already allowed negative ridge parameters \cite{hua1983negative}. More recent theory shows that the risk-optimal ridge parameter can be zero or negative in overparameterised settings when the geometry of the predictor space already supplies implicit shrinkage \cite{kobak2020negative}, and that negative optimal regularisation can also arise under covariate or regression shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations that lead to de-regularised least squares \cite{wiesel2008gaussian} and in multivariate climate downscaling, where negative ridge parameters were used to improve reproduced covariance structure \cite{cannon2009negative}. These Euclidean precedents are not the same as the signed residual construction used here, but they show that a negative regularisation sign is not pathological in itself. What is specific to the present \(p\)-adic setting is that the ultrametric loss makes the negative terms bounded and indicator-like on the intended finite domain, so they can encode inequality constraints directly. The same signed-residual viewpoint also extends beyond pairwise inequality: after Boolean pinning, a \(3\)-CNF clause becomes one forbidden affine equality, so negative terms can reward clause satisfaction one clause at a time.
+Negative regularisation is unusual in Euclidean linear regression. Classical work on generalized ridge already allowed negative ridge parameters \cite{hua1983negative}. More recent theory shows that the risk-optimal ridge parameter can be zero or negative in overparameterised settings when the geometry of the predictor space already supplies implicit shrinkage \cite{kobak2020negative}, and that negative optimal regularisation can also arise under covariate or regression shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations that lead to de-regularised least squares \cite{wiesel2008gaussian} and in multivariate climate downscaling, where negative ridge parameters were used to improve reproduced covariance structure \cite{cannon2009negative}. These Euclidean precedents are not the same as the signed residual construction used here, but they show that a negative sign is not pathological in itself. What is specific to the present \(p\)-adic setting is that the ultrametric loss makes the signed terms bounded and indicator-like on the intended finite domain, so they can encode inequality constraints directly.
+
+Viewed from the constraint-programming side, the construction is close in spirit to weighted CSP / Max-CSP penalty functions, graph-colouring energy models, and Ising/Potts/QUBO-style encodings of discrete optimisation, while Sudoku itself is routinely formulated by exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. The point here is not merely that a constraint system is mapped to a scalar objective. Rather, once \(p\) is larger than the finite domain and the unary wells snap the variables to their allowed values, each affine residual \(|x_i-x_j|_p\) collapses to an exact equality/inequality indicator on the original domain. This keeps one semantic variable per original variable while retaining a regression-style affine residual form. The same signed-residual viewpoint also extends beyond pairwise inequality: after Boolean pinning, a \(3\)-CNF clause becomes one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time.
 
 \section{Preliminaries}
 
@@ -131,6 +133,8 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 \]
 to the loss; formally, this is the $p$-adic analogue of a weighted Euclidean residual term.
 \end{definition}
+
+We will use the phrase \emph{signed $p$-adic residual objective} for sums of such terms. The word ``regression'' refers to the affine residual form of the objective; because negative weights are allowed, the resulting functional is an optimisation objective rather than a statistical loss in the usual positive-weight sense.
 
 \begin{definition}[Positive/negative observations]
 A signed weighted affine observation \((\sigma,u,b,\gamma)\) is \emph{positive} if \(\sigma=+1\) and \emph{negative} if \(\sigma=-1\). We also use the phrases \emph{positive regularisation term} and \emph{negative regularisation term}.
@@ -291,11 +295,11 @@ Since \(\mathbf 1_{x_i\neq x_j}=1-\mathbf 1_{x_i=x_j}\) on every edge, substitut
 
 \begin{corollary}
 \label{cor:all-different-csp}
-Any finite-domain all-different constraint system can be encoded, in polynomial time, as the global minimiser set of a signed weighted synthetic $p$-adic regression dataset.
+Any finite-domain all-different constraint system can be encoded, in polynomial time, as a signed weighted synthetic $p$-adic residual objective whose global minimisers are exactly the domain-respecting assignments with minimum conflict count. If the constraint system is satisfiable, these minimisers are exactly its satisfying assignments.
 \end{corollary}
 
 \begin{proof}
-Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists. Apply Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, and Theorem~\ref{thm:all-different}.
+Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists, and the minimum-conflict assignments are exactly the domain-respecting assignments minimising the corresponding edge-conflict sum. Apply Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, and Theorem~\ref{thm:all-different}.
 \end{proof}
 
 \paragraph{Discrete-metric variant.}
@@ -377,7 +381,7 @@ L_\Phi(x)=\alpha n-\operatorname{sat}_\Phi(x).
 So the global minimisers are exactly the assignments that maximise the number of satisfied clauses. We include this only as a short expressivity remark: unlike the earlier ordinary summed \(2\)-adic \textsc{Max-Cut} reduction \cite{baker2026nphard}, it uses a signed objective and assumes \(p>3\).
 
 \section{Sudoku as a special case}
-There are many sensible ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, and SAT encodings \cite{lynce2006sudoku} are all natural approaches. The approach given in this section and the remainder of the paper is not one of the sensible ways, but it is interesting and unusual, and has the most natural encoding of the unknown variables.
+There are many standard ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, and SAT encodings \cite{lynce2006sudoku} are all natural approaches. The purpose of the present construction is different. Sudoku is used here as a compact finite-domain case study where the variables, domains, and all-different constraints are familiar, so the general theorem can be written out completely in a concrete setting.
 
 \subsection{Sudoku}
 A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
@@ -446,7 +450,7 @@ L_{\min}(x) &=
 \end{align}
 A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations. This is the formulation used in the correctness statements below.
 
-For the experiments, however, we use the slightly more redundant expanded objective
+For exposition, it is also useful to write the slightly more redundant expanded objective
 \begin{align}
 L(x) &=
 \alpha\sum_{i=1}^{81}\sum_{k=1}^9 |x_i - k|_p
@@ -458,7 +462,7 @@ L(x) &=
 \end{align}
 Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even on clue cells and then adds the clue pins separately. It therefore contains \(729+|\mathcal C|\) positive observations and the same \(810\) negative observations. The first two sums are \emph{positive} regularisation, and the final sum is \emph{negative} regularisation. Equivalently, counting peer pairs per unit gives $27\binom{9}{2}=972$ negative terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall.
 
-This expanded form is useful in the implementation, but its unrestricted correctness requires an explicit clue-weight assumption. On a clue cell, the first sum in \eqref{eq:objective} has the same value \(8\alpha\) for every digit \(x_i\in D\), so clue fidelity is enforced only by the separate term \(\alpha_{\mathrm{clue}}|x_i-g_i|_p\). Accordingly, the same domination argument as before applies to \eqref{eq:objective} when \(\alpha_{\mathrm{clue}}>20\); the simplest choice is \(\alpha_{\mathrm{clue}}=\alpha=21\). Under that extra condition, \eqref{eq:objective} may be read as a redundant expanded form of \eqref{eq:objective-minimal}.
+This expanded form is convenient when the unary terms are written out explicitly, but its unrestricted correctness requires an explicit clue-weight assumption. On a clue cell, the first sum in \eqref{eq:objective} has the same value \(8\alpha\) for every digit \(x_i\in D\), so clue fidelity is enforced only by the separate term \(\alpha_{\mathrm{clue}}|x_i-g_i|_p\). Accordingly, the same domination argument as before applies to \eqref{eq:objective} when \(\alpha_{\mathrm{clue}}>20\); the simplest choice is \(\alpha_{\mathrm{clue}}=\alpha=21\). Under that extra condition, \eqref{eq:objective} may be read as a redundant expanded form of \eqref{eq:objective-minimal}.
 
 Once \(x\) is digit-valued, the pairwise part is simply
 \[
@@ -466,7 +470,7 @@ Once \(x\) is digit-valued, the pairwise part is simply
 =
 -|\mathcal P|+\sum_{(i,j)\in\mathcal{P}}\mathbf 1_{x_i=x_j},
 \]
-For the minimal objective on domain-respecting states, and for the expanded objective on digit-valued, clue-consistent states, the remaining terms are constant. In those regimes the loss differs from the peer-conflict count only by an additive constant. On the row-permutation states used by the heuristics, this is the column/box conflict count.
+For the minimal objective on domain-respecting states, and for the expanded objective on digit-valued, clue-consistent states, the remaining terms are constant. In those regimes the loss differs from the \emph{deduplicated} peer-conflict count only by an additive constant. The heuristics below do not optimise that deduplicated peer objective directly: on the row-permutation state space they use a duplicated unit-scope column/box surrogate that counts conflicts separately inside each column and each box. That surrogate is described in Section~\ref{sec:illustrative-computations} and Appendix~\ref{app:heuristics}.
 
 \begin{corollary}[Sudoku completion as a special case]
 \label{cor:sudoku-special-case}
@@ -485,14 +489,29 @@ Assume \(\alpha>20\). Then every global minimiser of the minimal objective \eqre
 Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm{Sud}}\). Thus a proper list-colouring assigns pairwise distinct digits in each unit. Since the available values are exactly \(\{1,\dots,9\}\), pairwise distinctness in a unit is equivalent to containing every digit exactly once. The singleton domains enforce the clues. Apply Theorem~\ref{thm:all-different}.
 \end{proof}
 
-For Sudoku, this bookkeeping is completely explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; a convenient sufficient choice is \(\alpha=21\). For the expanded objective \eqref{eq:objective}, the corresponding unrestricted claim requires \(\alpha_{\mathrm{clue}}>20\) as well, because the all-digit wells are constant on clue cells. If instead one rewrote the loss as a sum over row, column, and box scopes and counted overlaps separately, each cell would contribute \(8+8+8=24\) incident negative terms, and the corresponding sufficient choice would be \(>24\). This is where the negative regularisation has to be dominated by the positive unary weight.
+For Sudoku, this bookkeeping is completely explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; a convenient sufficient choice is \(\alpha=21\). For the expanded objective \eqref{eq:objective}, the corresponding unrestricted claim requires \(\alpha_{\mathrm{clue}}>20\) as well, because the all-digit wells are constant on clue cells. If instead one used a duplicated unit-scope row/column/box objective and counted overlaps separately, each cell would contribute \(8+8+8=24\) incident negative terms, and the corresponding safe unary bound would be \(>24\). That \(>24\) threshold belongs to the duplicated unit-scope objective, not to the deduplicated peer objective \eqref{eq:objective-minimal}.
 
 \paragraph{Why ultrametric residuals help with negative weights.}
 If one tries to do this with an ordinary squared-loss term $-(x_i-x_j)^2$ in $\mathbb{R}$, the optimiser is perversely incentivised to make some differences \emph{large}, not merely nonzero, and the objective can become unstable unless heavily bounded. An indicator-style ultrametric residual, by contrast, distinguishes only equality from inequality. The discrete metric has this property tautologically, and for $p>9$ the $p$-adic norm realises the same behaviour on digit-valued differences, so $|x_i-x_j|_p\in\{0,1\}$.
 
 \section{Illustrative computations}
 \label{sec:illustrative-computations}
-To show that the encoded objective can also be searched directly, we implemented two simple local-search procedures on the digit-valued, clue-consistent row-permutation state space: a greedy row-swap search and a discrete Zubarev walk. In that regime the positive part of \eqref{eq:objective} is constant, so the remaining objective is the column/box conflict count. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
+These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
+
+To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
+\[
+H_{\mathrm{cb}}(x):=
+\sum_{c=1}^{9} \operatorname{conf}(C_c;x)
+\;+\;
+\sum_{b=1}^{9} \operatorname{conf}(B_b;x),
+\]
+where \(C_c\) and \(B_b\) are the cells in column \(c\) and box \(b\), and
+\[
+\operatorname{conf}(U;x):=\sum_{d=1}^{9} \binom{\#\{u\in U:x_u=d\}}{2}.
+\]
+Because each row is kept as a permutation of \(\{1,\dots,9\}\), the corresponding row contribution is identically zero and is omitted. This duplicated unit-scope loss is close to, but not identical with, the deduplicated peer-conflict objective coming from \(\mathcal P\): a conflicting pair that lies simultaneously in a column and a box is counted twice. For the seed-\(0\) initialisation shown later in Figure~\ref{fig:seed-zero-init}, the deduplicated peer-conflict count is \(47\) whereas \(H_{\mathrm{cb}}=56\), because nine conflicting pairs lie in both a column and a box.
+
+We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
 
 On a small sample of randomly carved puzzles, both heuristics solved all \(36\) instances tested. The row-swap search used fewer steps throughout the sample: its median step counts were \(538\), \(2785\), and \(7041\) at \(36\), \(30\), and \(26\) clues, versus \(4534\), \(8752\), and \(9912\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve.
 
@@ -504,30 +523,18 @@ y_{r,c,d}\in\{0,1\},
 \]
 with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(9\times 9\times 9=729\) indicators before any clues are applied. The p-adic construction instead uses an \(81\)-cell digit space. This variable-level comparison is the main parsimony claim: one digit-valued parameter per semantic object rather than nine Boolean indicators per cell.
 
-The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The expanded implementation \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed p-adic encoding packages the constraints into a single objective. For the minimal objective on domain-respecting states, and for the expanded objective on the digit-valued, clue-consistent row-permutation states used by the heuristics, this objective is an additive constant plus the relevant conflict count.
+The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables. The heuristics in Appendix~\ref{app:heuristics} then evaluate the duplicated unit-scope surrogate \(H_{\mathrm{cb}}\) on the restricted row-permutation state space.
 
 Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than a family of pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves --- the optimiser kept finding local minima from which it could not escape to find the global minima (successful solutions).
 
 
 \section{Conclusion}
 
-Negative-weight regularisation in Euclidean squared-loss regression
-acts as anti-shrinkage in selected directions and is usually handled only in specific settings; positive weight regularisation is very commonly used, particularly to cause parameters to converge to zero.
+Negative weights in Euclidean squared-loss regression are usually interpreted as anti-shrinkage in selected directions and handled only in specific settings. The present construction uses signed residual terms for a different purpose. Positive synthetic terms first pin variables to a finite set; after that, the negative \(p\)-adic terms are automatically bounded and reduce to rewards for inequality on domain-respecting states.
 
-The present construction uses regularisation for a different purpose. Here the positive synthetic terms first pin variables to a finite set, after which the negative \(p\)-adic terms are automatically bounded and reduce to rewards for inequality on domain-respecting states.
+The point of the paper is not to propose a competitive Sudoku solver. Sudoku is used as a compact finite-domain case study in which the variables, domains, and all-different constraints are completely explicit. The main result is the general encoding theorem: finite-domain all-different systems admit polynomial-time signed \(p\)-adic residual encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
-The same viewpoint is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can also be written as one forbidden affine equality, so the negative terms can reward clause satisfaction one clause at a time.
-
-The resulting encoding can be used on complex constraint solving problems
-which get transformed into synthetic datasets for $p$-adic linear regression. Then it is possible to bring the machinery for solving $p$-adic regression problems to bear, which is often able to solve the constraint solving problem in a way that can be traced by a human being in a reasonable amount of time to prove the correctness of the operation.
-
-Constraint solving problems being a subclass of $p$-adic linear
-regression problems is an unexpected and interesting outcome. Given that
-$p$-adic linear regression already shows varying complexity classes on
-different datasets --- ranging from NP-hard in the general case
-to polynomial time for problems with no noise --- it also suggests that
-$p$-adic linear regression may be a useful instrument for understanding
-computational complexity as well.
+The same signed-residual viewpoint is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can also be written as one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time. In this sense, the paper connects $p$-adic regression-style objectives with a broader class of discrete optimisation problems, not by competing with SAT/CSP technology, but by showing that ultrametric residuals can encode crisp finite-domain constraints directly on the original variable set.
 
 \clearpage
 \appendix
@@ -536,19 +543,19 @@ computational complexity as well.
 \label{app:heuristics}
 
 \subsection{Row-swap local search}
-The objective \eqref{eq:objective} induces an NP-hard global optimisation problem, consistent with the earlier NP-hardness result for p-adic regression. In the experiments we work directly in the digit-valued, clue-consistent row-permutation state space. There the two positive sums in \eqref{eq:objective} are constant and the row conflict count is zero, so minimising \(L\) is equivalent to minimising the remaining column/box conflict count. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce the remaining loss. This is a block-local search on the integer state space.
+The theorem-side objective \eqref{eq:objective} induces an NP-hard global optimisation problem, consistent with the earlier NP-hardness result for $p$-adic regression. The heuristics, however, work directly on the digit-valued, clue-consistent row-permutation state space and minimise the duplicated unit-scope loss \(H_{\mathrm{cb}}\) from Section~\ref{sec:illustrative-computations}. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space.
 
 \begin{lemma}[Locality of row swaps]
 \label{lem:row-swap-locality}
 Let \(x\) be a digit-valued, clue-consistent Sudoku state in which each row is a permutation of \(1,\dots,9\). Let \(\xi\) swap two non-clue entries in a single row \(r\), at columns \(c_1\neq c_2\). Then the change
 \[
-\Delta L(\xi):=L(x\oplus \xi)-L(x)
+\Delta H_{\mathrm{cb}}(\xi):=H_{\mathrm{cb}}(x\oplus \xi)-H_{\mathrm{cb}}(x)
 \]
 is determined entirely by the conflict-pair contributions from columns \(c_1\) and \(c_2\), together with the one or two boxes containing \((r,c_1)\) and \((r,c_2)\). No other term of the digit-restricted objective changes.
 \end{lemma}
 
 \begin{proof}
-On digit-valued, clue-consistent row-permutation states, the positive part of \eqref{eq:objective} is constant and the row conflict count is zero, so only the column/box conflict count matters. A within-row swap preserves the row permutation, so row conflicts remain zero. Every cell outside row \(r\) is unchanged, and within row \(r\) only the two swapped positions change value. Hence only the two corresponding columns can change their conflict counts. Likewise, only the boxes containing those two cells can change. All other columns and boxes see the same multiset of digits before and after the swap, so their contributions are unchanged.
+On the row-permutation state space, the heuristic objective is exactly \(H_{\mathrm{cb}}\), so only column and box contributions matter. A within-row swap preserves the row permutation, so the omitted row contribution remains zero. Every cell outside row \(r\) is unchanged, and within row \(r\) only the two swapped positions change value. Hence only the two corresponding columns can change their conflict counts. Likewise, only the boxes containing those two cells can change. All other columns and boxes see the same multiset of digits before and after the swap, so their contributions are unchanged.
 \end{proof}
 
 \begin{algorithm}[t]
@@ -560,7 +567,7 @@ On digit-valued, clue-consistent row-permutation states, the positive part of \e
     \For{$t=1$ to $T$}
         \If{no column/box conflicts} \State \Return solution \EndIf
         \State Choose a row involved in a conflict
-        \State Find the best swap of two non-clue cells in that row (largest loss decrease)
+        \State Find the best swap of two non-clue cells in that row (largest decrease in \(H_{\mathrm{cb}}\))
         \State Apply the swap (or a random swap if no improving swap exists)
     \EndFor
 \EndFor
@@ -583,7 +590,7 @@ conflict pairs; afterwards they contribute
 \[
 3+3+2+1=9.
 \]
-Thus \(\Delta L=-4\), exactly as reported in Table~\ref{tab:trace-stepwise}. For this instance the solver reaches a full solution after \(228\) swaps on the same restart.
+Thus \(\Delta H_{\mathrm{cb}}=-4\), exactly as reported in Table~\ref{tab:trace-stepwise}. For this instance the solver reaches a full solution after \(228\) swaps on the same restart.
 
 \begin{figure}[t]
 \centering
@@ -660,13 +667,13 @@ Under mild conditions (in particular, that the set of improving moves has nonzer
 In the digit-restricted implementation used here, the state is already digit-valued, clue-consistent, and row-permuted. We therefore treat the Zubarev walk as a \emph{finite-move} stochastic optimiser:
 \begin{itemize}
     \item The parameter vector $w$ is the current Sudoku filling $x\in D^{81}$.
-    \item The loss $L(x)$ is the number of conflicting pairs in columns and boxes (equivalently, \eqref{eq:objective} up to an additive constant on the digit-valued, clue-consistent row-permutation states used here).
+    \item The loss is the duplicated unit-scope column/box count \(H_{\mathrm{cb}}(x)\).
     \item A move $\xi$ is a swap of two non-clue cells within a single row (preserving each row as a permutation of $1,\dots,9$).
 \end{itemize}
 
-For a chosen row $r$ and current state $x$, let $\Xi_r(x)$ be the set of all such swaps, and let $\Delta L(\xi) := L(x\oplus\xi)-L(x)$ be the change in loss after applying swap $\xi$ (where $x\oplus\xi$ denotes ``apply the swap''). Replacing the Haar measure in \eqref{eq:zubarev-boltzmann} with the counting measure on the finite set $\Xi_r(x)$ gives the discrete sampling rule
+For a chosen row $r$ and current state $x$, let $\Xi_r(x)$ be the set of all such swaps, and let \(\Delta H_{\mathrm{cb}}(\xi) := H_{\mathrm{cb}}(x\oplus\xi)-H_{\mathrm{cb}}(x)\) be the change in loss after applying swap \(\xi\) (where \(x\oplus\xi\) denotes ``apply the swap''). Replacing the Haar measure in \eqref{eq:zubarev-boltzmann} with the counting measure on the finite set $\Xi_r(x)$ gives the discrete sampling rule
 \begin{equation}
-\Pr(\xi \mid x,\beta_t) = \frac{\exp\!\bigl(-\beta_t\,\Delta L(\xi)\bigr)}{\sum_{\xi'\in\Xi_r(x)} \exp\!\bigl(-\beta_t\,\Delta L(\xi')\bigr)}.
+\Pr(\xi \mid x,\beta_t) = \frac{\exp\!\bigl(-\beta_t\,\Delta H_{\mathrm{cb}}(\xi)\bigr)}{\sum_{\xi'\in\Xi_r(x)} \exp\!\bigl(-\beta_t\,\Delta H_{\mathrm{cb}}(\xi')\bigr)}.
 \label{eq:zubarev-discrete}
 \end{equation}
 When $\beta_t\to 0$ this is uniform random swapping; when $\beta_t\to\infty$ it concentrates on the best (most loss-decreasing) swap, recovering a soft version of the greedy stepwise algorithm. In practice we use a simple annealing schedule: $\beta_t$ increases linearly from $\beta_0$ to $\beta_1$ over the allotted steps, gradually shifting from exploration to exploitation.
@@ -680,8 +687,8 @@ When $\beta_t\to 0$ this is uniform random swapping; when $\beta_t\to\infty$ it 
     \For{$t=1$ to $T$}
         \If{no column/box conflicts} \State \Return solution \EndIf
         \State Choose a row involved in a conflict
-        \State Enumerate row swaps $\Xi_r(x)$ and compute $\Delta L(\xi)$ for each $\xi\in\Xi_r(x)$
-        \State Sample $\xi\in\Xi_r(x)$ with probability $\propto \exp(-\beta_t\,\Delta L(\xi))$
+        \State Enumerate row swaps $\Xi_r(x)$ and compute $\Delta H_{\mathrm{cb}}(\xi)$ for each $\xi\in\Xi_r(x)$
+        \State Sample $\xi\in\Xi_r(x)$ with probability $\propto \exp(-\beta_t\,\Delta H_{\mathrm{cb}}(\xi))$
         \State Apply swap $\xi$
     \EndFor
 \EndFor
@@ -745,12 +752,12 @@ Zubarev walk & 26 & 6 & 6 & 9912 & 2.929 \\
 \label{tab:results}
 \end{table}
 
-Figure~\ref{fig:loss} shows the loss trajectory for the stepwise row-swap heuristic on the specific fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), using the row-wise random initialiser described above, $T=60{,}000$, and $R=15$. The plotted run is restart $0$, and the loss is the number of conflicting pairs in columns and boxes (equivalently, the objective \eqref{eq:objective} up to an additive constant in the digit-restricted regime).
+Figure~\ref{fig:loss} shows the conflict trajectory for the stepwise row-swap heuristic on the specific fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), using the row-wise random initialiser described above, $T=60{,}000$, and $R=15$. The plotted run is restart $0$, and the vertical axis is the duplicated column/box conflict count \(H_{\mathrm{cb}}\).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.75\linewidth]{loss_curve.pdf}
-\caption{Loss/conflict trajectory for the stepwise row-swap heuristic on the fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), from the row-wise random initialisation on restart $0$.}
+\caption{Conflict trajectory for the stepwise row-swap heuristic on the fast-carved $30$-clue instance with puzzle seed $955101029$ (solve seed $2638744256$), from the row-wise random initialisation on restart $0$.}
 \label{fig:loss}
 \end{figure}
 
@@ -805,6 +812,9 @@ The author declares that he has no conflict of interest.
 \section*{Author contributions}
 This is a single-author paper. The author is responsible for the conceptual development, proofs, implementation, and writing.
 
+\section*{Code and data availability}
+The Python implementation used for the heuristic experiments, together with the experiment driver used to generate Table~\ref{tab:results} and Figure~\ref{fig:loss}, is available from the author on request and is archived in the source tree used to prepare this manuscript.
+
 \begin{thebibliography}{99}
 
 \bibitem{baker2025padic}
@@ -816,8 +826,7 @@ G. Baker, S. McCallum, and D. Pattinson.
 \bibitem{baker2026nphard}
 G. Baker.
 \newblock NP-hardness of \(p\)-adic linear regression.
-\newblock Accepted for publication in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} (2026).
-\newblock arXiv:2602.13278
+\newblock Accepted for publication in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} (2026); preprint at arXiv:2602.13278.
 
 \bibitem{knuth2000dancing}
 Donald E. Knuth.
