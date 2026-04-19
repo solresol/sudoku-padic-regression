@@ -54,7 +54,7 @@ Two earlier results motivate the construction:
 \end{itemize}
 Recent work in this journal already connects $p$-adic methods with both regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. The novelty here is the signed construction in Section~\ref{construction}, where negative regularisation is used to enforce pairwise distinctness across arbitrary finite domains. In plain language, the main theorem says that a finite-domain all-different or list-colouring instance can be turned into a signed weighted synthetic $p$-adic regression objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this moves from structural support results and binary forcing gadgets to a polynomial-time finite-domain reduction with an exact global-minimiser description.
 
-Negative regularisation is unusual in Euclidean linear regression. Classical work on generalized ridge already allowed negative ridge parameters \cite{hua1983negative}. More recent theory shows that the risk-optimal ridge parameter can be zero or negative in overparameterised settings when the geometry of the predictor space already supplies implicit shrinkage \cite{kobak2020negative}, and that negative optimal regularisation can also arise under covariate or regression shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations that lead to de-regularised least squares \cite{wiesel2008gaussian} and in multivariate climate downscaling, where negative ridge parameters were used to improve reproduced covariance structure \cite{cannon2009negative}. These Euclidean precedents are not the same as the signed residual construction used here, but they show that a negative regularisation sign is not pathological in itself. What is specific to the present \(p\)-adic setting is that the ultrametric loss makes the negative terms bounded and indicator-like on the intended finite domain, so they can encode inequality constraints directly.
+Negative regularisation is unusual in Euclidean linear regression. Classical work on generalized ridge already allowed negative ridge parameters \cite{hua1983negative}. More recent theory shows that the risk-optimal ridge parameter can be zero or negative in overparameterised settings when the geometry of the predictor space already supplies implicit shrinkage \cite{kobak2020negative}, and that negative optimal regularisation can also arise under covariate or regression shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations that lead to de-regularised least squares \cite{wiesel2008gaussian} and in multivariate climate downscaling, where negative ridge parameters were used to improve reproduced covariance structure \cite{cannon2009negative}. These Euclidean precedents are not the same as the signed residual construction used here, but they show that a negative regularisation sign is not pathological in itself. What is specific to the present \(p\)-adic setting is that the ultrametric loss makes the negative terms bounded and indicator-like on the intended finite domain, so they can encode inequality constraints directly. The same signed-residual viewpoint also extends beyond pairwise inequality: after Boolean pinning, a \(3\)-CNF clause becomes one forbidden affine equality, so negative terms can reward clause satisfaction one clause at a time.
 
 \section{Preliminaries}
 
@@ -322,6 +322,60 @@ U_i^{\mathrm{disc}}(t):=\sum_{a\in D_i}\mathbf 1_{t\neq a}
 \]
 Hence replacing any \(x_i\notin D_i\) by a value \(b\in D_i\) decreases the positive part by exactly \(\lambda\), while the total increase in the negative part is at most \(\sum_j w_{ij}\le \Delta\). Since \(\lambda=1+\Delta\), the same snapping argument goes through. Therefore the conclusions of Theorem~\ref{thm:all-different} and Corollary~\ref{cor:all-different-csp} remain valid for the discrete metric as well. The \(p\)-adic case remains the main one because it realises the same indicator behaviour inside the affine \(p\)-adic regression framework used throughout the paper.
 
+\paragraph{Boolean clause rewards.}
+The same signed-residual idea also applies beyond all-different constraints. Let
+\[
+\Phi=\bigwedge_{r=1}^{m} C_r
+\]
+be a \(3\)-CNF formula on variables \(z_1,\dots,z_n\), and encode truth values by
+\[
+x_i=0 \iff z_i \text{ is true},
+\qquad
+x_i=1 \iff z_i \text{ is false}.
+\]
+For a literal \(\lambda\) on variable \(z_i\), define its failure indicator by
+\[
+\delta(\lambda;x)=
+\begin{cases}
+x_i, & \lambda=z_i,\\
+1-x_i, & \lambda=\neg z_i.
+\end{cases}
+\]
+Then for a clause \(C=(\lambda_1\vee \lambda_2\vee \lambda_3)\),
+\[
+C(x)\text{ is false}
+\iff
+\delta(\lambda_1;x)+\delta(\lambda_2;x)+\delta(\lambda_3;x)=3.
+\]
+After moving constants to the right-hand side, this means that there are \(u_C\in\mathbb Z^n\) and \(t_C\in\mathbb Z\) such that
+\[
+C(x)\text{ is true}
+\iff
+u_C^\top x\neq t_C.
+\]
+Here \(u_C\) records the \(\pm 1\) literal coefficients, and \(t_C=3-k\), where \(k\) is the number of negated literals in the clause. The translation is mechanical: a positive literal contributes \(+x_i\), a negated literal contributes \(-x_i\), and the forbidden right-hand side is \(3-k\). For example,
+\[
+(z_1\vee z_2\vee \neg z_3)
+\leadsto
+x_1+x_2-x_3\neq 2.
+\]
+If \(p>3\) and \(x\in\{0,1\}^n\), then \(u_C^\top x-t_C\) is \(0\) when \(C\) is false and one of \(-1,-2,-3\) when \(C\) is true, so
+\[
+|u_C^\top x-t_C|_p=\mathbf 1_{C(x)\text{ is true}}.
+\]
+Thus a negative observation \((-1,u_C,t_C,1)\) rewards satisfaction of the clause. If \(\Delta\) is the maximum number of clauses containing any variable and \(\alpha>\Delta\), then
+\[
+L_\Phi(x)
+=
+\alpha\sum_{i=1}^{n}\bigl(|x_i|_p+|x_i-1|_p\bigr)
+-\sum_{C\in\Phi}|u_C^\top x-t_C|_p
+\]
+has the same snapping property as before: every global minimiser lies in \(\{0,1\}^n\), and on Boolean assignments
+\[
+L_\Phi(x)=\alpha n-\operatorname{sat}_\Phi(x).
+\]
+So the global minimisers are exactly the assignments that maximise the number of satisfied clauses. We include this only as a short expressivity remark: unlike the earlier ordinary summed \(2\)-adic \textsc{Max-Cut} reduction \cite{baker2026nphard}, it uses a signed objective and assumes \(p>3\).
+
 \section{Sudoku as a special case}
 There are many sensible ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, and SAT encodings \cite{lynce2006sudoku} are all natural approaches. The approach given in this section and the remainder of the paper is not one of the sensible ways, but it is interesting and unusual, and has the most natural encoding of the unknown variables.
 
@@ -461,6 +515,8 @@ Negative-weight regularisation in Euclidean squared-loss regression
 acts as anti-shrinkage in selected directions and is usually handled only in specific settings; positive weight regularisation is very commonly used, particularly to cause parameters to converge to zero.
 
 The present construction uses regularisation for a different purpose. Here the positive synthetic terms first pin variables to a finite set, after which the negative \(p\)-adic terms are automatically bounded and reduce to rewards for inequality on domain-respecting states.
+
+The same viewpoint is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can also be written as one forbidden affine equality, so the negative terms can reward clause satisfaction one clause at a time.
 
 The resulting encoding can be used on complex constraint solving problems
 which get transformed into synthetic datasets for $p$-adic linear regression. Then it is possible to bring the machinery for solving $p$-adic regression problems to bear, which is often able to solve the constraint solving problem in a way that can be traced by a human being in a reasonable amount of time to prove the correctness of the operation.
