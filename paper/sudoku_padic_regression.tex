@@ -10,7 +10,7 @@
 \usepackage{sudoku}
 \usepackage{tikz}
 
-\title{Signed p-adic Residual Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study}
+\title{Signed p-adic Residual Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study\thanks{This article presents material that also appears as a chapter of the author's PhD dissertation (Australian National University, in preparation); it is the standalone version of that work.}}
 \author{Greg Baker\\\small School of Computing, Australian National University\\\small Canberra, Australia\\\small \href{mailto:greg.baker@anu.edu.au}{greg.baker@anu.edu.au}\\\small ORCID: \href{https://orcid.org/0000-0002-6910-3011}{0000-0002-6910-3011}}
 \date{}
 \hypersetup{
@@ -47,7 +47,7 @@ Standard Sudoku is an immediate special case: there is one variable per cell, si
 
 This paper studies finite-domain all-different systems encoded as a single signed synthetic $p$-adic residual objective on digit-valued variables, with Sudoku as a worked example. The emphasis is representational parsimony: one variable per semantic object, the same finite domain as the original problem, and a single $p$-adic objective enforcing both domain membership and pairwise distinctness.
 
-All signed objectives in this paper are optimised over \(\mathbb Z_p^n\). Allowing unrestricted \(\mathbb Q_p^n\) would make negative residual terms potentially unbounded below, so the integral domain is part of the construction rather than a cosmetic restriction.
+All signed objectives in this paper are optimised over \(\mathbb Z_p^n\). Restricting to the integral domain keeps every affine residual bounded, \(|\cdot|_p\le 1\), and, once \(p>q\), pins it to an exact \(0/1\) equality indicator on the intended finite domain; this is what makes the snapping analysis residue-based. It is a modelling convenience rather than a boundedness requirement: although a single negative term \(-|x_i-x_j|_p\) is unbounded below over \(\mathbb Q_p^n\), the assembled objectives constructed here remain bounded below on all of \(\mathbb Q_p^n\), because the same weight domination \(\lambda>\Delta\) that drives digit-snapping (Definition~\ref{def:list-dataset}, Lemma~\ref{lem:digit-snapping}) also dominates the total inequality reward.
 
 Two earlier results motivate the construction:
 \begin{itemize}
@@ -296,7 +296,7 @@ By Lemma~\ref{lem:digit-snapping}, any point with some coordinate outside its do
 |x_i-x_j|_p=\mathbf 1_{x_i\neq x_j}
 \qquad (1\le i<j\le n).
 \]
-Since \(\mathbf 1_{x_i\neq x_j}=1-\mathbf 1_{x_i=x_j}\) on every edge, substituting these identities into \(L_{\mathcal S}\) yields the displayed formula. The final claims follow immediately.
+Since \(\mathbf 1_{x_i\neq x_j}=1-\mathbf 1_{x_i=x_j}\) on every edge, substituting these identities into \(L_{\mathcal S}\) yields the displayed formula. A global minimiser exists: \(L_{\mathcal S}\) takes only finitely many values on the finite set \(\prod_i D_i\), and by the previous paragraph no point outside \(\prod_i D_i\) can be a global minimiser, so the global minimum is attained on \(\prod_i D_i\). There the displayed formula is an additive constant plus the conflict sum, so a domain-respecting assignment is a global minimiser if and only if it attains the least possible conflict sum; this is the stated ``exactly'' characterisation in both directions. In particular, if \((G,(D_i)_{i=1}^n)\) is satisfiable the least conflict sum is \(0\), and the global minimisers are exactly its proper list-colourings.
 \end{proof}
 
 \begin{corollary}
@@ -741,7 +741,7 @@ Step & Row & Swap (columns) & Conflicts (before) & (after) \\
 
 \section{Illustrative experiments}
 \label{app:heuristics-results}
-We implemented both heuristics above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters.
+We implemented both heuristics above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters: the search evaluates the integer conflict count \(H_{\mathrm{cb}}\) directly and never computes a \(p\)-adic valuation numerically, so the \(p\)-adic norm routines in the code are illustrative of the construction rather than part of the solve path.
 
 \subsection{Experimental setup}
 To obtain a quick, reproducible testbed, we generated random puzzles by:
