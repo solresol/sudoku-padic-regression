@@ -35,9 +35,9 @@
 \maketitle
 
 \begin{abstract}
-This article studies a signed synthetic p-adic residual objective for finite-domain all-different systems and uses Sudoku as a worked example. Given a graph whose vertices carry finite allowed sets and whose edges reward unequal assignments, we build positive synthetic observations that create unary domain wells and negative synthetic observations that reward pairwise inequality. For primes $p>q$, every nonzero difference between values in $\{1,\dots,q\}$ has p-adic norm $1$, so on domain-respecting states the objective is an additive constant plus the edge-conflict count. It follows that the global minimisers are exactly the domain-respecting assignments that maximise the number of unequal edges. When the associated list-colouring instance is satisfiable, the minimisers are precisely its proper list-colourings.
+We encode finite-domain all-different systems as signed synthetic \(p\)-adic residual objectives, with Sudoku as a worked example. Given a graph whose vertices carry finite allowed sets and whose edges require unequal assignments, positive synthetic observations create unary domain wells and negative synthetic observations reward pairwise inequality. For primes \(p>q\), every nonzero difference between values in \(\{1,\dots,q\}\) has \(p\)-adic norm \(1\). On domain-respecting states, the objective is therefore an additive constant plus the edge-conflict count. Its global minimisers are exactly the domain-respecting assignments that maximise the number of unequal edges. When the associated list-colouring instance is satisfiable, these minimisers are precisely its proper list-colourings.
 
-Standard Sudoku is an immediate special case: there is one variable per cell, singleton domains on clue cells, and edges between cells that share a row, column, or box. The resulting construction uses the original $81$ cell variables rather than a one-hot lift to $729$ Boolean indicators. The purpose of the Sudoku section is expository rather than algorithmic: it provides a compact worked example where the variables, domains, and all-different constraints are familiar. The main contribution is the general encoding theorem for finite-domain all-different systems as signed $p$-adic residual objectives; the word ``regression'' refers to the affine residual form of the objective, not to an ordinary positive-weight statistical loss.
+Standard Sudoku is a direct instance: there is one variable per cell, singleton domains on clue cells, and edges between cells that share a row, column, or box. The construction uses the original \(81\) cell variables rather than a one-hot lift to \(729\) Boolean indicators. The Sudoku section is not a solver proposal; it spells out the encoding in a case where the variables, domains, and all-different constraints are familiar. The word ``regression'' refers to the affine residual form of the objective, not to an ordinary positive-weight statistical loss.
 \end{abstract}
 
 \noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
@@ -45,20 +45,20 @@ Standard Sudoku is an immediate special case: there is one variable per cell, si
 \section{Introduction and prior work}
 
 
-This paper studies finite-domain all-different systems encoded as a single signed synthetic $p$-adic residual objective on digit-valued variables, with Sudoku as a worked example. The emphasis is representational parsimony: one variable per semantic object, the same finite domain as the original problem, and a single $p$-adic objective enforcing both domain membership and pairwise distinctness.
+This paper encodes finite-domain all-different systems as signed synthetic \(p\)-adic residual objectives, with Sudoku as a worked example. The representation keeps one variable per semantic object, uses the same finite domain as the original problem, and enforces both domain membership and pairwise distinctness in one objective.
 
-All signed objectives in this paper are optimised over \(\mathbb Z_p^n\). Restricting to the integral domain keeps every affine residual bounded, \(|\cdot|_p\le 1\), and, once \(p>q\), pins it to an exact \(0/1\) equality indicator on the intended finite domain; this is what makes the snapping analysis residue-based. It is a modelling convenience rather than a boundedness requirement: although a single negative term \(-|x_i-x_j|_p\) is unbounded below over \(\mathbb Q_p^n\), the assembled objectives constructed here remain bounded below on all of \(\mathbb Q_p^n\), because the same weight domination \(\lambda>\Delta\) that drives digit-snapping (Definition~\ref{def:list-dataset}, Lemma~\ref{lem:digit-snapping}) also dominates the total inequality reward.
+All signed objectives in this paper are optimised over \(\mathbb Z_p^n\). On this domain every affine residual is bounded by \(1\). Once \(p>q\), the same residual also becomes an exact \(0/1\) equality indicator on the intended finite alphabet. The restriction to \(\mathbb Z_p^n\) is mainly a modelling choice, not a way to hide an unbounded objective: although a single negative term \(-|x_i-x_j|_p\) is unbounded below over \(\mathbb Q_p^n\), the objectives constructed here remain bounded below on \(\mathbb Q_p^n\). The same domination condition that forces digit-snapping, \(\lambda>\Delta\), also dominates the total inequality reward.
 
 Two earlier results motivate the construction:
 \begin{itemize}
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive pinning points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} already connects $p$-adic methods with both regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. The novelty here is the signed construction in Definition~\ref{def:signed-dataset} and Theorem~\ref{thm:all-different}, where signed residual terms are used to enforce pairwise distinctness across arbitrary finite domains. Equivalently, the main theorem says that a finite-domain all-different or list-colouring instance can be turned into a signed weighted synthetic $p$-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this moves from structural support results and binary forcing gadgets to a polynomial-time finite-domain reduction with an exact global-minimiser description.
+Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} connects \(p\)-adic methods with regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. Here signed residual terms enforce pairwise distinctness across finite domains. The main theorem turns a finite-domain all-different or list-colouring instance into a signed weighted synthetic \(p\)-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this replaces structural support results and binary forcing gadgets by a polynomial-time finite-domain reduction with an exact global-minimiser description.
 
-Negative signed residual terms are unusual from the viewpoint of ordinary Euclidean linear regression. Classical work on generalized ridge already allowed negative ridge parameters \cite{hua1983negative}. More recent theory shows that the risk-optimal ridge parameter can be zero or negative in overparameterised settings when the geometry of the predictor space already supplies implicit shrinkage \cite{kobak2020negative}, and that negative optimal regularisation can also arise under covariate or regression shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations that lead to de-regularised least squares \cite{wiesel2008gaussian} and in multivariate climate downscaling, where negative ridge parameters were used to improve reproduced covariance structure \cite{cannon2009negative}. These Euclidean precedents are not the same as the signed residual construction used here, but they show that a negative sign is not pathological in itself. What is specific to the present \(p\)-adic setting is that the ultrametric residuals are bounded on \(\mathbb Z_p^n\) and become indicator-like on the intended finite domain, so they can encode inequality constraints directly.
+Negative signed residual terms do not have the usual interpretation of Euclidean least-squares terms. Classical generalized ridge regression allowed negative ridge parameters \cite{hua1983negative}; later work found zero or negative risk-optimal ridge parameters in overparameterised models \cite{kobak2020negative} and under distribution shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations \cite{wiesel2008gaussian} and in multivariate climate downscaling \cite{cannon2009negative}. These results do not justify the present construction by analogy. They only show that negative quadratic penalties are not, by themselves, incoherent. In the \(p\)-adic construction below, the reason they are usable is sharper: on \(\mathbb Z_p^n\), the residuals are bounded, and on the intended finite domain they become equality indicators.
 
-Viewed from the constraint-programming side, the construction is close in spirit to weighted CSP / Max-CSP penalty functions, graph-colouring energy models, and Ising/Potts/QUBO-style encodings of discrete optimisation, while Sudoku itself is routinely formulated by exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. The point here is not merely that a constraint system is mapped to a scalar objective. Rather, once \(p\) is larger than the finite domain and the unary wells snap the variables to their allowed values, each affine residual \(|x_i-x_j|_p\) collapses to an exact equality/inequality indicator on the original domain. This keeps one semantic variable per original variable while retaining a regression-style affine residual form. The same signed-residual viewpoint also extends beyond pairwise inequality: after Boolean pinning, a \(3\)-CNF clause becomes one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time.
+From the constraint-programming side, the construction is close to weighted CSP / Max-CSP penalty functions, graph-colouring energy models, and Ising/Potts/QUBO encodings of discrete optimisation. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. The feature specific to this paper is the affine \(p\)-adic residual form. Once \(p\) is larger than the finite domain and the unary wells snap the variables to their allowed values, each residual \(|x_i-x_j|_p\) is an equality/inequality indicator on the original domain. The same mechanism also handles clauses: after Boolean pinning, a \(3\)-CNF clause is one forbidden affine equality, so a signed residual can reward its satisfaction.
 
 \section{Preliminaries}
 
@@ -73,7 +73,6 @@ For comparison, note that the discrete metric \(d_{\mathrm{disc}}(s,t):=\mathbf 
 
 
 
-\label{construction}
 \subsection{List colouring}
 Many finite-domain constraint systems built from all-different conditions can be viewed as list-colouring problems on a graph. Each variable $x_i$ is assigned a value from a finite allowed set $D_i$, and an edge $\{i,j\}$ expresses the preference or requirement that $x_i\neq x_j$. Thus an all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique; this paper uses that pairwise primal graph, not global \emph{alldifferent} propagation.
 
@@ -124,6 +123,7 @@ negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
 \end{figure}
 
 \section{A general all-different residual-objective template}
+\label{construction}
 
 Over $\mathbb{Z}_p$ with $p>q$, once values are restricted to $\{1,\dots,q\}$, every nonzero difference has norm $1$.
 
@@ -143,6 +143,55 @@ We will use the phrase \emph{signed $p$-adic residual objective} for sums of suc
 \begin{definition}[Positive/negative observations]
 A signed weighted affine observation \((\sigma,u,b,\gamma)\) is \emph{positive} if \(\sigma=+1\) and \emph{negative} if \(\sigma=-1\). In the constructions below, positive observations serve as pinning terms and negative observations serve as reward terms.
 \end{definition}
+
+\begin{theorem}[Finite-domain signed affine compiler template]
+\label{thm:compiler-template}
+Fix a prime \(p\). Let \(D_i\subseteq\mathbb Z\) be finite nonempty sets whose elements are pairwise incongruent modulo \(p\), and put
+\[
+D:=\prod_{i=1}^n D_i\subseteq\mathbb Z_p^n.
+\]
+For each coordinate \(i\), choose a pinning weight \(\lambda_i>0\). Let \(\mathcal T\) be a finite family of signed affine observations
+\[
+(\sigma_\ell,u_\ell,b_\ell,\gamma_\ell),
+\qquad
+\sigma_\ell\in\{\pm1\},\quad u_\ell\in\mathbb Z^n,\quad b_\ell\in\mathbb Z,\quad \gamma_\ell>0,
+\]
+and define
+\[
+L(x):=
+\sum_{i=1}^n\lambda_i\sum_{a\in D_i}|x_i-a|_p
+\;+\;
+\sum_{\ell\in\mathcal T}\sigma_\ell\gamma_\ell |u_\ell^\top x-b_\ell|_p.
+\]
+Assume that, for every coordinate \(i\),
+\[
+\lambda_i>\sum_{\ell:\,(u_\ell)_i\neq 0}\gamma_\ell,
+\]
+and that, for every \(x\in D\) and every \(\ell\in\mathcal T\), the residual \(u_\ell^\top x-b_\ell\) is either \(0\) or a \(p\)-adic unit. Then \(L\) attains its global minimum on \(D\), and every global minimiser lies in \(D\). On \(D\), \(L\) is a constant plus a finite signed objective whose interaction terms have values \(0\) and \(\sigma_\ell\gamma_\ell\).
+\end{theorem}
+
+\begin{proof}
+Suppose \(x_i\notin D_i\). If \(x_i\) is congruent modulo \(p\) to an element of \(D_i\), let \(b\) be that element; otherwise choose any \(b\in D_i\). Let \(x'\) be obtained from \(x\) by replacing \(x_i\) with \(b\).
+
+The \(i\)-th unary sum decreases by at least \(\lambda_i|x_i-b|_p\). Indeed, if \(x_i\equiv b\pmod p\), then the only changed unary contribution below \(1\) is \(|x_i-b|_p\). If \(x_i\) is congruent to no element of \(D_i\), then \(|x_i-a|_p=1\) for all \(a\in D_i\), while the unary sum at \(b\) has one zero term and all other terms equal to \(1\); in this case \(|x_i-b|_p=1\).
+
+For an interaction term with \((u_\ell)_i\neq0\), write \(r_\ell'=u_\ell^\top x'-b_\ell\). Then
+\[
+u_\ell^\top x-b_\ell=r_\ell'+(u_\ell)_i(x_i-b).
+\]
+Since \((u_\ell)_i\in\mathbb Z\), \(|(u_\ell)_i|_p\le1\), and the ultrametric inequality gives
+\[
+\bigl||u_\ell^\top x-b_\ell|_p-|r_\ell'|_p\bigr|
+\le |x_i-b|_p.
+\]
+Thus the total interaction increase caused by changing coordinate \(i\) is at most
+\[
+\sum_{\ell:\,(u_\ell)_i\neq0}\gamma_\ell |x_i-b|_p.
+\]
+By the assumed domination inequality, \(L(x')<L(x)\). Repeating this coordinate-snapping step gives a point of \(D\) with smaller loss than any starting point outside \(D\). Since \(D\) is finite, the global minimum is attained on \(D\), and no global minimiser lies outside \(D\).
+
+On \(D\), every unary sum is constant: exactly one term is zero and the rest are units. The second assumption says each interaction residual is either zero or a unit, so each signed interaction term is either \(0\) or \(\sigma_\ell\gamma_\ell\). This proves the stated finite-domain form of \(L|_D\).
+\end{proof}
 
 \begin{definition}[Synthetic dataset for list-colouring]
 \label{def:list-dataset}
@@ -180,9 +229,11 @@ L_{\mathcal S}(x)
 \]
 \end{definition}
 
-We now analyse that construction. This dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). The positive observations pin coordinates to allowed values, the negative observations reward inequality across edges, and there are no ordinary data points unrelated to the constraint system.
+This dataset has exactly \(\sum_{i=1}^n |D_i|\) positive observations and \(|E|\) negative observations, so it is computable in time \(O(\sum_i |D_i|+|E|)\). The positive observations pin coordinates to allowed values, and the negative observations reward inequality across edges.
 
 Each positive observation \((+1,e_i,a,\lambda)\) contributes \(\lambda|x_i-a|_p\) to the loss, and each negative observation \((-1,e_i-e_j,0,1)\) contributes \(-|x_i-x_j|_p\) to the loss. Summing them yields the displayed loss. The size bound and runtime are immediate from the explicit definitions.
+
+The compiler template already implies that minimisers snap to the finite alphabet, because the pinning weight is larger than the degree of every vertex. The next proof records the stronger fact needed for all-different systems: after snapping, the objective is exactly a constant plus the edge-conflict count.
 
 \subsection{Correctness}
 Since \(p>q\), the residues of \(1,\dots,q\) are distinct modulo \(p\). In particular, for any fixed \(i\in V\) and any \(t\in\mathbb Z_p\), there is at most one \(a\in D_i\) with \(t\equiv a\pmod p\).
@@ -275,7 +326,7 @@ L_{\mathcal S}(x')-L_{\mathcal S}(x)
 \]
 \end{proof}
 
-Next we analyse the loss on domain-respecting assignments. In that regime it becomes an additive constant plus the conflict count, so if the list-colouring instance is satisfiable the rightmost sum can be zero.
+On domain-respecting assignments, the loss is an additive constant plus the conflict count.
 
 \begin{theorem}[Correctness of the synthetic reduction]
 \label{thm:all-different}
@@ -386,7 +437,7 @@ L_\Phi(x)=\alpha n-\operatorname{sat}_\Phi(x).
 \]
 So the global minimisers are exactly the assignments that maximise the number of satisfied clauses. We include this only as a short expressivity remark: unlike the earlier ordinary summed \(2\)-adic \textsc{Max-Cut} reduction \cite{baker2026nphard}, it uses a signed objective and assumes \(p>3\).
 
-A related positive hole-filling observation explains why the signed clause reward is less fragile than a positive multiwell encoding. Suppose the clause is instead encoded positively by the failure-sum
+The corresponding positive encoding is unstable under added wells. Suppose the clause is instead encoded positively by the failure-sum
 \[
 s_C(x):=\delta(\lambda_1;x)+\delta(\lambda_2;x)+\delta(\lambda_3;x)
 \]
@@ -394,10 +445,10 @@ and by the allowed set \(S_C=\{0,1,2,3\}\setminus\{3\}\). In the affine row \(u_
 \[
 W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
-When \(p>3\) and \(t\in\{0,1,2,3\}\), this positive term is minimised exactly on \(S\). Adding the missing positive well at the excluded value changes \(W_{S_C}\) into \(W_{\{0,1,2,3\}}\), which is constant on Boolean inputs; repeating this for every clause leaves only the unary Boolean pinning. This is not an algorithm for \textsc{3-SAT}, but a structural reason that the signed clause-reward formulation is less fragile than a positive multiwell encoding.
+When \(p>3\) and \(t\in\{0,1,2,3\}\), this positive term is minimised exactly on \(S\). Adding the missing positive well at the excluded value changes \(W_{S_C}\) into \(W_{\{0,1,2,3\}}\), which is constant on Boolean inputs; doing this for every clause leaves only the unary Boolean pinning. The signed reward keeps the excluded affine value visible instead of erasing it by filling the missing well.
 
 \section{Sudoku as a special case}
-There are many standard ways to solve Sudoku puzzles. Exact-cover formulations solved by Knuth's Algorithm X with dancing links \cite{knuth2000dancing}, constraint-programming formulations built around \emph{alldifferent} constraints \cite{simonis2005sudoku}, SAT encodings \cite{lynce2006sudoku}, and complexity-theoretic studies of puzzle variants \cite{yato-seta} are all natural points of comparison. The purpose of the present construction is different. Sudoku is used here as a compact finite-domain case study where the variables, domains, and all-different constraints are familiar, so the general theorem can be written out completely in a concrete setting.
+Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly.
 
 \subsection{Sudoku}
 A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
@@ -410,7 +461,7 @@ Equivalently, in each unit (row, column, box) all entries are \emph{pairwise dis
 
 Standard Sudoku fits Corollary~\ref{cor:all-different-csp} directly. The vertices are the $81$ cells, two vertices are adjacent when the corresponding cells share a row, column, or $3\times 3$ box, unclued cells have domain $\{1,\dots,9\}$, and clue cells have singleton domains. A proper list-colouring of this graph is exactly a valid Sudoku completion.
 
-The general lemmas above specialise very cleanly to Sudoku. We therefore state the Sudoku facts below mainly as direct corollaries of the unary-well and edge-indicator lemmas, and only then write down the concrete synthetic datasets used in the paper.
+The Sudoku facts below are direct corollaries of the unary-well and edge-indicator lemmas. We state them before writing the concrete objectives.
 
 \subsection{Positive pinning: snapping coefficients to digits}
 
@@ -466,7 +517,7 @@ L_{\min}(x) &=
 \end{align}
 A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations. This is the formulation used in the correctness statements below.
 
-For exposition, it is also useful to write the slightly more redundant expanded objective
+For exposition, we also use the redundant expanded objective
 \begin{align}
 L(x) &=
 \alpha\sum_{i=1}^{81}\sum_{k=1}^9 |x_i - k|_p
@@ -478,7 +529,7 @@ L(x) &=
 \end{align}
 Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even on clue cells and then adds the clue pins separately. It therefore contains \(729+|\mathcal C|\) positive observations and the same \(810\) negative observations. The first two sums are positive pinning terms, and the final sum is a negative pairwise reward term. Equivalently, counting peer pairs per unit gives $27\binom{9}{2}=972$ negative terms, but $162$ of these pairs lie simultaneously in a row/column \emph{and} a box, leaving $810$ distinct pairs overall.
 
-This expanded form is convenient when the unary terms are written out explicitly, but its unrestricted correctness requires an explicit clue-weight assumption. On a clue cell, the first sum in \eqref{eq:objective} has the same value \(8\alpha\) for every digit \(x_i\in D\), so clue fidelity is enforced only by the separate term \(\alpha_{\mathrm{clue}}|x_i-g_i|_p\). Accordingly, the same domination argument as before applies to \eqref{eq:objective} when \(\alpha_{\mathrm{clue}}>20\); the simplest choice is \(\alpha_{\mathrm{clue}}=\alpha=21\). Under that extra condition, \eqref{eq:objective} may be read as a redundant expanded form of \eqref{eq:objective-minimal}.
+This expanded form needs an explicit clue-weight assumption. On a clue cell, the first sum in \eqref{eq:objective} has the same value \(8\alpha\) for every digit \(x_i\in D\), so clue fidelity is enforced only by \(\alpha_{\mathrm{clue}}|x_i-g_i|_p\). The same domination argument applies to \eqref{eq:objective} when \(\alpha_{\mathrm{clue}}>20\); the simplest choice is \(\alpha_{\mathrm{clue}}=\alpha=21\). Under that extra condition, \eqref{eq:objective} is a redundant expanded form of \eqref{eq:objective-minimal}.
 
 Once \(x\) is digit-valued, the pairwise part is simply
 \[
@@ -505,10 +556,10 @@ Assume \(\alpha>20\). Then every global minimiser of the minimal objective \eqre
 Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm{Sud}}\). Thus a proper list-colouring assigns pairwise distinct digits in each unit. Since the available values are exactly \(\{1,\dots,9\}\), pairwise distinctness in a unit is equivalent to containing every digit exactly once. The singleton domains enforce the clues. Apply Theorem~\ref{thm:all-different}.
 \end{proof}
 
-For Sudoku, this bookkeeping is completely explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; a convenient sufficient choice is \(\alpha=21\). For the expanded objective \eqref{eq:objective}, the corresponding unrestricted claim requires \(\alpha_{\mathrm{clue}}>20\) as well, because the all-digit wells are constant on clue cells. If instead one used a duplicated unit-scope row/column/box objective and counted overlaps separately, each cell would contribute \(8+8+8=24\) incident negative terms, and the corresponding safe unary bound would be \(>24\). That \(>24\) threshold belongs to the duplicated unit-scope objective, not to the deduplicated peer objective \eqref{eq:objective-minimal}.
+For Sudoku, the bound is explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; \(\alpha=21\) is enough. For the expanded objective \eqref{eq:objective}, the same claim requires \(\alpha_{\mathrm{clue}}>20\), because the all-digit wells are constant on clue cells. If one instead counts row, column, and box overlaps separately, each cell has \(8+8+8=24\) incident negative terms, and the safe unary bound becomes \(>24\). That threshold belongs to the duplicated unit-scope objective, not to the deduplicated peer objective \eqref{eq:objective-minimal}.
 
 \paragraph{Why ultrametric residuals help with negative weights.}
-If one tries to do this with an ordinary squared-loss term $-(x_i-x_j)^2$ in $\mathbb{R}$, the optimiser is perversely incentivised to make some differences \emph{large}, not merely nonzero, and the objective can become unstable unless heavily bounded. An indicator-style ultrametric residual, by contrast, distinguishes only equality from inequality. The discrete metric has this property tautologically, and for $p>9$ the $p$-adic norm realises the same behaviour on digit-valued differences, so $|x_i-x_j|_p\in\{0,1\}$.
+An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large differences, not just nonzero differences, and needs separate bounds. An ultrametric residual distinguishes equality from inequality. The discrete metric has this property by definition, and for \(p>9\) the \(p\)-adic norm has the same behaviour on digit-valued differences: \(|x_i-x_j|_p\in\{0,1\}\).
 
 \section{Illustrative computations}
 \label{sec:illustrative-computations}
@@ -541,20 +592,18 @@ with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(
 
 The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables. The heuristics in Appendix~\ref{app:heuristics} then evaluate the duplicated unit-scope surrogate \(H_{\mathrm{cb}}\) on the restricted row-permutation state space.
 
-Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than a family of pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves --- the optimiser kept finding local minima from which it could not escape to find valid completions.
+Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
 
 \section{Conclusion}
 
-Negative weights in Euclidean squared-loss regression are usually interpreted as anti-shrinkage in selected directions and handled only in specific settings. The present construction uses signed residual terms for a different purpose. Positive synthetic terms first pin variables to a finite set; after that, the negative \(p\)-adic terms are automatically bounded and reduce to rewards for inequality on domain-respecting states.
+Negative weights in Euclidean squared-loss regression are usually treated as anti-shrinkage terms in selected directions. Here signed residuals have a different role. Positive synthetic terms pin variables to a finite set; after that, negative \(p\)-adic terms are bounded rewards for inequality on domain-respecting states.
 
-The point of the paper is not to propose a competitive Sudoku solver. Sudoku is used as a compact finite-domain case study in which the variables, domains, and all-different constraints are completely explicit. The main result is the general encoding theorem: finite-domain all-different systems admit polynomial-time signed \(p\)-adic residual encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
+The paper does not propose a competitive Sudoku solver. Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. The main result is the encoding theorem: finite-domain all-different systems admit polynomial-time signed \(p\)-adic residual encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
-Mihara's recent work on \(p\)-adic manifold learning from impartial games gives a useful adjacent point of comparison \cite{mihara2026manifoldgames}. There, 3-heap Nim is used as a benchmark for estimating a \(p\)-adic zero locus associated with the Grundy function from finite samples. The present Sudoku example is deliberately different: it does not try to infer a hidden game-theoretic set, but starts from known finite-domain constraints and compiles them into signed residual terms. Thus the connection is benchmark design and interpretability, not a change to the all-different encoding theorem.
+Mihara's work on \(p\)-adic manifold learning from impartial games gives an adjacent comparison \cite{mihara2026manifoldgames}. There, 3-heap Nim is a benchmark for estimating a \(p\)-adic zero locus associated with the Grundy function from finite samples. The Sudoku example here does not infer a hidden game-theoretic set. It starts from known finite-domain constraints and compiles them into signed residual terms. The connection is benchmark design and interpretability, not the all-different theorem.
 
-The same signed-residual viewpoint is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can also be written as one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time. In this sense, the paper connects $p$-adic regression-style objectives with a broader class of discrete optimisation problems, not by competing with SAT/CSP technology, but by showing that ultrametric residuals can encode crisp finite-domain constraints directly on the original variable set.
-
-The positive hole-filling observation above is one small example of a broader phenomenon: adding synthetic observations can change, and sometimes erase, the induced optimisation landscape rather than merely strengthening an existing constraint.
+The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can be written as one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time. This connects \(p\)-adic residual objectives with finite-domain optimisation beyond all-different constraints, while keeping the claim separate from solver performance.
 
 \clearpage
 \appendix
