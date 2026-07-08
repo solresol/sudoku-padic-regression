@@ -1,0 +1,532 @@
+import {
+  CirclePause,
+  FlaskConical,
+  Grid3x3,
+  Play,
+  RotateCcw,
+  ShieldCheck,
+  Shuffle,
+  Sigma,
+  Square
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Grid,
+  type PuzzleModel,
+  ALPHA_DEFAULT,
+  P_DEFAULT,
+  PEERS,
+  buildPuzzleModel,
+  carve,
+  dedupedPeerConflicts,
+  evaluateObjective,
+  gridToString,
+  parsePuzzle,
+  randomSolvedGrid
+} from "./lib/sudoku";
+import {
+  type SolverSnapshot,
+  type SudokuMethod,
+  SudokuSolver
+} from "./lib/sudokuSolver";
+
+const STANDARD_PUZZLE = [
+  "53..7....",
+  "6..195...",
+  ".98....6.",
+  "8...6...3",
+  "4..8.3..1",
+  "7...2...6",
+  ".6....28.",
+  "...419..5",
+  "....8..79"
+].join("");
+
+const EMPTY_PUZZLE = ".".repeat(81);
+
+interface HistoryPoint {
+  step: number;
+  conflicts: number;
+}
+
+type Phase = "setup" | "running" | "paused" | "solved" | "settled";
+
+const STEPS_PER_FRAME: Record<string, number> = {
+  slow: 6,
+  normal: 40,
+  fast: 400
+};
+
+function SudokuMode() {
+  const [puzzleText, setPuzzleText] = useState(STANDARD_PUZZLE);
+  const [method, setMethod] = useState<SudokuMethod>("stepwise");
+  const [maxSteps, setMaxSteps] = useState(60_000);
+  const [restarts, setRestarts] = useState(15);
+  const [speed, setSpeed] = useState<keyof typeof STEPS_PER_FRAME>("normal");
+
+  const [snap, setSnap] = useState<SolverSnapshot | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [phase, setPhase] = useState<Phase>("setup");
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const solverRef = useRef<SudokuSolver | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const runningRef = useRef(false);
+
+  const puzzle = useMemo<Grid | null>(() => {
+    try {
+      const grid = parsePuzzle(puzzleText);
+      return grid;
+    } catch {
+      return null;
+    }
+  }, [puzzleText]);
+
+  const model = useMemo<PuzzleModel | null>(
+    () => (puzzle ? buildPuzzleModel(puzzle, { p: P_DEFAULT, alpha: ALPHA_DEFAULT }) : null),
+    [puzzle]
+  );
+
+  useEffect(() => {
+    try {
+      parsePuzzle(puzzleText);
+      setParseError(null);
+    } catch (error) {
+      setParseError(error instanceof Error ? error.message : String(error));
+    }
+  }, [puzzleText]);
+
+  const stopRaf = useCallback(() => {
+    runningRef.current = false;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopRaf, [stopRaf]);
+
+  const frame = useCallback(() => {
+    const solver = solverRef.current;
+    if (!solver || !runningRef.current) {
+      return;
+    }
+    const steps = STEPS_PER_FRAME[speed];
+    let latest = solver.snapshot();
+    for (let i = 0; i < steps; i += 1) {
+      latest = solver.advance();
+      if (latest.solved || latest.done) {
+        break;
+      }
+    }
+    setSnap(latest);
+    setHistory((prev) => {
+      const next = [...prev, { step: latest.totalSteps, conflicts: latest.conflicts }];
+      return next.length > 600 ? next.slice(next.length - 600) : next;
+    });
+
+    if (latest.solved) {
+      setPhase("solved");
+      stopRaf();
+      return;
+    }
+    if (latest.done) {
+      setPhase("settled");
+      stopRaf();
+      return;
+    }
+    rafRef.current = requestAnimationFrame(frame);
+  }, [speed, stopRaf]);
+
+  const handleStart = useCallback(() => {
+    if (!puzzle) {
+      return;
+    }
+    solverRef.current = new SudokuSolver(puzzle, {
+      method,
+      seed: 0,
+      maxSteps,
+      restarts,
+      beta0: 0.5,
+      beta1: 6.0
+    });
+    const initial = solverRef.current.snapshot();
+    setSnap(initial);
+    setHistory([{ step: 0, conflicts: initial.conflicts }]);
+    if (initial.solved) {
+      setPhase("solved");
+      return;
+    }
+    setPhase("running");
+    runningRef.current = true;
+    rafRef.current = requestAnimationFrame(frame);
+  }, [puzzle, method, maxSteps, restarts, frame]);
+
+  const handlePause = useCallback(() => {
+    stopRaf();
+    setPhase("paused");
+  }, [stopRaf]);
+
+  const handleResume = useCallback(() => {
+    if (!solverRef.current) {
+      return;
+    }
+    setPhase("running");
+    runningRef.current = true;
+    rafRef.current = requestAnimationFrame(frame);
+  }, [frame]);
+
+  const handleReset = useCallback(() => {
+    stopRaf();
+    solverRef.current = null;
+    setSnap(null);
+    setHistory([]);
+    setPhase("setup");
+  }, [stopRaf]);
+
+  const setSample = useCallback(
+    (text: string) => {
+      handleReset();
+      setPuzzleText(text);
+    },
+    [handleReset]
+  );
+
+  const newRandomPuzzle = useCallback(() => {
+    const solution = randomSolvedGrid(Math.random);
+    const carved = carve(solution, 30, Math.random);
+    setSample(gridToString(carved));
+  }, [setSample]);
+
+  const displayGrid: Grid = snap ? snap.grid : puzzle ?? new Array(81).fill(0);
+  const conflictedCells = useMemo(() => computeConflicts(displayGrid), [displayGrid]);
+  const objective = useMemo(
+    () => (model ? evaluateObjective(displayGrid, model) : null),
+    [displayGrid, model]
+  );
+  const dedupConf = useMemo(() => dedupedPeerConflicts(displayGrid), [displayGrid]);
+
+  const isRunning = phase === "running";
+  const canEdit = phase === "setup";
+
+  return (
+    <div className="sudoku-mode">
+      <section className="panel sudoku-board-panel">
+        <div className="panel-header">
+          <Grid3x3 size={21} />
+          <h2>All-different instance</h2>
+        </div>
+        <SudokuGrid
+          grid={displayGrid}
+          puzzle={puzzle ?? new Array(81).fill(0)}
+          conflicted={conflictedCells}
+          lastMove={isRunning ? snap?.lastMove ?? null : null}
+        />
+        <div className="board-legend">
+          <span><i className="swatch clue" /> clue (singleton domain)</span>
+          <span><i className="swatch fill" /> search variable</span>
+          <span><i className="swatch conflict" /> peer conflict</span>
+        </div>
+        {canEdit ? (
+          <>
+            <div className="sample-row">
+              <button className="secondary-button" type="button" onClick={() => setSample(STANDARD_PUZZLE)}>
+                Standard
+              </button>
+              <button className="secondary-button" type="button" onClick={() => setSample(EMPTY_PUZZLE)}>
+                Empty
+              </button>
+              <button className="secondary-button" type="button" onClick={newRandomPuzzle}>
+                <Shuffle size={15} /> New random
+              </button>
+            </div>
+            <label className="puzzle-input-label" htmlFor="puzzle-input">
+              81-character puzzle (digits, 0 or . for blanks)
+            </label>
+            <textarea
+              id="puzzle-input"
+              className="puzzle-input"
+              spellCheck={false}
+              value={puzzleText}
+              onChange={(event) => setPuzzleText(event.target.value.replace(/\s+/gu, ""))}
+            />
+            {parseError && <div className="error-box">{parseError}</div>}
+          </>
+        ) : (
+          <div className="board-status">
+            <StatusBanner phase={phase} snap={snap} />
+          </div>
+        )}
+      </section>
+
+      <section className="panel sudoku-objective-panel">
+        <div className="panel-header">
+          <Sigma size={21} />
+          <h2>Signed p-adic objective</h2>
+        </div>
+        {model ? (
+          <>
+            <MetricRow label="Variables (cells)" value={`${model.variables}`} />
+            <MetricRow label="Clues (singleton domains)" value={`${model.clueCount}`} />
+            <MetricRow label="Prime" value={`p = ${model.p}  (> 9)`} />
+            <MetricRow label="Pinning weight" value={`α = ${model.alpha}  (> 20)`} accent />
+            <MetricRow
+              label="Positive pinning observations"
+              value={model.positiveObservationsMinimal.toLocaleString()}
+            />
+            <MetricRow
+              label="Negative reward observations"
+              value={`${model.negativeObservations.toLocaleString()}  (peer pairs)`}
+            />
+            <div className="scoring-card">
+              <strong>Minimal objective</strong>
+              <code>
+                L(x) = α · Σᵢ Σₐ |xᵢ − a|ₚ − Σ |xᵢ − xⱼ|ₚ
+              </code>
+              <span>
+                Every term is a genuine p-adic norm. For p &gt; 9 each edge norm is 0 (equal) or 1
+                (unequal), so on digit states L = floor + conflicts.
+              </span>
+            </div>
+            {objective && (
+              <div className="constraint-check">
+                <MetricRow label="Theoretical floor" value={model.theoreticalFloor.toLocaleString()} />
+                <MetricRow label="Current loss L(x)" value={objective.loss.toLocaleString()} />
+                <MetricRow
+                  label="Peer conflicts (loss − floor)"
+                  value={`${objective.dedupedConflicts}`}
+                  accent={objective.dedupedConflicts > 0}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="empty-state">Enter a valid 81-character puzzle to compile the objective.</div>
+        )}
+      </section>
+
+      <section className="panel sudoku-search-panel">
+        <div className="panel-header">
+          <FlaskConical size={21} />
+          <h2>Local search</h2>
+        </div>
+        <div className="control-block">
+          <span className="control-label">Heuristic</span>
+          <div className="segmented small">
+            <button
+              type="button"
+              className={method === "stepwise" ? "seg on" : "seg"}
+              onClick={() => canEdit && setMethod("stepwise")}
+              disabled={!canEdit}
+            >
+              Row-swap
+            </button>
+            <button
+              type="button"
+              className={method === "zubarev" ? "seg on" : "seg"}
+              onClick={() => canEdit && setMethod("zubarev")}
+              disabled={!canEdit}
+            >
+              Zubarev walk
+            </button>
+          </div>
+        </div>
+        <div className="control-block">
+          <span className="control-label">Speed</span>
+          <div className="segmented small">
+            {(["slow", "normal", "fast"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={speed === s ? "seg on" : "seg"}
+                onClick={() => setSpeed(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+        <MetricRow label="Max steps / restart" value={maxSteps.toLocaleString()} />
+        <MetricRow label="Restarts" value={`${restarts}`} />
+
+        <div className="run-stats sudoku-stats">
+          <Stat label="Conflicts H_cb" value={`${snap?.conflicts ?? objective?.hcbConflicts ?? 0}`} />
+          <Stat label="Peer conflicts" value={`${dedupConf}`} />
+          <Stat label="Best" value={`${snap?.bestConflicts ?? "–"}`} />
+          <Stat label="Steps" value={`${snap?.totalSteps.toLocaleString() ?? 0}`} />
+        </div>
+        {method === "zubarev" && snap?.beta != null && (
+          <MetricRow label="Inverse temperature β" value={snap.beta.toFixed(2)} />
+        )}
+        <MetricRow label="Restart" value={snap ? `${snap.restart + 1} / ${restarts}` : `–`} />
+
+        <div className="run-actions">
+          {phase === "setup" && (
+            <button className="run-button" type="button" onClick={handleStart} disabled={!puzzle}>
+              <Play size={17} /> Start search
+            </button>
+          )}
+          {phase === "running" && (
+            <button className="secondary-button" type="button" onClick={handlePause}>
+              <CirclePause size={17} /> Pause
+            </button>
+          )}
+          {phase === "paused" && (
+            <button className="run-button" type="button" onClick={handleResume}>
+              <Play size={17} /> Resume
+            </button>
+          )}
+          {(phase === "solved" || phase === "settled") && (
+            <div className="result-pill">
+              {phase === "solved" ? (
+                <>
+                  <ShieldCheck size={17} /> Solved in {snap?.totalSteps.toLocaleString()} steps
+                </>
+              ) : (
+                <>Settled at {snap?.bestConflicts} conflicts (minimum-conflict)</>
+              )}
+            </div>
+          )}
+          <button className="danger-button" type="button" onClick={handleReset}>
+            <RotateCcw size={15} /> Reset
+          </button>
+        </div>
+      </section>
+
+      <section className="panel sudoku-chart-panel">
+        <div className="panel-header">
+          <Square size={18} />
+          <h2>Conflict count over time</h2>
+        </div>
+        <ConflictChart history={history} />
+      </section>
+    </div>
+  );
+}
+
+function computeConflicts(grid: Grid): Set<number> {
+  const conflicts = new Set<number>();
+  for (let i = 0; i < 81; i += 1) {
+    const v = grid[i];
+    if (v === 0) continue;
+    for (const j of PEERS[i]) {
+      if (grid[j] === v) {
+        conflicts.add(i);
+        break;
+      }
+    }
+  }
+  return conflicts;
+}
+
+function SudokuGrid({
+  grid,
+  puzzle,
+  conflicted,
+  lastMove
+}: {
+  grid: Grid;
+  puzzle: Grid;
+  conflicted: Set<number>;
+  lastMove: { row: number; col1: number; col2: number } | null;
+}) {
+  const movedCells = new Set<number>();
+  if (lastMove) {
+    movedCells.add(lastMove.row * 9 + lastMove.col1);
+    movedCells.add(lastMove.row * 9 + lastMove.col2);
+  }
+  return (
+    <div className="sudoku-grid" role="grid" aria-label="Sudoku grid">
+      {grid.map((value, i) => {
+        const isClue = puzzle[i] !== 0;
+        const classes = ["sudoku-cell"];
+        if (i % 3 === 2 && i % 9 !== 8) classes.push("box-right");
+        if (Math.floor(i / 9) % 3 === 2 && Math.floor(i / 9) !== 8) classes.push("box-bottom");
+        if (isClue) classes.push("clue");
+        if (conflicted.has(i)) classes.push("conflict");
+        if (movedCells.has(i)) classes.push("moved");
+        return (
+          <div className={classes.join(" ")} key={i} role="gridcell">
+            {value === 0 ? "" : value}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatusBanner({ phase, snap }: { phase: Phase; snap: SolverSnapshot | null }) {
+  if (phase === "solved") {
+    return (
+      <span className="status-good">
+        <ShieldCheck size={16} /> Valid completion — all 810 peer edges unequal.
+      </span>
+    );
+  }
+  if (phase === "settled") {
+    return (
+      <span className="status-warn">
+        Minimum-conflict state: {snap?.bestConflicts} conflicting pairs remain (likely unsatisfiable
+        clues). This is the Max-CSP half of the theorem.
+      </span>
+    );
+  }
+  return <span className="status-run">Searching… conflicts {snap?.conflicts}</span>;
+}
+
+function ConflictChart({ history }: { history: HistoryPoint[] }) {
+  const points = history.length ? history : [{ step: 0, conflicts: 0 }];
+  const maxConf = Math.max(1, ...points.map((p) => p.conflicts));
+  const width = 900;
+  const height = 180;
+  const path = points
+    .map((point, index) => {
+      const x = points.length === 1 ? 0 : (index / (points.length - 1)) * width;
+      const y = height - (point.conflicts / maxConf) * (height - 28) - 14;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <div className="loss-chart">
+      <div className="chart-title">
+        <strong>H_cb (column + box conflict pairs)</strong>
+        <span>lower is better; floor = 0</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Conflict count over time">
+        <line x1="0" x2={width} y1={height - 14} y2={height - 14} className="floor-line" />
+        <path d={path} className="loss-line" />
+        <text x="14" y={height - 20}>
+          solved when the count reaches the floor
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function MetricRow({
+  label,
+  value,
+  accent = false
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="metric-row">
+      <span>{label}</span>
+      <strong className={accent ? "accent" : undefined}>{value}</strong>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+export default SudokuMode;

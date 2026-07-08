@@ -167,6 +167,71 @@ export function renderClause(clause: TernaryClause): string {
   return `(${clause.terms.map(renderExpression).join(" v ")})`;
 }
 
+// The paper's Boolean clause reward. Encode truth by x_i = 0 (true) / 1 (false).
+// A disjunctive clause is false iff every literal fails, i.e. iff u·x = t, where a
+// positive literal z_i contributes +x_i (and +1 to t) and a negated literal ¬z_i
+// contributes −x_i. So the clause is TRUE iff u·x ≠ t, and for a prime p > 3 the
+// residual |u·x − t|_p is exactly the 0/1 indicator of clause satisfaction.
+export interface ClauseAffineResidual {
+  coeffs: Array<{ name: string; sign: 1 | -1 }>;
+  t: number;
+}
+
+export function clauseAffineResidual(clause: TernaryClause): ClauseAffineResidual {
+  const coeffs: Array<{ name: string; sign: 1 | -1 }> = [];
+  let t = 0;
+  for (const term of clause.terms) {
+    if (term.type === "literal") {
+      coeffs.push({ name: term.name, sign: 1 });
+      t += 1;
+    } else if (term.type === "not" && term.expr.type === "literal") {
+      coeffs.push({ name: term.expr.name, sign: -1 });
+    }
+  }
+  return { coeffs, t };
+}
+
+export function renderClauseAffine(clause: TernaryClause): string {
+  const { coeffs, t } = clauseAffineResidual(clause);
+  if (coeffs.length === 0) {
+    return `0 ≠ ${t}`;
+  }
+  const lhs = coeffs
+    .map((c, index) => {
+      if (index === 0) {
+        return c.sign < 0 ? `−${c.name}` : c.name;
+      }
+      return c.sign < 0 ? ` − ${c.name}` : ` + ${c.name}`;
+    })
+    .join("");
+  return `${lhs} ≠ ${t}`;
+}
+
+// The genuine p-adic clause reward |u·x − t|_p (with x_i = 0 for true, 1 for false),
+// which equals 1 exactly when the clause is satisfied and 0 otherwise for p > 3.
+export function pAdicClauseReward(
+  clause: TernaryClause,
+  assignment: Record<string, boolean>,
+  p = 17
+): number {
+  const { coeffs, t } = clauseAffineResidual(clause);
+  let residual = -t;
+  for (const c of coeffs) {
+    const x = assignment[c.name] ? 0 : 1; // true -> 0, false -> 1
+    residual += c.sign * x;
+  }
+  if (residual === 0) {
+    return 0;
+  }
+  let m = Math.abs(residual);
+  let k = 0;
+  while (m % p === 0) {
+    m /= p;
+    k += 1;
+  }
+  return p ** -k;
+}
+
 export function renderExpression(expr: Expression): string {
   switch (expr.type) {
     case "literal":

@@ -7,6 +7,7 @@ import {
   Download,
   FileText,
   FlaskConical,
+  Grid3x3,
   Moon,
   Play,
   RotateCcw,
@@ -23,7 +24,8 @@ import {
   type CompiledProblem,
   compileProblem,
   evaluateAssignment,
-  renderClause
+  renderClause,
+  renderClauseAffine
 } from "./lib/csp";
 import {
   type LanguageModelAvailability,
@@ -32,6 +34,9 @@ import {
 } from "./lib/browserLanguageModel";
 import { createSearchPlan, formatAssignmentCount } from "./lib/search";
 import { useSearchController } from "./hooks/useSearchController";
+import SudokuMode from "./SudokuMode";
+
+type Mode = "csp" | "sudoku";
 
 const DEFAULT_CSP = [
   "# Example CSP (boolean variables, constraints)",
@@ -60,6 +65,7 @@ const DEFAULT_DESCRIPTION = [
 ].join("\n");
 
 function App() {
+  const [mode, setMode] = useState<Mode>("csp");
   const [source, setSource] = useState(DEFAULT_CSP);
   const [description, setDescription] = useState(DEFAULT_DESCRIPTION);
   const [compiled, setCompiled] = useState<CompiledProblem | null>(() =>
@@ -146,41 +152,88 @@ function App() {
         activeStep={isRunning ? "Run" : "Problem"}
         status={isRunning ? "Exhaustive search in this browser" : "Ready"}
       />
-      <CapabilityStrip status={modelStatus} note={modelNote} />
+      <ModeSwitch mode={mode} onChange={setMode} />
 
-      {isRunning && compiled ? (
-        <RunDashboard
-          compiled={compiled}
-          workerCount={workerCount}
-          controller={controller}
-        />
+      {mode === "sudoku" ? (
+        <SudokuMode />
       ) : (
         <>
-          <main className="setup-grid">
-            <ProblemPanel
-              source={source}
-              description={description}
-              isGenerating={isGenerating}
-              onDescriptionChange={setDescription}
-              onGenerateCsp={handleGenerateCsp}
-              onSourceChange={setSource}
-            />
-            <TernaryPanel compiled={compiled} error={compileError} />
-            <SearchPlanPanel compiled={compiled} workerCount={workerCount} />
-          </main>
+          <CapabilityStrip status={modelStatus} note={modelNote} />
 
-          <ReadyBand
-            compiled={compiled}
-            plan={searchPlan}
-            workerCount={workerCount}
-            onCompile={handleCompile}
-            onStart={() => compiled && controller.start(workerCount)}
-            onWorkerCountChange={setWorkerCount}
-          />
+          {isRunning && compiled ? (
+            <RunDashboard
+              compiled={compiled}
+              workerCount={workerCount}
+              controller={controller}
+            />
+          ) : (
+            <>
+              <main className="setup-grid">
+                <ProblemPanel
+                  source={source}
+                  description={description}
+                  isGenerating={isGenerating}
+                  onDescriptionChange={setDescription}
+                  onGenerateCsp={handleGenerateCsp}
+                  onSourceChange={setSource}
+                />
+                <TernaryPanel compiled={compiled} error={compileError} />
+                <SearchPlanPanel compiled={compiled} workerCount={workerCount} />
+              </main>
+
+              <ReadyBand
+                compiled={compiled}
+                plan={searchPlan}
+                workerCount={workerCount}
+                onCompile={handleCompile}
+                onStart={() => compiled && controller.start(workerCount)}
+                onWorkerCountChange={setWorkerCount}
+              />
+            </>
+          )}
         </>
       )}
 
       <Footer compiled={compiled} />
+    </div>
+  );
+}
+
+function ModeSwitch({
+  mode,
+  onChange
+}: {
+  mode: Mode;
+  onChange: (mode: Mode) => void;
+}) {
+  return (
+    <div className="mode-switch" role="tablist" aria-label="Problem family">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "csp"}
+        className={mode === "csp" ? "mode-tab on" : "mode-tab"}
+        onClick={() => onChange("csp")}
+      >
+        <FileText size={18} />
+        <span>
+          <strong>Boolean CSP / SAT</strong>
+          <small>clause rewards · exhaustive search</small>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "sudoku"}
+        className={mode === "sudoku" ? "mode-tab on" : "mode-tab"}
+        onClick={() => onChange("sudoku")}
+      >
+        <Grid3x3 size={18} />
+        <span>
+          <strong>Sudoku / all-different</strong>
+          <small>the main theorem · local search</small>
+        </span>
+      </button>
     </div>
   );
 }
@@ -342,7 +395,12 @@ function TernaryPanel({
             {compiled.ternaryClauses.map((clause) => (
               <div className="clause-row" key={clause.id}>
                 <span>{clause.id}</span>
-                <code>{renderClause(clause)}</code>
+                <div className="clause-forms">
+                  <code>{renderClause(clause)}</code>
+                  <code className="affine" title="p-adic clause residual">
+                    {renderClauseAffine(clause)}
+                  </code>
+                </div>
               </div>
             ))}
           </div>
@@ -376,10 +434,10 @@ function SearchPlanPanel({
           />
           <MetricRow label="Strategy" value="Brute force (exhaustive)" accent />
           <MetricRow label="Worker split" value="Integer ranges" />
-          <MetricRow label="Evaluator" value="Optimised p-adic linear regression solver" />
-          <MetricRow label="Execution" value="Generated worker code hidden" />
-          <MetricRow label="Loss floor" value="0 unit-well violations" />
-          <MetricRow label="Success criterion" value="All non-unit constraints score zero" />
+          <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17 > 3)" />
+          <MetricRow label="Loss(mask)" value="# clauses with reward 0" />
+          <MetricRow label="Loss floor" value="0 (every clause satisfied)" />
+          <MetricRow label="Success criterion" value="all clause rewards = 1" />
         </>
       ) : (
         <EmptyState text="No compiled problem yet." />
@@ -479,8 +537,8 @@ function RunDashboard({
         <MetricRow label="Workers" value={`${workerCount}`} />
         <div className="scoring-card">
           <strong>Scoring model</strong>
-          <code>loss(mask) = unit penalties + p-adic residual score</code>
-          <span>Minimum possible loss: 0</span>
+          <code>loss(mask) = #&#123;clauses : |u·x − t|ₚ = 0&#125;</code>
+          <span>Each clause reward is 0 (unsatisfied) or 1 (satisfied) for p &gt; 3. Floor = 0.</span>
         </div>
       </section>
 
@@ -521,8 +579,8 @@ function RunDashboard({
                 value={`${validation?.nonUnitSatisfied ?? 0} / ${compiled.constraints.length}`}
               />
               <MetricRow
-                label="p-adic residual"
-                value={`${validation?.loss ?? "-"} loss`}
+                label="Clauses unsatisfied"
+                value={`${validation?.loss ?? "-"}`}
               />
             </div>
           </>

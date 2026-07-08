@@ -832,11 +832,339 @@ button {
   font-style: italic;
 }
 
+/* ---- mode switch ---- */
+.mode-switch {
+  display: flex;
+  gap: 10px;
+  margin: 14px 2px 16px;
+}
+
+.mode-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  box-shadow: 0 6px 18px rgb(18 32 51 / 5%);
+}
+
+.mode-tab svg {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.mode-tab span {
+  display: flex;
+  flex-direction: column;
+}
+
+.mode-tab strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.mode-tab small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mode-tab.on {
+  border-color: var(--teal);
+  box-shadow: 0 8px 22px rgb(15 143 143 / 18%);
+}
+
+.mode-tab.on svg {
+  color: var(--teal);
+}
+
+.mode-tab.on strong {
+  color: var(--teal-strong);
+}
+
+/* ---- CSP affine residual form ---- */
+.clause-forms {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 10px;
+}
+
+.clause-forms code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clause-forms code.affine {
+  color: var(--teal-strong);
+  font-size: 12px;
+}
+
+/* ---- Sudoku mode ---- */
+.sudoku-mode {
+  display: grid;
+  grid-template-columns: minmax(340px, 440px) 1fr 320px;
+  grid-template-areas:
+    "board objective search"
+    "board chart chart";
+  gap: 16px;
+  align-items: start;
+}
+
+.sudoku-board-panel {
+  grid-area: board;
+}
+
+.sudoku-objective-panel {
+  grid-area: objective;
+}
+
+.sudoku-search-panel {
+  grid-area: search;
+}
+
+.sudoku-chart-panel {
+  grid-area: chart;
+}
+
+.sudoku-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 12px;
+  border: 2.5px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.sudoku-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  border-right: 1px solid var(--soft-line);
+  border-bottom: 1px solid var(--soft-line);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(15px, 2.4vw, 22px);
+  font-weight: 600;
+  color: var(--teal-strong);
+  transition: background 120ms ease;
+}
+
+.sudoku-cell.box-right {
+  border-right: 2.5px solid var(--ink);
+}
+
+.sudoku-cell.box-bottom {
+  border-bottom: 2.5px solid var(--ink);
+}
+
+.sudoku-cell.clue {
+  color: var(--ink);
+  background: #eef3f8;
+  font-weight: 800;
+}
+
+.sudoku-cell.moved {
+  background: #fff2cf;
+}
+
+.sudoku-cell.conflict {
+  background: #ffe1e1;
+  color: var(--coral);
+}
+
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.board-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.swatch.clue {
+  background: #eef3f8;
+}
+
+.swatch.fill {
+  background: #fff;
+}
+
+.swatch.conflict {
+  background: #ffe1e1;
+  border-color: #ffc9c9;
+}
+
+.sample-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.sample-row .secondary-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.puzzle-input-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.puzzle-input {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.board-status {
+  margin-top: 4px;
+}
+
+.status-good,
+.status-warn,
+.status-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.status-good {
+  background: #e7f7ef;
+  color: var(--green);
+}
+
+.status-warn {
+  background: #fff4e5;
+  color: #b45309;
+}
+
+.status-run {
+  background: #eef2f8;
+  color: var(--muted);
+}
+
+.control-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.control-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented .seg {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: #fff;
+  padding: 0 12px;
+  height: 36px;
+  color: var(--muted);
+  font-weight: 640;
+  text-transform: capitalize;
+}
+
+.segmented .seg:first-child {
+  border-left: 0;
+}
+
+.segmented .seg.on {
+  background: var(--teal);
+  color: #fff;
+}
+
+.segmented .seg:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.segmented.small .seg {
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.sudoku-stats {
+  margin-top: 8px;
+}
+
+.result-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  min-height: 44px;
+  border-radius: 8px;
+  background: #e7f7ef;
+  color: var(--green);
+  border: 1px solid #bfe6cf;
+  font-weight: 720;
+}
+
 @media (max-width: 1180px) {
   .setup-grid,
   .run-grid {
     grid-template-columns: 1fr;
     grid-template-areas: none;
+  }
+
+  .sudoku-mode {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+  }
+
+  .sudoku-board-panel,
+  .sudoku-objective-panel,
+  .sudoku-search-panel,
+  .sudoku-chart-panel {
+    grid-area: auto;
   }
 
   .compiled-summary,
