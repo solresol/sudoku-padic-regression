@@ -359,6 +359,12 @@ Any finite-domain all-different constraint system can be encoded, in polynomial 
 Given an all-different constraint system, form its primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists, and the minimum-conflict assignments are exactly the domain-respecting assignments minimising the corresponding edge-conflict sum. Apply Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, and Theorem~\ref{thm:all-different}.
 \end{proof}
 
+\paragraph{Unsatisfiable instances and minimum conflicts.}
+The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case, and it is exercised directly by the interactive browser demonstration described in the code-and-data statement below: a search that settles above the floor is displaying a minimum-conflict state.
+
+\paragraph{Relation to Potts energies.}
+On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
+
 \paragraph{Discrete-metric variant.}
 The same synthetic dataset also works with the discrete metric
 \[
@@ -605,6 +611,8 @@ Mihara's work on \(p\)-adic manifold learning from impartial games gives an adja
 
 The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, a \(3\)-CNF clause can be written as one forbidden affine equality, so signed terms can reward clause satisfaction one clause at a time. This connects \(p\)-adic residual objectives with finite-domain optimisation beyond all-different constraints, while keeping the claim separate from solver performance.
 
+To support teaching and dissemination, an interactive browser demonstration of both constructions is available (see the code-and-data statement). It lets a reader compile a Sudoku or list-colouring instance, or a Boolean CSP, into the signed residual objective and watch a simple search drive the conflict count to its floor, making the correspondence between finite-domain constraint satisfaction and signed \(p\)-adic residual objectives concrete without requiring any \(p\)-adic machinery on the reader's part.
+
 \clearpage
 \appendix
 
@@ -798,7 +806,7 @@ To obtain a quick, reproducible testbed, we generated random puzzles by:
     \item sampling a random solved grid; then
     \item \emph{carving} it down to a specified clue count by removing entries uniformly at random.
 \end{enumerate}
-This procedure does \emph{not} enforce uniqueness of the resulting puzzle. Each carved puzzle was then solved with up to $T=60{,}000$ steps and $R=15$ random restarts. All results reported below use a fixed RNG seed ($123$) for reproducibility.
+This procedure does \emph{not} enforce uniqueness of the resulting puzzle. Since Theorem~\ref{thm:all-different} characterises the entire set of global minimisers as the set of valid completions, a puzzle with several completions has several global minimisers, and the heuristics report whichever one their trajectory reaches first. Each carved puzzle was then solved with up to $T=60{,}000$ steps and $R=15$ random restarts. All results reported below use a fixed RNG seed ($123$) for reproducibility.
 
 The table can be regenerated from the repository root with the following commands:
 \begin{quote}\small
@@ -903,6 +911,13 @@ Revision: \texttt{ba49a8b2e51670f66db624d814d3f31678881b93}\\
 Scripts: \path{code/padic_sudoku_regression.py}, \path{code/run_experiments.py}
 \end{quote}
 The submitted source package includes the experiment CSV files, puzzle seeds, trace puzzle and solution files, and figure source used for Table~\ref{tab:results} and Figure~\ref{fig:loss}.
+
+\subsection*{Interactive demonstration}
+A browser-based demonstration of the construction is available at
+\begin{quote}\small
+\url{https://padic-logic.symmachus.org}
+\end{quote}
+It has two modes, and all computation runs client-side. The all-different mode compiles a Sudoku or list-colouring instance into the signed \(p\)-adic residual objective of Definition~\ref{def:list-loss} on the native cell variables, evaluates the genuine \(p\)-adic norms (with \(p=11\)), and animates the row-swap and Zubarev-walk heuristics of Appendix~\ref{app:heuristics} until the column/box conflict count reaches its floor; on an unsatisfiable instance the search visibly settles at a minimum-conflict state. The Boolean mode illustrates the clause-reward remark of Section~\ref{construction}: it compiles a CSP to ternary clauses, displays each clause as a forbidden affine equality \(u_C^\top x\neq t_C\), and searches for satisfying assignments in the browser.
 
 \begin{thebibliography}{99}
 
