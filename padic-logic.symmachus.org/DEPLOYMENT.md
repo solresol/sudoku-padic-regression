@@ -7,8 +7,22 @@ This app is a static Vite build hosted on `merah`.
 - DNS for `padic-logic.symmachus.org` resolves through Cloudflare.
 - The static vhost directory has been provisioned on `merah`.
 - The current production build has been synced to `htdocs`.
+- GitHub Actions deploys the static build to `htdocs` on pushes to `main`.
 - The proposed `httpd.conf` server block validates with `httpd -n`.
 - Public activation still requires adding the server block below to `/etc/httpd.conf` and reloading `httpd`.
+
+## Automated Deploy
+
+The workflow in `.github/workflows/padic-logic.yml` runs on pull requests and pushes that touch the app. Pull requests run tests and a production build. Pushes to `main` also deploy `dist/` to:
+
+```text
+padiclogic@merah.cassia.ifost.org.au:/var/www/vhosts/padic-logic.symmachus.org/htdocs/
+```
+
+Required GitHub repository secrets:
+
+- `MERAH_DEPLOY_KEY`: private half of the dedicated deploy key installed for the `padiclogic` user on `merah`.
+- `MERAH_KNOWN_HOSTS`: the SSH host key line for `merah.cassia.ifost.org.au`.
 
 ## Manual Deploy
 

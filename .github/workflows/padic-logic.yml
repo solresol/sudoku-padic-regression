@@ -1,0 +1,68 @@
+name: Padic Logic CI/CD
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/padic-logic.yml"
+      - "padic-logic.symmachus.org/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/padic-logic.yml"
+      - "padic-logic.symmachus.org/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: padic-logic-symmachus-deploy
+  cancel-in-progress: false
+
+jobs:
+  test-build-deploy:
+    name: Test, build, deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: padic-logic.symmachus.org
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: padic-logic.symmachus.org/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Configure SSH deploy key
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.MERAH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.MERAH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Deploy to merah
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          rsync -az --delete \
+            --exclude='.DS_Store' \
+            -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            dist/ \
+            padiclogic@merah.cassia.ifost.org.au:/var/www/vhosts/padic-logic.symmachus.org/htdocs/
