@@ -54,7 +54,7 @@ Two earlier results motivate the construction:
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive pinning points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} connects \(p\)-adic methods with regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. Here signed residual terms enforce pairwise distinctness across finite domains. The main theorem turns a finite-domain all-different or list-colouring instance into a signed weighted synthetic \(p\)-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this replaces structural support results and binary forcing gadgets by a polynomial-time finite-domain reduction with an exact global-minimiser description.
+Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} connects \(p\)-adic methods with regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. Mihara studies a different regression regime: polynomial regression with digitwise noise \cite{mihara2026polyreg}, and a probabilistic linear-regression algorithm that estimates the digits of one hidden affine law from random samples with sparse digitwise corruption \cite{mihara2026digitwise}. Here signed residual terms enforce pairwise distinctness across finite domains. The main theorem turns a finite-domain all-different or list-colouring instance into a signed weighted synthetic \(p\)-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this replaces structural support results and binary forcing gadgets by a polynomial-time finite-domain reduction with an exact global-minimiser description. Section~\ref{sec:mihara-digitwise} explains why Mihara's digitwise-noise linear-regression algorithm is adjacent but not a solver for the Sudoku or Boolean-CSP objectives studied here.
 
 Negative signed residual terms do not have the usual interpretation of Euclidean least-squares terms. Classical generalized ridge regression allowed negative ridge parameters \cite{hua1983negative}; later work found zero or negative risk-optimal ridge parameters in overparameterised models \cite{kobak2020negative} and under distribution shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations \cite{wiesel2008gaussian} and in multivariate climate downscaling \cite{cannon2009negative}. These results do not justify the present construction by analogy. They only show that negative quadratic penalties are not, by themselves, incoherent. In the \(p\)-adic construction below, the reason they are usable is sharper: on \(\mathbb Z_p^n\), the residuals are bounded, and on the intended finite domain they become equality indicators.
 
@@ -600,6 +600,37 @@ The minimal objective \eqref{eq:objective-minimal} is already a single scalar lo
 
 Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
+\section{Relation to Mihara's digitwise-noise regression}
+\label{sec:mihara-digitwise}
+
+Mihara's linear-regression algorithm \cite{mihara2026digitwise} addresses an inverse statistical problem. The data are samples
+\[
+(\vec x_i,y_i)\in\mathbb Z_p^D\times\mathbb Z_p
+\]
+from a single hidden affine graph
+\[
+y=\langle c,\vec x\rangle,
+\]
+with digitwise noise. Writing
+\[
+I_e=\{i:y_i-\langle c,\vec x_i\rangle\in p^e\mathbb Z_p\},
+\]
+the method estimates \(c\bmod p^E\) recursively: first solve a modulo-\(p\) linear-regression problem to estimate \(c\bmod p\), subtract that digit, divide residuals by \(p\), restrict to the samples in \(I_1\), and repeat. The probabilistic argument relies on a large, sufficiently random sample from the hidden affine graph, a small digitwise corruption rate such as
+\[
+\frac{|I_e\setminus I_{e+1}|}{|I_e|}\le r \ll \frac12,
+\]
+and the condition that the noise-free samples have the right affine hull modulo \(p\) at each digit step.
+
+Those assumptions do not match the Sudoku construction. In this paper the unknowns \(x_i\) are the cell values themselves, not coefficients of an observed response law. The residual rows are exact synthetic constraints chosen by the modeller: unary wells pin cells to allowed digits, while negative residuals \(-|x_i-x_j|_p\) reward inequality across peer edges. After digit snapping, the problem is exactly a finite-domain conflict-minimisation problem. There is no response vector \(Y\), no hidden coefficient vector \(c\) to recover from random samples, and no large noise-free affine locus whose graph could be estimated digit by digit.
+
+The mismatch is even sharper for the Boolean clause remark. A clause becomes one \emph{forbidden} affine equality
+\[
+u_C^\top x=t_C,
+\]
+and a satisfying assignment is rewarded because the residual is nonzero. Mihara's modulo-\(p\) stage is designed to recover an affine equality satisfied by most noise-free samples. The Boolean CSP task asks for one point avoiding many clause-specific forbidden hyperplanes, or, in the Max-CSP case, avoiding as many as possible. Failed clauses are not random digitwise outliers from a single affine law; they are exact, structured constraints sharing variables.
+
+Thus Mihara's algorithm is relevant background for \(p\)-adic regression with digitwise noise, but it is not a drop-in replacement for the search procedures here. It would be appropriate if the task were to estimate an unknown affine or polynomial \(p\)-adic rule from noisy sampled evaluations. Sudoku and the finite-domain CSP objectives instead compile known constraints into a signed residual objective whose minimisers are discrete assignments. Any use of Mihara's method here would first require changing the problem into a different statistical estimation task, and would no longer preserve the exact minimiser characterisation in Theorem~\ref{thm:all-different} or the clause-reward calculation of Section~\ref{construction}.
+
 
 \section{Conclusion}
 
@@ -962,6 +993,18 @@ A. P. Zubarev.
 \newblock \(p\)-Adic polynomial regression as alternative to neural network for approximating \(p\)-adic functions of many variables.
 \newblock \emph{p-Adic Numbers, Ultrametric Analysis and Applications} 17(4), 413--420 (2025).
 \newblock \url{https://doi.org/10.1134/S2070046625040065}
+
+\bibitem{mihara2026polyreg}
+T. Mihara.
+\newblock \(p\)-adic polynomial regression detecting digitwise noise.
+\newblock \emph{p-Adic Numbers, Ultrametric Analysis and Applications} 18(1), 33--47 (2026).
+\newblock \url{https://doi.org/10.1134/S2070046626010036}
+
+\bibitem{mihara2026digitwise}
+T. Mihara.
+\newblock \(p\)-adic linear regression for random sampling with digitwise noise.
+\newblock arXiv:2604.13137 (2026).
+\newblock \url{https://arxiv.org/abs/2604.13137}
 
 \bibitem{mihara2026manifoldgames}
 T. Mihara.
