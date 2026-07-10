@@ -1,7 +1,17 @@
+import {
+  permuteAssignmentIndex,
+  type AssignmentPermutation,
+  type SearchStrategy
+} from "../lib/search";
+
 interface StartMessage {
   type: "start";
   workerId: number;
   evaluatorSource: string;
+  lossFloor: number;
+  assignmentCount: number;
+  strategy: SearchStrategy;
+  permutation: AssignmentPermutation;
   start: number;
   endExclusive: number;
   updateEveryMs: number;
@@ -39,21 +49,46 @@ function runSearch(message: StartMessage): void {
   let solutions = 0;
   let bestLoss = Number.POSITIVE_INFINITY;
   let bestMask: number | null = null;
+  let currentMask = message.start;
   let lastUpdate = performance.now();
   const startedAt = performance.now();
   const chunkSize = 16_384;
 
+  const emitProgress = (
+    type: "progress" | "done",
+    done: boolean,
+    now: number
+  ) => {
+    ctx.postMessage({
+      type,
+      workerId: message.workerId,
+      tested,
+      currentMask,
+      bestLoss: Number.isFinite(bestLoss) ? bestLoss : null,
+      bestMask,
+      solutions,
+      speed: tested / Math.max((now - startedAt) / 1000, 0.001),
+      done
+    });
+  };
+
   const step = () => {
     const chunkEnd = Math.min(cursor + chunkSize, message.endExclusive);
     for (; cursor < chunkEnd; cursor += 1) {
-      const loss = evaluateMask(cursor);
+      currentMask = message.strategy === "random"
+        ? permuteAssignmentIndex(cursor, message.assignmentCount, message.permutation)
+        : cursor;
+      const loss = evaluateMask(currentMask);
       tested += 1;
-      if (loss === 0) {
+      if (loss === message.lossFloor) {
         solutions += 1;
       }
       if (loss < bestLoss) {
         bestLoss = loss;
-        bestMask = cursor;
+        bestMask = currentMask;
+        const now = performance.now();
+        emitProgress("progress", false, now);
+        lastUpdate = now;
       }
     }
 
@@ -65,17 +100,8 @@ function runSearch(message: StartMessage): void {
 
     if (shouldUpdate) {
       lastUpdate = now;
-      ctx.postMessage({
-        type: cursor >= message.endExclusive || stopped ? "done" : "progress",
-        workerId: message.workerId,
-        tested,
-        currentMask: Math.max(message.start, cursor - 1),
-        bestLoss: Number.isFinite(bestLoss) ? bestLoss : null,
-        bestMask,
-        solutions,
-        speed: tested / Math.max((now - startedAt) / 1000, 0.001),
-        done: cursor >= message.endExclusive || stopped
-      });
+      const done = cursor >= message.endExclusive || stopped;
+      emitProgress(done ? "done" : "progress", done, now);
     }
 
     if (cursor < message.endExclusive && !stopped) {

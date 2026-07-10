@@ -101,6 +101,8 @@ describe("browser languageModel CSP generation", () => {
   it("extracts an assignment schema and expands it deterministically", async () => {
     const events: string[] = [];
     const conversationRoles: string[] = [];
+    const eventOrder: string[] = [];
+    const variableSets: string[][] = [];
     const { factory, prompt, sessions } = installLanguageModel([
       JSON.stringify({
         kind: "assignment",
@@ -119,6 +121,12 @@ describe("browser languageModel CSP generation", () => {
       onProgress: (event) => {
         if (event.type === "conversation") {
           conversationRoles.push(event.entry.role);
+          eventOrder.push(`conversation:${event.entry.role}`);
+        } else {
+          eventOrder.push(event.type);
+        }
+        if (event.type === "variables") {
+          variableSets.push(event.variables);
         }
         if (event.type === "clause") {
           events.push(event.step.purpose);
@@ -146,6 +154,13 @@ describe("browser languageModel CSP generation", () => {
     expect(conversationRoles).toContain("assistant-recorded");
     expect(conversationRoles).toContain("browser");
     expect(conversationRoles).not.toContain("system");
+    expect(variableSets).toEqual([
+      ["Ava_test", "Ava_design", "Ben_test", "Ben_design"]
+    ]);
+    expect(eventOrder.indexOf("conversation:assistant-recorded"))
+      .toBeLessThan(eventOrder.indexOf("variables"));
+    expect(eventOrder.indexOf("variables")).toBeLessThan(eventOrder.indexOf("clause"));
+    expect(eventOrder.indexOf("clause")).toBeLessThan(eventOrder.indexOf("review"));
 
     expect(factory.create).toHaveBeenCalledTimes(1);
     expect(typeof vi.mocked(factory.create).mock.calls[0][0]?.monitor).toBe("function");

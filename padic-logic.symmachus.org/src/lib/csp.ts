@@ -1,4 +1,4 @@
-export type BooleanOp = "or" | "xor" | "and";
+export type BooleanOp = "or" | "xor" | "and" | "implies";
 
 export interface Variable {
   name: string;
@@ -43,6 +43,7 @@ export interface CompiledProblem extends ParsedProblem {
     prime: number;
     power: number;
     theoreticalFloor: number;
+    unitWellWeight: number;
     unitWellViolationsAllowed: number;
     nonUnitConstraintTarget: number;
   };
@@ -61,8 +62,25 @@ export interface RegressionDataFrameRow {
   kind: "constraint" | "unit-well";
   label: string;
   coefficients: Record<string, number>;
+  relation: "=" | "≠";
   target: number;
+  sign: 1 | -1;
+  weight: number;
   source: string;
+}
+
+export interface RegressionDataFrameEvaluationRow extends RegressionDataFrameRow {
+  affineValue: number;
+  residual: number;
+  pAdicNorm: number;
+  signedWeight: number;
+  contribution: number;
+  status: "satisfied" | "violated" | "at-target" | "away-from-target";
+}
+
+export interface RegressionDataFrameEvaluation {
+  rows: RegressionDataFrameEvaluationRow[];
+  totalLoss: number;
 }
 
 type TokenKind =
@@ -71,6 +89,7 @@ type TokenKind =
   | "or"
   | "xor"
   | "and"
+  | "implies"
   | "leftParen"
   | "rightParen"
   | "eof";
@@ -84,7 +103,8 @@ const OP_WORDS: Record<string, TokenKind> = {
   and: "and",
   or: "or",
   xor: "xor",
-  not: "not"
+  not: "not",
+  implies: "implies"
 };
 
 export function parseProblem(source: string): ParsedProblem {
@@ -122,6 +142,9 @@ export function compileProblem(source: string): CompiledProblem {
     (maxWidth, clause) => Math.max(maxWidth, clause.terms.length),
     0
   );
+  const unitWellWeight = ternaryClauses.length + 1;
+  const theoreticalFloor =
+    unitWellWeight * parsed.variables.length - ternaryClauses.length;
 
   const compiled: CompiledProblem = {
     ...parsed,
@@ -136,7 +159,8 @@ export function compileProblem(source: string): CompiledProblem {
     scoring: {
       prime: 17,
       power: 4,
-      theoreticalFloor: parsed.variables.length,
+      theoreticalFloor,
+      unitWellWeight,
       unitWellViolationsAllowed: 0,
       nonUnitConstraintTarget: 0
     }
@@ -173,7 +197,7 @@ export function evaluateAssignment(
 }
 
 export function buildRegressionDataFrame(
-  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses">
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">
 ): RegressionDataFrameRow[] {
   const rows: RegressionDataFrameRow[] = compiled.ternaryClauses.map((clause) => {
     const residual = clauseAffineResidual(clause);
@@ -187,7 +211,10 @@ export function buildRegressionDataFrame(
       kind: "constraint",
       label: `C${clause.id}`,
       coefficients,
+      relation: "≠",
       target: residual.t,
+      sign: -1,
+      weight: 1,
       source: clause.source
     };
   });
@@ -202,13 +229,56 @@ export function buildRegressionDataFrame(
           ...zeroCoefficientRow(compiled.variables),
           [variable.name]: 1
         },
+        relation: "=",
         target,
+        sign: 1,
+        weight: compiled.scoring.unitWellWeight,
         source: `Unit well for ${variable.name} at ${target}`
       });
     }
   }
 
   return rows;
+}
+
+export function evaluateRegressionDataFrame(
+  compiled: CompiledProblem,
+  assignment: Record<string, boolean>
+): RegressionDataFrameEvaluation {
+  const coordinates = Object.fromEntries(
+    compiled.variables.map((variable) => [
+      variable.name,
+      assignment[variable.name] ? 0 : 1
+    ])
+  );
+  const rows = buildRegressionDataFrame(compiled).map((row) => {
+    const affineValue = compiled.variables.reduce(
+      (sum, variable) =>
+        sum + (row.coefficients[variable.name] ?? 0) * coordinates[variable.name],
+      0
+    );
+    const residual = affineValue - row.target;
+    const pAdicNorm = pAdicIntegerNorm(residual, compiled.scoring.prime);
+    const signedWeight = row.sign * row.weight;
+    const contribution = pAdicNorm === 0 ? 0 : signedWeight * pAdicNorm;
+
+    return {
+      ...row,
+      affineValue,
+      residual,
+      pAdicNorm,
+      signedWeight,
+      contribution,
+      status: row.kind === "constraint"
+        ? residual === 0 ? "violated" : "satisfied"
+        : residual === 0 ? "at-target" : "away-from-target"
+    } satisfies RegressionDataFrameEvaluationRow;
+  });
+
+  return {
+    rows,
+    totalLoss: rows.reduce((sum, row) => sum + row.contribution, 0)
+  };
 }
 
 export function renderClause(clause: TernaryClause): string {
@@ -286,8 +356,10 @@ export function renderExpression(expr: Expression): string {
       return expr.name;
     case "not":
       return `~${renderExpression(expr.expr)}`;
-    case "binary":
-      return `${renderExpression(expr.left)} ${expr.op === "or" ? "v" : expr.op} ${renderExpression(expr.right)}`;
+    case "binary": {
+      const operator = expr.op === "or" ? "v" : expr.op === "implies" ? "->" : expr.op;
+      return `${renderExpression(expr.left)} ${operator} ${renderExpression(expr.right)}`;
+    }
   }
 }
 
@@ -309,6 +381,9 @@ export function evaluateExpression(
       if (expr.op === "and") {
         return left && right;
       }
+      if (expr.op === "implies") {
+        return !left || right;
+      }
       return left !== right;
     }
   }
@@ -325,7 +400,23 @@ function zeroCoefficientRow(variables: Variable[]): Record<string, number> {
   return Object.fromEntries(variables.map((variable) => [variable.name, 0]));
 }
 
-export function buildEvaluatorSource(compiled: Pick<CompiledProblem, "variables" | "ternaryClauses">): string {
+function pAdicIntegerNorm(value: number, prime: number): number {
+  if (value === 0) {
+    return 0;
+  }
+
+  let magnitude = Math.abs(value);
+  let valuation = 0;
+  while (magnitude % prime === 0) {
+    magnitude /= prime;
+    valuation += 1;
+  }
+  return prime ** -valuation;
+}
+
+export function buildEvaluatorSource(
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">
+): string {
   const variableLines = compiled.variables.map((variable) => {
     const bitExpression =
       variable.index < 31
@@ -341,7 +432,7 @@ export function buildEvaluatorSource(compiled: Pick<CompiledProblem, "variables"
 
   return [
     "function evaluateMask(mask) {",
-    "  let loss = 0;",
+    `  let loss = ${compiled.scoring.theoreticalFloor};`,
     ...variableLines,
     ...constraintLines,
     "  return loss;",
@@ -380,6 +471,12 @@ function tokenize(source: string): Token[] {
     if (char === "~" || char === "!") {
       tokens.push({ kind: "not", value: char });
       index += 1;
+      continue;
+    }
+
+    if (char === "-" && source[index + 1] === ">") {
+      tokens.push({ kind: "implies", value: "->" });
+      index += 2;
       continue;
     }
 
@@ -433,8 +530,21 @@ class Parser {
   constructor(private readonly tokens: Token[]) {}
 
   parse(): Expression {
-    const expr = this.parseOr();
+    const expr = this.parseImplies();
     this.expect("eof");
+    return expr;
+  }
+
+  private parseImplies(): Expression {
+    const expr = this.parseOr();
+    if (this.match("implies")) {
+      return {
+        type: "binary",
+        op: "implies",
+        left: expr,
+        right: this.parseImplies()
+      };
+    }
     return expr;
   }
 
@@ -468,7 +578,7 @@ class Parser {
     }
 
     if (this.match("leftParen")) {
-      const expr = this.parseOr();
+      const expr = this.parseImplies();
       this.expect("rightParen");
       return expr;
     }
@@ -635,6 +745,9 @@ function expressionToCode(expr: Expression, variables: Variable[]): string {
       }
       if (expr.op === "and") {
         return `(${left} && ${right})`;
+      }
+      if (expr.op === "implies") {
+        return `(!(${left}) || ${right})`;
       }
       return `(${left} !== ${right})`;
     }

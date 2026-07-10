@@ -1,5 +1,12 @@
 import type { CompiledProblem } from "./csp";
 
+export type SearchStrategy = "ordered" | "random";
+
+export interface AssignmentPermutation {
+  multiplier: number;
+  offset: number;
+}
+
 export interface AssignmentRange {
   workerId: number;
   start: number;
@@ -7,7 +14,7 @@ export interface AssignmentRange {
 }
 
 export interface SearchPlan {
-  strategy: "brute-force";
+  strategy: SearchStrategy;
   assignmentCount: number;
   lossFloor: number;
   ranges: AssignmentRange[];
@@ -45,14 +52,54 @@ export function splitAssignmentRanges(
 
 export function createSearchPlan(
   compiled: CompiledProblem,
-  workerCount: number
+  workerCount: number,
+  strategy: SearchStrategy = "ordered"
 ): SearchPlan {
   return {
-    strategy: "brute-force",
+    strategy,
     assignmentCount: compiled.assignmentCount,
     lossFloor: compiled.scoring.theoreticalFloor,
     ranges: splitAssignmentRanges(compiled.variables.length, workerCount)
   };
+}
+
+export function createSearchPermutation(
+  assignmentCount: number,
+  seed: number
+): AssignmentPermutation {
+  if (assignmentCount <= 1) {
+    return { multiplier: 1, offset: 0 };
+  }
+
+  const normalizedSeed = seed >>> 0;
+  if (assignmentCount > 2 ** 31) {
+    return {
+      multiplier: 1,
+      offset: normalizedSeed % assignmentCount
+    };
+  }
+
+  const mixedSeed = Math.imul(normalizedSeed ^ 0x9e37_79b9, 0x85eb_ca6b) >>> 0;
+  return {
+    multiplier: (mixedSeed | 1) >>> 0,
+    offset: (normalizedSeed ^ (normalizedSeed >>> 16)) % assignmentCount
+  };
+}
+
+export function permuteAssignmentIndex(
+  index: number,
+  assignmentCount: number,
+  permutation: AssignmentPermutation
+): number {
+  if (assignmentCount <= 1) {
+    return 0;
+  }
+  if (permutation.multiplier === 1 || assignmentCount > 2 ** 31) {
+    return (index + permutation.offset) % assignmentCount;
+  }
+  return (
+    (Math.imul(index >>> 0, permutation.multiplier >>> 0) + permutation.offset) >>> 0
+  ) % assignmentCount;
 }
 
 export function exhaustiveSearchRange(

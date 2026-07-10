@@ -29,6 +29,7 @@ export interface CnfConversationEntry {
 
 export type CnfGenerationEvent =
   | { type: "conversation"; entry: CnfConversationEntry }
+  | { type: "variables"; variables: string[] }
   | { type: "clause"; step: CnfGenerationStep; source: string }
   | { type: "review"; review: CnfReview; source: string };
 
@@ -83,6 +84,7 @@ const LANGUAGE_OPTIONS: LanguageModelCreateOptions = {
 
 const CLAUSE_SCHEMA =
   '{"cnf":"one valid CNF OR-clause only","purpose":"the source sentence or constraint this captures"}';
+const VARIABLE_STAGE_DISPLAY_MS = 600;
 
 export const CNF_GENERATION_CACHE_ENABLED = false;
 
@@ -212,6 +214,11 @@ async function generateFromSchemaSession(
   const schema = parseAssignmentSchemaResponse(response);
   const correctedJson = JSON.stringify(assignmentSchemaToJson(schema));
   appendAssistantJson(history, correctedJson, onProgress);
+  const variables = assignmentSchemaVariables(schema);
+  if (onProgress && variables.length) {
+    onProgress({ type: "variables", variables });
+    await waitForIntermediateStage(VARIABLE_STAGE_DISPLAY_MS, signal);
+  }
 
   const clauses = assignmentSchemaToCnfSteps(schema);
   const accepted: CnfGenerationStep[] = [];
@@ -303,6 +310,25 @@ function assignmentSchemaToJson(schema: AssignmentCspSchema): Record<string, unk
     forbidden: schema.forbidden,
     implications: schema.implications
   };
+}
+
+function assignmentSchemaVariables(schema: AssignmentCspSchema): string[] {
+  const variables = new Set<string>();
+  if (schema.personExactlyOneJob || schema.jobExactlyOnePerson) {
+    for (const person of schema.people) {
+      for (const job of schema.jobs) {
+        variables.add(assignmentVariable(person, job));
+      }
+    }
+  }
+  for (const entry of schema.forbidden) {
+    variables.add(assignmentVariable(entry.person, entry.job));
+  }
+  for (const entry of schema.implications) {
+    variables.add(assignmentVariable(entry.if.person, entry.if.job));
+    variables.add(assignmentVariable(entry.then.person, entry.then.job));
+  }
+  return [...variables];
 }
 
 function assignmentSchemaToCnfSteps(schema: AssignmentCspSchema): CnfGenerationStep[] {
@@ -1016,6 +1042,26 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 
   throw new DOMException("CSP generation cancelled.", "AbortError");
+}
+
+async function waitForIntermediateStage(
+  durationMs: number,
+  signal?: AbortSignal
+): Promise<void> {
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    const handleAbort = () => {
+      clearTimeout(timeoutId);
+      reject(new DOMException("CSP generation cancelled.", "AbortError"));
+    };
+    const timeoutId = globalThis.setTimeout(() => {
+      signal?.removeEventListener("abort", handleAbort);
+      resolve();
+    }, durationMs);
+
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
 }
 
 function stringArray(value: unknown): string[] {

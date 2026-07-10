@@ -4,11 +4,13 @@ import {
   render,
   screen,
   waitFor,
+  within,
   type RenderResult
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { DEFAULT_ASSIGNMENT_PROBLEM } from "./lib/defaultProblems";
 
 class MockWorker {
   static instances: MockWorker[] = [];
@@ -44,6 +46,7 @@ describe("p-adic logic app", () => {
 
   afterEach(() => {
     clearLanguageModel();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -63,10 +66,22 @@ describe("p-adic logic app", () => {
     expect(screen.queryByText(/No problem text leaves this browser/i)).not.toBeInTheDocument();
   });
 
-  it("hides natural-language CSP entry unless a browser language model is exposed", async () => {
+  it("shows manual syntax hints unless a browser language model is exposed", async () => {
+    const user = userEvent.setup();
     const { unmount } = await renderApp();
     expect(screen.queryByText("Enter CSP")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Default problem/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Default problem/i })).not.toBeInTheDocument();
+    const manualEditor = screen.getByLabelText("CSP source");
+    expect(manualEditor.getAttribute("placeholder")).toContain("One CSP clause per line");
+    expect(manualEditor.getAttribute("placeholder")).toContain("not A or C");
+    expect(manualEditor.getAttribute("placeholder")).toContain("A implies B");
+    expect(manualEditor.getAttribute("placeholder")).toContain("C -> D");
+    await user.click(screen.getByRole("button", { name: "CSP syntax help" }));
+    const syntaxHelp = screen.getByRole("note", { name: "CSP clause syntax" });
+    expect(syntaxHelp).toHaveTextContent("one Boolean constraint per line");
+    expect(within(syntaxHelp).getByText("B xor C")).toBeInTheDocument();
+    expect(within(syntaxHelp).getByText("A implies B")).toBeInTheDocument();
+    expect(within(syntaxHelp).getByText("C -> D")).toBeInTheDocument();
     unmount();
 
     const availability = vi.fn().mockResolvedValue("available");
@@ -78,21 +93,34 @@ describe("p-adic logic app", () => {
     await renderApp();
     await waitFor(() => expect(screen.getByText("Enter CSP")).toBeInTheDocument());
     expect(availability).toHaveBeenCalled();
+    expect(screen.getByLabelText("Natural language problem")).toHaveValue(DEFAULT_ASSIGNMENT_PROBLEM);
+    expect(screen.queryByRole("button", { name: "CSP syntax help" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("CSP source")).not.toHaveAttribute("placeholder");
   });
 
   it("starts with a blank CSP editor", async () => {
-    await renderApp();
+    const { container } = await renderApp();
 
-    expect(screen.getByRole("heading", { name: /p-adic linear regression/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", {
+      name: "p-adic linear regression",
+      exact: true
+    })).toBeInTheDocument();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     expect(screen.getByRole("separator", { name: /Resize CSP and CNF columns/i })).toBeInTheDocument();
     expect(screen.getByRole("separator", { name: /Resize CNF and data columns/i })).toBeInTheDocument();
     expect(screen.getByLabelText("CSP source")).toHaveValue("");
     expect(screen.getByText(/Constraints: 0/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Solve p-adic regression/i })).toBeDisabled();
+    const readyBand = container.querySelector<HTMLElement>(".ready-band");
+    const setupGrid = container.querySelector<HTMLElement>(".setup-grid");
+    const header = screen.getByRole("banner");
+    expect(readyBand).toBeInTheDocument();
+    expect(readyBand).toHaveAttribute("aria-hidden", "true");
+    expect(readyBand).not.toHaveClass("is-visible");
+    expect(readyBand?.querySelector(".run-button")).toBeDisabled();
+    expect(header.compareDocumentPosition(readyBand as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(readyBand?.compareDocumentPosition(setupGrid as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Solve p-adic linear regression/i })).not.toBeInTheDocument();
     expect(screen.getByText(/No compiled problem yet/i)).toBeInTheDocument();
-    expect(screen.getByText("Threads")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("resizes adjacent setup columns from the dividers", async () => {
@@ -133,17 +161,26 @@ describe("p-adic logic app", () => {
       target: { value: "A or not B" }
     });
 
-    expect(screen.getByText("CNF regression dataframe")).toBeInTheDocument();
+    expect(screen.getByText("p-adic linear regression dataframe")).toBeInTheDocument();
     expect(screen.getByText("C1")).toBeInTheDocument();
     expect(screen.getByText("A = 0")).toBeInTheDocument();
     expect(screen.getByText("A = 1")).toBeInTheDocument();
     expect(screen.getByText("CNF constraints")).toBeInTheDocument();
     expect(screen.getByText("Unit wells")).toBeInTheDocument();
-    expect(screen.getByText("Loss floor")).toBeInTheDocument();
-    expect(screen.getByText("2 (one unit well per coefficient)")).toBeInTheDocument();
+    expect(screen.getByText("Negative clause reward")).toBeInTheDocument();
+    expect(screen.getByText("Unit-well weight")).toBeInTheDocument();
+    expect(screen.getByText("α = 2 = clauses + 1")).toBeInTheDocument();
+    expect(screen.getByText("Satisfiable floor")).toBeInTheDocument();
+    expect(screen.getByText("3 = αn − clauses")).toBeInTheDocument();
+    expect(screen.getByText("≠ 1")).toBeInTheDocument();
+    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(document.querySelector(".ready-band")).toHaveClass("is-visible");
+    expect(document.querySelector(".ready-band")).toHaveAttribute("aria-hidden", "false");
+    expect(screen.getByText("Ready to solve.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Solve p-adic linear regression/i })).toBeEnabled();
   });
 
-  it("resets the default natural-language problem without preloading CNF", async () => {
+  it("loads a story sample with its known CNF", async () => {
     const user = userEvent.setup();
     globalThis.languageModel = {
       availability: vi.fn().mockResolvedValue("available"),
@@ -152,16 +189,111 @@ describe("p-adic logic app", () => {
     await renderApp();
     await waitFor(() => expect(screen.getByText("Enter CSP")).toBeInTheDocument());
 
+    await user.selectOptions(screen.getByLabelText("Sample problem"), "blackout-restoration");
+
+    expect((screen.getByLabelText("Natural language problem") as HTMLTextAreaElement).value)
+      .toContain("city-wide blackout");
+    expect((screen.getByLabelText("CSP source") as HTMLTextAreaElement).value)
+      .toContain("Harbour_primary xor Harbour_backup");
+    expect(screen.getByText(/Constraints: 24/i)).toBeInTheDocument();
+    expect(screen.getByText("47 clauses")).toBeInTheDocument();
+    expect(screen.getAllByText(/16,777,216/).length).toBeGreaterThan(0);
+  });
+
+  it("shows sample text as non-form content without a language model and fades it on clause edits", async () => {
+    const { container } = await renderApp();
+
+    fireEvent.change(screen.getByLabelText("Sample problem"), {
+      target: { value: "blackout-restoration" }
+    });
+
+    const statement = screen.getByRole("note", { name: "Sample problem statement" });
+    expect(statement.tagName).toBe("DIV");
+    expect(statement).toHaveTextContent("city-wide blackout");
+
+    vi.useFakeTimers();
+    const source = screen.getByLabelText("CSP source") as HTMLTextAreaElement;
+    fireEvent.change(source, { target: { value: `${source.value}\nnot Harbour_primary` } });
+
+    expect(container.querySelector(".sample-description-box")).toHaveClass("is-fading");
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.queryByRole("note", { name: "Sample problem statement" })).not.toBeInTheDocument();
+  });
+
+  it("fades the language-model problem text on the first clause edit", async () => {
+    globalThis.languageModel = {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () => ({ prompt: vi.fn(), destroy: vi.fn() }))
+    };
+    const { container } = await renderApp();
+    await waitFor(() => expect(screen.getByText("Enter CSP")).toBeInTheDocument());
+    vi.useFakeTimers();
+
+    fireEvent.change(screen.getByLabelText("CSP source"), {
+      target: { value: "A or B" }
+    });
+
+    expect(container.querySelector(".description-box")).toHaveClass("is-fading");
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.queryByLabelText("Natural language problem")).not.toBeInTheDocument();
+  });
+
+  it("uses one scrolling textarea and keeps its line-number gutter in sync", async () => {
+    const { container } = await renderApp();
+    const editor = screen.getByLabelText("CSP source") as HTMLTextAreaElement;
+    const gutter = container.querySelector<HTMLElement>(".line-numbers");
+
+    expect(editor).toHaveAttribute("wrap", "off");
+    expect(gutter).not.toBeNull();
+    editor.scrollTop = 84;
+    fireEvent.scroll(editor);
+    expect(gutter?.scrollTop).toBe(84);
+  });
+
+  it("shows variables beside manually edited CSP clauses", async () => {
+    await renderApp();
     const editor = screen.getByLabelText("CSP source");
-    const problem = screen.getByLabelText("Natural language problem");
-    fireEvent.change(editor, { target: { value: "Zed" } });
-    fireEvent.change(problem, { target: { value: "Custom problem" } });
 
-    await user.click(screen.getByRole("button", { name: /Default problem/i }));
+    fireEvent.change(editor, {
+      target: { value: "Alpha or Beta\nGamma xor not Alpha" }
+    });
 
-    expect(editor).toHaveValue("");
-    expect((problem as HTMLTextAreaElement).value).toContain("Ava, Ben, Cara, and Devina");
-    expect(screen.getByText(/Constraints: 0/i)).toBeInTheDocument();
+    let variables = screen.getByRole("list", { name: "CSP variables" });
+    expect(within(variables).getAllByRole("listitem").map((item) => item.textContent))
+      .toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(screen.getByText("Variables: 3")).toBeInTheDocument();
+
+    fireEvent.change(editor, {
+      target: { value: "Alpha or Beta\nDelta or" }
+    });
+
+    variables = screen.getByRole("list", { name: "CSP variables" });
+    expect(within(variables).getAllByRole("listitem").map((item) => item.textContent))
+      .toEqual(["Alpha", "Beta"]);
+  });
+
+  it("sends a complete random permutation to every search worker", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    fireEvent.change(screen.getByLabelText("CSP source"), {
+      target: { value: "A or B" }
+    });
+
+    await user.selectOptions(screen.getByLabelText("Search strategy"), "random");
+    expect(screen.getByText("Random-permutation exhaustive search")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
+
+    expect(MockWorker.instances).toHaveLength(2);
+    for (const worker of MockWorker.instances) {
+      expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        assignmentCount: 4,
+        strategy: "random",
+        permutation: expect.objectContaining({
+          multiplier: expect.any(Number),
+          offset: expect.any(Number)
+        })
+      }));
+    }
   });
 
   it("shows generation progress without the debug transcript", async () => {
@@ -186,11 +318,59 @@ describe("p-adic logic app", () => {
 
     await user.click(screen.getByRole("button", { name: /Generate CSP/i }));
 
+    await waitFor(() => expect(screen.getByText(/1 Boolean variable found/i)).toBeInTheDocument());
+    expect(screen.getByText("Ava_test")).toBeInTheDocument();
+    expect(screen.getByLabelText("CSP source")).toHaveValue("");
     await waitFor(() => expect(screen.getByLabelText("CSP source")).toHaveValue("not Ava_test"));
     expect(screen.queryByText("Language model conversation")).not.toBeInTheDocument();
     expect(screen.queryByText("assistant-recorded")).not.toBeInTheDocument();
-    expect(screen.getByText(/Review complete/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Boolean variable found/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Conversion complete/i)).toBeInTheDocument();
     expect(screen.getAllByText(/not Ava_test/).length).toBeGreaterThan(0);
+  });
+
+  it("moves a small reading highlight while the local model is thinking", async () => {
+    const prompt = vi.fn((_input, options?: { signal?: AbortSignal }) => {
+      return new Promise<string>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+    globalThis.languageModel = {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn(async () => ({ prompt, destroy: vi.fn() }))
+    };
+    const { container } = await renderApp();
+    await waitFor(() => expect(screen.getByText("Enter CSP")).toBeInTheDocument());
+    vi.useFakeTimers();
+
+    fireEvent.click(screen.getByRole("button", { name: /Generate CSP/i }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(prompt).toHaveBeenCalled();
+    const highlightedWords = () => Array.from(
+      container.querySelectorAll<HTMLElement>(".generation-reading-token.is-focused")
+    ).map((token) => token.textContent).join(" ");
+    const firstHighlight = highlightedWords();
+    expect(firstHighlight.split(" ")).toHaveLength(2);
+
+    act(() => vi.advanceTimersByTime(340));
+
+    const nextHighlight = highlightedWords();
+    expect(nextHighlight).not.toBe(firstHighlight);
+    expect(nextHighlight.split(" ").length).toBeGreaterThanOrEqual(1);
+    expect(nextHighlight.split(" ").length).toBeLessThanOrEqual(3);
+
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".generation-reading-text")).not.toBeInTheDocument();
   });
 
   it("lets the user cancel CSP generation", async () => {
@@ -211,31 +391,58 @@ describe("p-adic logic app", () => {
 
     await user.click(screen.getByRole("button", { name: /Generate CSP/i }));
     await waitFor(() => expect(prompt).toHaveBeenCalled());
-    expect(screen.getByText(/Decoding terms and finding variables/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reading the problem and extracting a typed structure/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Cancel/i }));
 
     await waitFor(() => expect(screen.getByText(/Generation cancelled/i)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /Cancel/i })).not.toBeInTheDocument();
+    expect(document.querySelector(".generation-reading-text")).not.toBeInTheDocument();
     expect((prompt.mock.calls[0]?.[1] as { signal?: AbortSignal }).signal?.aborted).toBe(true);
   });
 
-  it("compiles the current editor contents when exhaustive search starts", async () => {
+  it("keeps the CSP, CNF, and dataframe above the results when search starts", async () => {
     const user = userEvent.setup();
-    await renderApp();
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+      writable: true
+    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const { container } = await renderApp();
 
     const editor = screen.getByLabelText("CSP source");
     fireEvent.change(editor, { target: { value: "Zed" } });
 
-    await user.click(screen.getByRole("button", { name: /Solve p-adic regression/i }));
+    await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
 
-    expect(screen.getByText(/Regression problem/i)).toBeInTheDocument();
+    expect(container.querySelector(".ready-band")).not.toHaveClass("is-visible");
+    expect(container.querySelector(".ready-band")).toHaveAttribute("aria-hidden", "true");
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveValue("Zed");
+    expect(screen.getByRole("heading", { name: "CNF view" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "p-adic linear regression dataframe" })).toBeInTheDocument();
+    expect(screen.queryByText(/Regression problem/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Search results" })).toBeInTheDocument();
+    const setupGrid = container.querySelector(".setup-grid");
+    const runGrid = container.querySelector(".run-grid");
+    expect(setupGrid).not.toBeNull();
+    expect(runGrid).not.toBeNull();
+    expect(setupGrid?.compareDocumentPosition(runGrid as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(MockWorker.instances).toHaveLength(2);
     expect(MockWorker.instances[0].postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluatorSource: expect.stringContaining("// Zed")
       })
     );
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start"
+    }));
   });
 
   it("replaces active search controls when exhaustive search completes", async () => {
@@ -245,7 +452,7 @@ describe("p-adic logic app", () => {
     fireEvent.change(screen.getByLabelText("CSP source"), {
       target: { value: "Zed" }
     });
-    await user.click(screen.getByRole("button", { name: /Solve p-adic regression/i }));
+    await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
     expect(screen.getByRole("button", { name: /^Pause$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Stop$/i })).toBeInTheDocument();
 
@@ -257,6 +464,8 @@ describe("p-adic logic app", () => {
           endExclusive: number;
         };
         const width = startMessage.endExclusive - startMessage.start;
+        const containsSatisfyingAssignment =
+          startMessage.start <= 1 && startMessage.endExclusive > 1;
         worker.onmessage?.({
           data: {
             type: "done",
@@ -264,9 +473,11 @@ describe("p-adic logic app", () => {
             tested: width,
             currentMask: Math.max(startMessage.start, startMessage.endExclusive - 1),
             speed: 1,
-            bestLoss: width > 0 ? 0 : null,
-            bestMask: width > 0 ? startMessage.start : null,
-            solutions: width > 0 ? 1 : 0,
+            bestLoss: width > 0 ? containsSatisfyingAssignment ? 1 : 2 : null,
+            bestMask: width > 0
+              ? containsSatisfyingAssignment ? 1 : startMessage.start
+              : null,
+            solutions: containsSatisfyingAssignment ? 1 : 0,
             done: true
           }
         } as MessageEvent);
@@ -276,11 +487,30 @@ describe("p-adic logic app", () => {
     await waitFor(() => expect(screen.getByText("Search complete")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /^Pause$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Stop$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Back to setup/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Clear results/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Export proof/i })).toBeInTheDocument();
     expect(screen.getByText(/Best p-adic regression solution/i)).toBeInTheDocument();
     expect(screen.getByText(/y = /i)).toBeInTheDocument();
-    expect(screen.getByText("Unit-well floor")).toBeInTheDocument();
+    expect(screen.queryByText(/Regression problem/i)).not.toBeInTheDocument();
+    expect(document.querySelector(".compiled-summary")).not.toBeInTheDocument();
+    expect(document.querySelector(".assignment-panel")).not.toBeInTheDocument();
+    const lossChart = document.querySelector(".loss-chart");
+    const solutionSection = document.querySelector(".solution-section");
+    expect(lossChart).not.toBeNull();
+    expect(solutionSection).not.toBeNull();
+    expect(
+      lossChart?.compareDocumentPosition(solutionSection as Node) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    const contributionTable = screen.getByRole("table", { name: "Regression row contributions" });
+    expect(contributionTable.querySelectorAll("tbody tr")).toHaveLength(3);
+    expect(screen.getByText("Total L = 1")).toBeInTheDocument();
+    expect(
+      Array.from(document.querySelectorAll(".loss-chart .y-axis-label")).map((node) => node.textContent)
+    ).toEqual(["1", "2"]);
+    expect(document.querySelector(".loss-chart svg")).toHaveAttribute("data-points", "2");
+    expect(document.querySelector(".loss-chart svg")).toHaveAttribute("data-last-tested", "2");
+    expect(document.querySelector(".loss-chart svg")).toHaveAttribute("data-hit-floor", "true");
+    expect(screen.getAllByText("Satisfiable floor").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/candidate hyperplanes/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/mask/i)).not.toBeInTheDocument();

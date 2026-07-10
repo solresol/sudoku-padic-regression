@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { CompiledProblem } from "../lib/csp";
-import { maskToAssignment, splitAssignmentRanges } from "../lib/search";
+import {
+  createSearchPermutation,
+  maskToAssignment,
+  splitAssignmentRanges,
+  type SearchStrategy
+} from "../lib/search";
 
 export interface WorkerLane {
   workerId: number;
@@ -29,7 +34,7 @@ export interface SearchSnapshot {
   totalTested: number;
   totalSpeed: number;
   solutions: number;
-  history: Array<{ second: number; loss: number }>;
+  history: Array<{ tested: number; loss: number }>;
   logs: SearchLogEntry[];
 }
 
@@ -73,7 +78,11 @@ export function useSearchController(compiled: CompiledProblem | null) {
   const [snapshot, setSnapshot] = useState<SearchSnapshot>(INITIAL_SNAPSHOT);
 
   const start = useCallback(
-    (workerCount: number, compiledOverride?: CompiledProblem) => {
+    (
+      workerCount: number,
+      compiledOverride?: CompiledProblem,
+      strategy: SearchStrategy = "ordered"
+    ) => {
       const problem = compiledOverride ?? compiled;
       if (!problem) {
         return;
@@ -82,6 +91,10 @@ export function useSearchController(compiled: CompiledProblem | null) {
       stopWorkers();
       const ranges = splitAssignmentRanges(problem.variables.length, workerCount);
       const startedAt = Date.now();
+      const permutation = createSearchPermutation(
+        problem.assignmentCount,
+        startedAt ^ logCounterRef.current
+      );
       const lanes = ranges.map((range) => ({
         ...range,
         tested: 0,
@@ -101,7 +114,7 @@ export function useSearchController(compiled: CompiledProblem | null) {
         logs: [
           {
             id: ++logCounterRef.current,
-            text: `[sys] partitioned ${problem.assignmentCount.toLocaleString()} candidate hyperplanes across ${ranges.length} threads`
+            text: `[sys] ${strategy === "random" ? "randomly permuted" : "ordered"} scan of ${problem.assignmentCount.toLocaleString()} candidate hyperplanes across ${ranges.length} threads`
           }
         ]
       });
@@ -113,13 +126,17 @@ export function useSearchController(compiled: CompiledProblem | null) {
         );
 
         worker.onmessage = (event: MessageEvent<WorkerProgress>) => {
-          setSnapshot((previous) => applyProgress(previous, event.data, startedAt));
+          setSnapshot((previous) => applyProgress(previous, event.data));
         };
 
         worker.postMessage({
           type: "start",
           workerId: range.workerId,
           evaluatorSource: problem.evaluatorSource,
+          lossFloor: problem.scoring.theoreticalFloor,
+          assignmentCount: problem.assignmentCount,
+          strategy,
+          permutation,
           start: range.start,
           endExclusive: range.endExclusive,
           updateEveryMs: 220
@@ -161,8 +178,7 @@ export function useSearchController(compiled: CompiledProblem | null) {
 
 function applyProgress(
   previous: SearchSnapshot,
-  progress: WorkerProgress,
-  startedAt: number
+  progress: WorkerProgress
 ): SearchSnapshot {
   const lanes = previous.lanes.map((lane) =>
     lane.workerId === progress.workerId
@@ -187,9 +203,11 @@ function applyProgress(
   const solutions = lanes.reduce((sum, lane) => sum + lane.solutions, 0);
   const bestLoss = laneBest?.bestLoss ?? previous.bestLoss;
   const bestMask = laneBest?.bestMask ?? previous.bestMask;
-  const elapsedSecond = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
   const done = lanes.length > 0 && lanes.every((lane) => lane.done);
   const changedBest = bestLoss != null && bestLoss !== previous.bestLoss;
+  const lastHistoryPoint = previous.history[previous.history.length - 1];
+  const appendCompletionPlateau =
+    done && bestLoss != null && lastHistoryPoint?.tested !== totalTested;
 
   return {
     ...previous,
@@ -201,15 +219,15 @@ function applyProgress(
     bestLoss,
     bestMask,
     history:
-      bestLoss == null
+      bestLoss == null || (!changedBest && !appendCompletionPlateau)
         ? previous.history
-        : [...previous.history, { second: elapsedSecond, loss: bestLoss }].slice(-80),
+        : [...previous.history, { tested: totalTested, loss: bestLoss }].slice(-160),
     logs: changedBest
       ? [
           ...previous.logs,
           {
             id: previous.logs.length + 1,
-            text: `[t${progress.workerId}] new best constraint loss ${bestLoss} at hyperplane ${
+            text: `[t${progress.workerId}] new best p-adic loss ${bestLoss} at hyperplane ${
               progress.bestMask == null ? "-" : `H${progress.bestMask}`
             }`
           }

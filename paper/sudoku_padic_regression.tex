@@ -54,7 +54,9 @@ Two earlier results motivate the construction:
     \item A structural result on $p$-adic linear regression \cite{baker2025padic}: an optimal hyperplane is supported by $n+1$ data points.
     \item A complexity result on $p$-adic linear regression \cite{baker2026nphard}: the problem is NP-hard, via an embedding of \textsc{Max-Cut} using positive pinning points that snap coefficients to $\{0,1\}$.
 \end{itemize}
-Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} connects \(p\)-adic methods with regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. Mihara studies a different regression regime: polynomial regression with digitwise noise \cite{mihara2026polyreg}, and a probabilistic linear-regression algorithm that estimates the digits of one hidden affine law from random samples with sparse digitwise corruption \cite{mihara2026digitwise}. Here signed residual terms enforce pairwise distinctness across finite domains. The main theorem turns a finite-domain all-different or list-colouring instance into a signed weighted synthetic \(p\)-adic residual objective whose global minimisers are exactly the domain-respecting assignments with the fewest conflicts, and in the satisfiable case exactly the valid solutions. Relative to \cite{baker2025padic,baker2026nphard}, this replaces structural support results and binary forcing gadgets by a polynomial-time finite-domain reduction with an exact global-minimiser description. Section~\ref{sec:mihara-digitwise} explains why Mihara's digitwise-noise linear-regression algorithm is adjacent but not a solver for the Sudoku or Boolean-CSP objectives studied here.
+Recent work in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} connects \(p\)-adic methods with regression structure and optimisation \cite{baker2025padic,zubarev2025padic}. Mihara studies a different regression regime: polynomial regression with digitwise noise \cite{mihara2026polyreg}, and a probabilistic linear-regression algorithm that estimates the digits of one hidden affine law from random samples with sparse digitwise corruption \cite{mihara2026digitwise}.
+
+Mihara also generalises Baker's forcing method from \(p=2\) to arbitrary fixed primes \cite{mihara2026forcing}. For a product domain \(C=\prod_i B_i\) with \(B_i\subseteq\{0,\ldots,p-1\}\), his forcing theorem adds positive unary wells and identifies global optima with those of a nonnegative discrete objective on \(C\), subject to a concentration hypothesis; he consequently proves ordinary \(p\)-adic linear regression NP-hard for every fixed prime. Thus arbitrary finite-alphabet positive pinning is not the distinction of the present construction. The new ingredient here is the signed affine interaction layer: a coordinatewise domination condition permits negative inequality rewards, and the resulting global minimisers are exactly the minimum-conflict list-colourings or all-different assignments on the native finite-domain variables. Section~\ref{sec:mihara-digitwise} explains why Mihara's digitwise-noise linear-regression algorithm is adjacent but not a solver for the Sudoku or Boolean-CSP objectives studied here.
 
 Negative signed residual terms do not have the usual interpretation of Euclidean least-squares terms. Classical generalized ridge regression allowed negative ridge parameters \cite{hua1983negative}; later work found zero or negative risk-optimal ridge parameters in overparameterised models \cite{kobak2020negative} and under distribution shift \cite{patil2024oodridge}. Related anti-shrinkage effects appear in Gaussian model-uncertainty formulations \cite{wiesel2008gaussian} and in multivariate climate downscaling \cite{cannon2009negative}. These results do not justify the present construction by analogy. They only show that negative quadratic penalties are not, by themselves, incoherent. In the \(p\)-adic construction below, the reason they are usable is sharper: on \(\mathbb Z_p^n\), the residuals are bounded, and on the intended finite domain they become equality indicators.
 
@@ -486,7 +488,7 @@ U_D(t) := \sum_{k=1}^9 |t-k|_p.
 
 By Lemma~\ref{lem:unary-well} applied to the common domain \(D\), one has \(U_D(t)\ge 8\) for every \(t\in\mathbb Z_p\), with equality if and only if \(t\in D\).
 
-This is the $9$-valued analogue of the earlier ``snap to $\{0,1\}$'' construction from \cite{baker2026nphard}: the positive pinning observations $t=k$ for all $k\in D$ create a multiwell objective with minima exactly at $D$.
+The unary term is the nine-valued specialisation of the arbitrary-residue positive wells in Mihara's general forcing theorem \cite{mihara2026forcing}: the observations $t=k$ for all $k\in D$ create a multiwell objective with minima exactly at $D$. The additional signed terms below reward pairwise inequality and produce the Sudoku/list-colouring objective.
 
 \subsection{Negative signed residual terms: rewarding inequality via p-adic norms}
 
@@ -651,7 +653,7 @@ To support teaching and dissemination, an interactive browser demonstration of b
 \label{app:heuristics}
 
 \subsection{Row-swap local search}
-The theorem-side objective \eqref{eq:objective} induces an NP-hard global optimisation problem, consistent with the earlier NP-hardness result for $p$-adic regression. The heuristics, however, work directly on the digit-valued, clue-consistent row-permutation state space and minimise the duplicated unit-scope loss \(H_{\mathrm{cb}}\) from Section~\ref{sec:illustrative-computations}. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space.
+The general family of signed $p$-adic residual objectives produced by the compiler is NP-hard to optimise globally. For comparison, Mihara proves ordinary positive $p$-adic linear regression NP-hard for every individual prime, including the choice $p=11$ used here \cite{mihara2026forcing}. The heuristics, however, work directly on the digit-valued, clue-consistent row-permutation state space and minimise the duplicated unit-scope loss \(H_{\mathrm{cb}}\) from Section~\ref{sec:illustrative-computations}. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space.
 
 \begin{lemma}[Locality of row swaps]
 \label{lem:row-swap-locality}
@@ -960,9 +962,9 @@ G. Baker, S. McCallum, and D. Pattinson.
 
 \bibitem{baker2026nphard}
 G. Baker.
-\newblock NP-hardness of \(p\)-adic linear regression.
-\newblock Accepted for publication in \emph{p-Adic Numbers, Ultrametric Analysis and Applications} (2026); preprint at arXiv:2602.13278.
-\newblock \url{https://arxiv.org/abs/2602.13278}
+\newblock Expressivity and NP-hardness of \(p\)-adic linear regression.
+\newblock \emph{p-Adic Numbers, Ultrametric Analysis and Applications} 18(2), 210--216 (2026).
+\newblock \url{https://doi.org/10.1134/S2070046626020081}
 
 \bibitem{knuth2000dancing}
 Donald E. Knuth.
@@ -1011,6 +1013,12 @@ T. Mihara.
 \newblock \(p\)-adic manifold learning and benchmark tasks from impartial games.
 \newblock arXiv:2605.04374 (2026).
 \newblock \url{https://arxiv.org/abs/2605.04374}
+
+\bibitem{mihara2026forcing}
+T. Mihara.
+\newblock Generalisation of Baker's forcing method to arbitrary prime and NP-hardness of several \(p\)-adic optimisations.
+\newblock arXiv:2607.06092 (2026).
+\newblock \url{https://arxiv.org/abs/2607.06092}
 
 \bibitem{hua1983negative}
 T. A. Hua and R. F. Gunst.
