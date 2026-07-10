@@ -9,6 +9,7 @@
     "deploy:merah": "scripts/deploy-merah.sh",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
+    "test:language-model": "node scripts/cft-language-model-eval.mjs",
     "test:watch": "vitest",
     "lint": "tsc -b --pretty false"
   },

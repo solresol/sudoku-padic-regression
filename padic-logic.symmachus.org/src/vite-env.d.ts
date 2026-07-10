@@ -8,7 +8,10 @@ declare global {
   }
 
   interface LanguageModelSession {
-    prompt(input: string | LanguageModelPrompt[]): Promise<string>;
+    prompt(
+      input: string | LanguageModelPrompt[],
+      options?: LanguageModelPromptOptions
+    ): Promise<string>;
     destroy?: () => void;
   }
 
@@ -24,9 +27,15 @@ declare global {
     expectedOutputs?: Array<{ type: "text"; languages: string[] }>;
     initialPrompts?: LanguageModelPrompt[];
     monitor?: (monitor: EventTarget) => void;
+    signal?: AbortSignal;
+  }
+
+  interface LanguageModelPromptOptions {
+    signal?: AbortSignal;
   }
 
   var LanguageModel: LanguageModelFactory | undefined;
+  var languageModel: LanguageModelFactory | undefined;
 }
 
 export {};

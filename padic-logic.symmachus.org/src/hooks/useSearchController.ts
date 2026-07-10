@@ -73,13 +73,14 @@ export function useSearchController(compiled: CompiledProblem | null) {
   const [snapshot, setSnapshot] = useState<SearchSnapshot>(INITIAL_SNAPSHOT);
 
   const start = useCallback(
-    (workerCount: number) => {
-      if (!compiled) {
+    (workerCount: number, compiledOverride?: CompiledProblem) => {
+      const problem = compiledOverride ?? compiled;
+      if (!problem) {
         return;
       }
 
       stopWorkers();
-      const ranges = splitAssignmentRanges(compiled.variables.length, workerCount);
+      const ranges = splitAssignmentRanges(problem.variables.length, workerCount);
       const startedAt = Date.now();
       const lanes = ranges.map((range) => ({
         ...range,
@@ -100,7 +101,7 @@ export function useSearchController(compiled: CompiledProblem | null) {
         logs: [
           {
             id: ++logCounterRef.current,
-            text: `[sys] split ${compiled.assignmentCount.toLocaleString()} masks across ${ranges.length} workers`
+            text: `[sys] partitioned ${problem.assignmentCount.toLocaleString()} candidate hyperplanes across ${ranges.length} threads`
           }
         ]
       });
@@ -118,7 +119,7 @@ export function useSearchController(compiled: CompiledProblem | null) {
         worker.postMessage({
           type: "start",
           workerId: range.workerId,
-          evaluatorSource: compiled.evaluatorSource,
+          evaluatorSource: problem.evaluatorSource,
           start: range.start,
           endExclusive: range.endExclusive,
           updateEveryMs: 220
@@ -208,7 +209,9 @@ function applyProgress(
           ...previous.logs,
           {
             id: previous.logs.length + 1,
-            text: `[w${progress.workerId}] new best loss ${bestLoss} at mask ${progress.bestMask ?? "-"}`
+            text: `[t${progress.workerId}] new best constraint loss ${bestLoss} at hyperplane ${
+              progress.bestMask == null ? "-" : `H${progress.bestMask}`
+            }`
           }
         ].slice(-12)
       : previous.logs

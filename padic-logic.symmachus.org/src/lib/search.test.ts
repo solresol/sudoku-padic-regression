@@ -18,12 +18,12 @@ describe("bit-mask search", () => {
     });
   });
 
-  it("builds a brute-force plan with a zero-loss floor", () => {
+  it("builds a brute-force plan with the unit-well floor", () => {
     const plan = createSearchPlan(compileProblem("A or B\nB xor not C"), 4);
 
     expect(plan.strategy).toBe("brute-force");
     expect(plan.assignmentCount).toBe(8);
-    expect(plan.lossFloor).toBe(0);
+    expect(plan.lossFloor).toBe(3);
     expect(plan.ranges).toHaveLength(4);
   });
 

@@ -1,26 +1,31 @@
 import {
-  BookOpen,
   Check,
-  ChevronRight,
   CirclePause,
   Code2,
   Download,
   FileText,
   FlaskConical,
   Grid3x3,
-  Moon,
   Play,
   RotateCcw,
   Search,
-  Send,
-  Settings,
   ShieldCheck,
   Square,
   Triangle,
-  WandSparkles
+  WandSparkles,
+  X
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import {
+  buildRegressionDataFrame,
   type CompiledProblem,
   compileProblem,
   evaluateAssignment,
@@ -28,57 +33,62 @@ import {
   renderClauseAffine
 } from "./lib/csp";
 import {
+  type CnfGenerationStep,
   type LanguageModelAvailability,
   detectLanguageModel,
   generateCspFromDescription
 } from "./lib/browserLanguageModel";
+import {
+  DEFAULT_ASSIGNMENT_PROBLEM,
+  countCspConstraints
+} from "./lib/defaultProblems";
 import { createSearchPlan, formatAssignmentCount } from "./lib/search";
 import { useSearchController } from "./hooks/useSearchController";
 import SudokuMode from "./SudokuMode";
 
 type Mode = "csp" | "sudoku";
+type ColumnWidths = {
+  problem: number;
+  cnf: number;
+  regression: number;
+};
+type ColumnDivider = "problem-cnf" | "cnf-regression";
+type ColumnResize = {
+  cleanup: () => void;
+  divider: ColumnDivider;
+  pointerId: number;
+  startX: number;
+  widths: ColumnWidths;
+};
 
-const DEFAULT_CSP = [
-  "# Example CSP (boolean variables, constraints)",
-  "A or B or C",
-  "B or C or not D",
-  "not A or D or E",
-  "A or not E or F",
-  "not B or not C or G",
-  "D or E or F",
-  "not F or G or H",
-  "A or not H or I",
-  "J or K or not I",
-  "not J or K or L",
-  "L or M or N",
-  "M or N or not O",
-  "not O or P or Q",
-  "Q or R or S",
-  "not S or T or U",
-  "V or W or X",
-  "not V or X"
-].join("\n");
-
-const DEFAULT_DESCRIPTION = [
-  "Four friends - Ava (A), Ben (B), Cara (C), and Dev (D) - need to be assigned.",
-  "Rules: A cannot test. B and C cannot work on the same task. If D documents, then A designs."
-].join("\n");
+const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
+  problem: 1.12,
+  cnf: 0.82,
+  regression: 1.08
+};
+const MIN_COLUMN_WIDTHS: ColumnWidths = {
+  problem: 320,
+  cnf: 280,
+  regression: 340
+};
 
 function App() {
   const [mode, setMode] = useState<Mode>("csp");
-  const [source, setSource] = useState(DEFAULT_CSP);
-  const [description, setDescription] = useState(DEFAULT_DESCRIPTION);
-  const [compiled, setCompiled] = useState<CompiledProblem | null>(() =>
-    compileProblem(DEFAULT_CSP)
-  );
+  const [columnWidths, setColumnWidths] = useState<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
+  const [source, setSource] = useState("");
+  const [description, setDescription] = useState(DEFAULT_ASSIGNMENT_PROBLEM);
+  const [compiled, setCompiled] = useState<CompiledProblem | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
-  const [workerCount, setWorkerCount] = useState(() =>
-    Math.min(Math.max(navigator.hardwareConcurrency ?? 4, 2), 8)
-  );
+  const [workerCount, setWorkerCount] = useState(2);
   const [modelStatus, setModelStatus] =
     useState<LanguageModelAvailability>("unavailable");
-  const [modelNote, setModelNote] = useState("Checking local browser model...");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationSteps, setGenerationSteps] = useState<CnfGenerationStep[]>([]);
+  const [generationStatus, setGenerationStatus] = useState<string | null>(null);
+  const [generationReview, setGenerationReview] = useState<string | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
+  const setupGridRef = useRef<HTMLElement | null>(null);
+  const columnResizeRef = useRef<ColumnResize | null>(null);
   const controller = useSearchController(compiled);
 
   useEffect(() => {
@@ -89,20 +99,20 @@ function App() {
           return;
         }
         setModelStatus(availability);
-        setModelNote(
-          availability === "available"
-            ? "Chrome/Edge languageModel is ready."
-            : availability === "unavailable"
-              ? "Manual CSP entry is available in every browser."
-              : `Model is ${availability}; browser may download it on first use.`
-        );
       })
       .catch(() => {
         setModelStatus("unavailable");
-        setModelNote("Manual CSP entry is available in every browser.");
       });
     return () => {
       alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      columnResizeRef.current?.cleanup();
+      columnResizeRef.current = null;
+      document.body.classList.remove("is-resizing-columns");
     };
   }, []);
 
@@ -111,55 +121,232 @@ function App() {
     [compiled, workerCount]
   );
 
-  const handleCompile = () => {
+  const handleSourceChange = (value: string) => {
+    setSource(value);
+    setGenerationReview(null);
     try {
-      const nextCompiled = compileProblem(source);
-      setCompiled(nextCompiled);
+      setCompiled(compileCspSource(value));
       setCompileError(null);
       controller.reset();
     } catch (error) {
+      setCompiled(null);
       setCompileError(error instanceof Error ? error.message : String(error));
+      controller.reset();
     }
   };
 
+  const handleLoadDefaultProblem = () => {
+    setDescription(DEFAULT_ASSIGNMENT_PROBLEM);
+    setSource("");
+    setGenerationSteps([]);
+    setGenerationStatus(null);
+    setGenerationReview(null);
+    setCompiled(null);
+    setCompileError(null);
+    controller.reset();
+  };
+
   const handleGenerateCsp = async () => {
+    generationAbortRef.current?.abort();
+    const abortController = new AbortController();
+    generationAbortRef.current = abortController;
     setIsGenerating(true);
+    setSource("");
+    setCompiled(null);
+    setGenerationSteps([]);
+    setGenerationStatus("Decoding terms and finding variables");
+    setGenerationReview(null);
     try {
-      const result = await generateCspFromDescription(description);
+      const result = await generateCspFromDescription(description, {
+        signal: abortController.signal,
+        onProgress: (event) => {
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          if (event.type === "conversation") {
+            setGenerationStatus(statusFromGenerationMessage(event.entry.content));
+            return;
+          }
+
+          setSource(event.source);
+          try {
+            setCompiled(compileCspSource(event.source));
+            setCompileError(null);
+          } catch {
+            setCompiled(null);
+          }
+
+          if (event.type === "clause") {
+            setGenerationStatus("Expanding typed terms into CNF clauses");
+            setGenerationSteps((steps) => [...steps, event.step]);
+          } else if (event.review.status === "complete") {
+            setGenerationStatus(null);
+            setGenerationReview("Review complete: the model found no missing or wrong clauses.");
+          } else {
+            const missing = event.review.missingConstraints.length
+              ? ` Missing: ${event.review.missingConstraints.join("; ")}.`
+              : "";
+            const wrong = event.review.wrongClauses.length
+              ? ` Wrong: ${event.review.wrongClauses.join("; ")}.`
+              : "";
+            setGenerationReview(`Review requested changes.${missing}${wrong}`);
+            if (event.review.correctedClauses.length) {
+              setGenerationSteps((steps) => [
+                ...steps,
+                ...event.review.correctedClauses
+              ]);
+            }
+          }
+        }
+      });
+      if (abortController.signal.aborted) {
+        return;
+      }
       setSource(result.source);
-      setCompiled(compileProblem(result.source));
+      setGenerationSteps(result.clauses);
+      setCompiled(compileCspSource(result.source));
       setCompileError(null);
-      setModelNote(
-        result.usedLocalModel
-          ? "Generated locally with browser languageModel."
-          : "Generated with the deterministic fallback template."
-      );
     } catch (error) {
-      setCompileError(error instanceof Error ? error.message : String(error));
+      if (isAbortError(error)) {
+        setCompileError(null);
+        setGenerationStatus(null);
+        setGenerationReview("Generation cancelled.");
+      } else {
+        setCompileError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsGenerating(false);
+      if (generationAbortRef.current === abortController) {
+        generationAbortRef.current = null;
+        setIsGenerating(false);
+      }
     }
+  };
+
+  const handleCancelGenerate = () => {
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    setIsGenerating(false);
+    setGenerationStatus(null);
+    setGenerationReview("Generation cancelled.");
+  };
+
+  const handleStart = () => {
+    try {
+      const nextCompiled = compileCspSource(source);
+      if (!nextCompiled) {
+        throw new Error("Enter CSP clauses before starting search.");
+      }
+      setCompiled(nextCompiled);
+      setCompileError(null);
+      controller.start(workerCount, nextCompiled);
+    } catch (error) {
+      setCompiled(null);
+      setCompileError(error instanceof Error ? error.message : String(error));
+      controller.reset();
+    }
+  };
+
+  const handleColumnPointerDown = (
+    divider: ColumnDivider,
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const widths = measureColumnWidths(setupGridRef.current);
+    if (!widths) {
+      return;
+    }
+
+    event.preventDefault();
+    columnResizeRef.current?.cleanup();
+
+    const ownerWindow = event.currentTarget.ownerDocument.defaultView ?? window;
+    const resize: ColumnResize = {
+      cleanup: () => undefined,
+      divider,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      widths
+    };
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== resize.pointerId) {
+        return;
+      }
+      setColumnWidths(
+        resizeAdjacentColumns(
+          resize.widths,
+          resize.divider,
+          moveEvent.clientX - resize.startX
+        )
+      );
+    };
+    const finishResize = (endEvent?: PointerEvent) => {
+      if (endEvent && endEvent.pointerId !== resize.pointerId) {
+        return;
+      }
+      resize.cleanup();
+      if (columnResizeRef.current === resize) {
+        columnResizeRef.current = null;
+      }
+      document.body.classList.remove("is-resizing-columns");
+    };
+    const finishResizeOnBlur = () => finishResize();
+    resize.cleanup = () => {
+      ownerWindow.removeEventListener("pointermove", handlePointerMove);
+      ownerWindow.removeEventListener("pointerup", finishResize);
+      ownerWindow.removeEventListener("pointercancel", finishResize);
+      ownerWindow.removeEventListener("blur", finishResizeOnBlur);
+    };
+    ownerWindow.addEventListener("pointermove", handlePointerMove);
+    ownerWindow.addEventListener("pointerup", finishResize);
+    ownerWindow.addEventListener("pointercancel", finishResize);
+    ownerWindow.addEventListener("blur", finishResizeOnBlur);
+    columnResizeRef.current = resize;
+    document.body.classList.add("is-resizing-columns");
+  };
+
+  const handleColumnResizeKeyDown = (
+    divider: ColumnDivider,
+    event: ReactKeyboardEvent<HTMLDivElement>
+  ) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      return;
+    }
+
+    const widths = measureColumnWidths(setupGridRef.current);
+    if (!widths) {
+      return;
+    }
+
+    event.preventDefault();
+    setColumnWidths(
+      resizeAdjacentColumns(widths, divider, event.key === "ArrowLeft" ? -24 : 24)
+    );
   };
 
   const isRunning =
     controller.snapshot.status === "running" ||
     controller.snapshot.status === "complete" ||
     controller.snapshot.status === "paused";
+  const hasLanguageModel = modelStatus !== "unavailable";
 
   return (
     <div className="app-shell">
-      <Header
-        activeStep={isRunning ? "Run" : "Problem"}
-        status={isRunning ? "Exhaustive search in this browser" : "Ready"}
-      />
-      <ModeSwitch mode={mode} onChange={setMode} />
+      <header className="app-title-row">
+        <div className="app-title-copy">
+          <h1>p-adic linear regression</h1>
+          <p>Boolean CNF as a local regression dataframe over candidate hyperplanes.</p>
+        </div>
+        <ModeSwitch mode={mode} onChange={setMode} />
+      </header>
 
       {mode === "sudoku" ? (
         <SudokuMode />
       ) : (
         <>
-          <CapabilityStrip status={modelStatus} note={modelNote} />
-
           {isRunning && compiled ? (
             <RunDashboard
               compiled={compiled}
@@ -168,25 +355,53 @@ function App() {
             />
           ) : (
             <>
-              <main className="setup-grid">
+              <main
+                className="setup-grid"
+                ref={setupGridRef}
+                style={{
+                  "--problem-column": `${columnWidths.problem}fr`,
+                  "--cnf-column": `${columnWidths.cnf}fr`,
+                  "--regression-column": `${columnWidths.regression}fr`
+                } as CSSProperties}
+              >
                 <ProblemPanel
                   source={source}
                   description={description}
+                  generationReview={generationReview}
+                  generationStatus={generationStatus}
+                  generationSteps={generationSteps}
+                  hasLanguageModel={hasLanguageModel}
                   isGenerating={isGenerating}
+                  onCancelGenerate={handleCancelGenerate}
                   onDescriptionChange={setDescription}
                   onGenerateCsp={handleGenerateCsp}
-                  onSourceChange={setSource}
+                  onLoadDefaultProblem={handleLoadDefaultProblem}
+                  onSourceChange={handleSourceChange}
+                />
+                <ColumnResizeHandle
+                  label="Resize CSP and CNF columns"
+                  value={columnDividerValue(columnWidths, "problem-cnf")}
+                  onKeyDown={(event) => handleColumnResizeKeyDown("problem-cnf", event)}
+                  onPointerDown={(event) => handleColumnPointerDown("problem-cnf", event)}
                 />
                 <TernaryPanel compiled={compiled} error={compileError} />
-                <SearchPlanPanel compiled={compiled} workerCount={workerCount} />
+                <ColumnResizeHandle
+                  label="Resize CNF and data columns"
+                  value={columnDividerValue(columnWidths, "cnf-regression")}
+                  onKeyDown={(event) => handleColumnResizeKeyDown("cnf-regression", event)}
+                  onPointerDown={(event) => handleColumnPointerDown("cnf-regression", event)}
+                />
+                <div className="regression-column">
+                  <RegressionDataFramePanel compiled={compiled} />
+                  <SearchPlanPanel compiled={compiled} workerCount={workerCount} />
+                </div>
               </main>
 
               <ReadyBand
                 compiled={compiled}
                 plan={searchPlan}
                 workerCount={workerCount}
-                onCompile={handleCompile}
-                onStart={() => compiled && controller.start(workerCount)}
+                onStart={handleStart}
                 onWorkerCountChange={setWorkerCount}
               />
             </>
@@ -217,8 +432,8 @@ function ModeSwitch({
       >
         <FileText size={18} />
         <span>
-          <strong>Boolean CSP / SAT</strong>
-          <small>clause rewards · exhaustive search</small>
+          <strong>Boolean CSP/SAT</strong>
+          <small>exhaustive search</small>
         </span>
       </button>
       <button
@@ -230,126 +445,127 @@ function ModeSwitch({
       >
         <Grid3x3 size={18} />
         <span>
-          <strong>Sudoku / all-different</strong>
-          <small>the main theorem · local search</small>
+          <strong>Sudoku</strong>
+          <small>all-different search</small>
         </span>
       </button>
     </div>
   );
 }
 
-function Header({
-  activeStep,
-  status
+function ColumnResizeHandle({
+  label,
+  onKeyDown,
+  onPointerDown,
+  value
 }: {
-  activeStep: "Problem" | "Run";
-  status: string;
-}) {
-  const tabs = [
-    { label: "Problem", href: "#problem", icon: <FileText size={18} /> },
-    { label: "Clauses", href: "#clauses", icon: <Triangle size={18} /> },
-    { label: "Search", href: "#search", icon: <Search size={18} /> },
-    { label: "Run", href: "#run", icon: <Play size={18} /> },
-    { label: "Proof", href: "#proof", icon: <ShieldCheck size={18} /> }
-  ];
-
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <Mascot />
-        <div>
-          <h1>p-adic logic</h1>
-          <p>padic-logic.symmachus.org</p>
-        </div>
-      </div>
-      <nav className="nav-tabs" aria-label="Workflow">
-        {tabs.map((tab) => (
-          <a
-            className={tab.label === activeStep ? "nav-tab is-active" : "nav-tab"}
-            href={tab.href}
-            key={tab.label}
-          >
-            {tab.icon}
-            {tab.label}
-          </a>
-        ))}
-      </nav>
-      <div className="top-actions">
-        <span className="status-pill">{status}</span>
-        <button className="icon-button" type="button" aria-label="Settings">
-          <Settings size={19} />
-        </button>
-        <button className="icon-button" type="button" aria-label="Docs">
-          <BookOpen size={19} />
-        </button>
-        <button className="icon-button" type="button" aria-label="Theme">
-          <Moon size={18} />
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function CapabilityStrip({
-  status,
-  note
-}: {
-  status: LanguageModelAvailability;
-  note: string;
+  label: string;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  value: number;
 }) {
   return (
-    <section className="capability-strip" aria-label="Browser capability">
-      <span className={`dot dot-${status}`} />
-      <strong>
-        {status === "available"
-          ? "Local browser model available"
-          : "Manual CSP mode ready"}
-      </strong>
-      <span className="capability-chip">Chrome/Edge languageModel</span>
-      <span>{note}</span>
-      <span className="privacy-note">No problem text leaves this browser.</span>
-    </section>
+    <div
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={value}
+      className="column-resize-handle"
+      onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
+      role="separator"
+      tabIndex={0}
+      title="Drag to resize columns"
+    />
   );
 }
 
 function ProblemPanel({
   source,
   description,
+  generationReview,
+  generationStatus,
+  generationSteps,
+  hasLanguageModel,
   isGenerating,
+  onCancelGenerate,
   onDescriptionChange,
   onGenerateCsp,
+  onLoadDefaultProblem,
   onSourceChange
 }: {
   source: string;
   description: string;
+  generationReview: string | null;
+  generationStatus: string | null;
+  generationSteps: CnfGenerationStep[];
+  hasLanguageModel: boolean;
   isGenerating: boolean;
+  onCancelGenerate: () => void;
   onDescriptionChange: (value: string) => void;
   onGenerateCsp: () => void;
+  onLoadDefaultProblem: () => void;
   onSourceChange: (value: string) => void;
 }) {
   return (
     <section className="panel problem-panel" id="problem">
-      <PanelHeader icon={<FileText size={21} />} title="Enter CSP" />
-      <div className="description-box">
-        <div>
-          <h3>Describe the problem</h3>
-          <p>Use Chrome or Edge to ask the local browser model for CSP lines.</p>
+      <div className="panel-header panel-header-actions">
+        <div className="panel-title">
+          <FileText size={21} />
+          <h2>CSP clauses</h2>
         </div>
-        <textarea
-          aria-label="Natural language problem"
-          value={description}
-          onChange={(event) => onDescriptionChange(event.target.value)}
-        />
         <button
           className="secondary-button"
           type="button"
-          onClick={onGenerateCsp}
-          disabled={isGenerating}
+          onClick={onLoadDefaultProblem}
         >
-          <WandSparkles size={16} />
-          {isGenerating ? "Generating..." : "Generate CSP"}
+          <RotateCcw size={16} />
+          Default problem
         </button>
       </div>
+
+      {hasLanguageModel && (
+        <div className="description-box">
+          <div>
+            <h3>Enter CSP</h3>
+            <p>Ask the local browser model to decode the terms and find the variables.</p>
+          </div>
+          <div className="generation-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={onGenerateCsp}
+              disabled={isGenerating}
+            >
+              <WandSparkles size={16} />
+              {isGenerating ? "Generating..." : "Generate CSP"}
+            </button>
+            {isGenerating && (
+              <button
+                className="secondary-button cancel-generation-button"
+                type="button"
+                onClick={onCancelGenerate}
+              >
+                <X size={16} />
+                Cancel
+              </button>
+            )}
+          </div>
+          <textarea
+            aria-label="Natural language problem"
+            value={description}
+            onChange={(event) => onDescriptionChange(event.target.value)}
+          />
+          <GenerationProgress
+            isGenerating={isGenerating}
+            review={generationReview}
+            status={generationStatus}
+            steps={generationSteps}
+          />
+        </div>
+      )}
+
       <div className="editor-shell">
         <div className="line-numbers" aria-hidden="true">
           {source.split(/\r?\n/u).map((_, index) => (
@@ -366,10 +582,47 @@ function ProblemPanel({
       </div>
       <div className="panel-foot">
         <span>Lines: {source.split(/\r?\n/u).length}</span>
-        <span>Constraints: {source.split(/\r?\n/u).filter(Boolean).length - 1}</span>
+        <span>Constraints: {countCspConstraints(source)}</span>
         <span>Variables are inferred</span>
       </div>
     </section>
+  );
+}
+
+function GenerationProgress({
+  isGenerating,
+  review,
+  status,
+  steps
+}: {
+  isGenerating: boolean;
+  review: string | null;
+  status: string | null;
+  steps: CnfGenerationStep[];
+}) {
+  if (!steps.length && !review && !isGenerating) {
+    return null;
+  }
+
+  return (
+    <div className="generation-progress" aria-label="CNF generation progress">
+      {isGenerating && (
+        <div className="generation-active">
+          <div className="generation-swoosh" aria-hidden="true">
+            <span />
+          </div>
+          <strong>{status ?? "Decoding terms and finding variables"}</strong>
+        </div>
+      )}
+      {steps.map((step, index) => (
+        <div className="generation-step" key={`${step.cnf}-${index}`}>
+          <span>{index + 1}</span>
+          <strong>{step.purpose}</strong>
+          <code>{step.cnf}</code>
+        </div>
+      ))}
+      {review && <div className="generation-review">{review}</div>}
+    </div>
   );
 }
 
@@ -381,14 +634,14 @@ function TernaryPanel({
   error: string | null;
 }) {
   return (
-    <section className="panel" id="clauses">
-      <PanelHeader icon={<Triangle size={21} />} title="Ternary reduction" />
+    <section className="panel cnf-panel" id="clauses">
+      <PanelHeader icon={<Triangle size={21} />} title="CNF view" />
       {error ? (
         <div className="error-box">{error}</div>
       ) : compiled ? (
         <>
           <div className="panel-toolbar">
-            <strong>Ternary CNF</strong>
+            <strong>CNF clauses</strong>
             <span>{compiled.ternaryClauses.length} clauses</span>
           </div>
           <div className="clause-list">
@@ -407,7 +660,65 @@ function TernaryPanel({
           <ValidationList compiled={compiled} />
         </>
       ) : (
-        <EmptyState text="Compile the evaluator to see ternary clauses." />
+        <EmptyState text="Enter valid CSP clauses to see the compiled form." />
+      )}
+    </section>
+  );
+}
+
+function RegressionDataFramePanel({
+  compiled
+}: {
+  compiled: CompiledProblem | null;
+}) {
+  const rows = useMemo(
+    () => (compiled ? buildRegressionDataFrame(compiled) : []),
+    [compiled]
+  );
+
+  return (
+    <section className="panel dataframe-panel" aria-label="CNF regression dataframe">
+      <PanelHeader icon={<FlaskConical size={21} />} title="CNF regression dataframe" />
+      {compiled ? (
+        <>
+          <div className="dataframe-scroll">
+            <table className="dataframe-table">
+              <thead>
+                <tr>
+                  <th className="row-label">row</th>
+                  {compiled.variables.map((variable) => (
+                    <th className="feature-heading" key={variable.name}>
+                      <span>{variable.name}</span>
+                    </th>
+                  ))}
+                  <th className="target-heading">target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr className={`dataframe-row row-${row.kind}`} key={row.id}>
+                    <th title={row.source}>{row.label}</th>
+                    {compiled.variables.map((variable) => {
+                      const value = row.coefficients[variable.name] ?? 0;
+                      return (
+                        <td className={value < 0 ? "negative-cell" : undefined} key={variable.name}>
+                          {value}
+                        </td>
+                      );
+                    })}
+                    <td className="target-cell">{row.target}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="dataframe-legend">
+            <span><i className="legend-constraint" /> CNF constraints</span>
+            <span><i className="legend-unit" /> Unit wells</span>
+          </div>
+        </>
+      ) : (
+        <EmptyState text="Enter valid CSP clauses to see the regression dataframe." />
       )}
     </section>
   );
@@ -427,17 +738,20 @@ function SearchPlanPanel({
       <PanelHeader icon={<Search size={21} />} title="Search plan" />
       {compiled && plan ? (
         <>
-          <MetricRow label="Variables" value={`n = ${compiled.variables.length}`} />
+          <MetricRow label="Coefficients" value={`n = ${compiled.variables.length}`} />
           <MetricRow
-            label="Assignments"
+            label="Candidate hyperplanes"
             value={`2^${compiled.variables.length} = ${formatAssignmentCount(compiled.variables.length)}`}
           />
-          <MetricRow label="Strategy" value="Brute force (exhaustive)" accent />
-          <MetricRow label="Worker split" value="Integer ranges" />
-          <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17 > 3)" />
-          <MetricRow label="Loss(mask)" value="# clauses with reward 0" />
-          <MetricRow label="Loss floor" value="0 (every clause satisfied)" />
-          <MetricRow label="Success criterion" value="all clause rewards = 1" />
+          <MetricRow label="Strategy" value="Exhaustive p-adic hyperplane search" accent />
+          <MetricRow label="Thread split" value="Disjoint hyperplane batches" />
+          <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17)" />
+          <MetricRow label="Regression loss" value="# constraints with reward 0" />
+          <MetricRow
+            label="Loss floor"
+            value={`${compiled.scoring.theoreticalFloor} (one unit well per coefficient)`}
+          />
+          <MetricRow label="Success criterion" value="loss reaches the unit-well floor" />
         </>
       ) : (
         <EmptyState text="No compiled problem yet." />
@@ -450,14 +764,12 @@ function ReadyBand({
   compiled,
   plan,
   workerCount,
-  onCompile,
   onStart,
   onWorkerCountChange
 }: {
   compiled: CompiledProblem | null;
   plan: ReturnType<typeof createSearchPlan> | null;
   workerCount: number;
-  onCompile: () => void;
   onStart: () => void;
   onWorkerCountChange: (value: number) => void;
 }) {
@@ -466,12 +778,12 @@ function ReadyBand({
       <div className="ready-copy">
         <FlaskConical size={30} />
         <div>
-          <h2>Ready to run in this browser</h2>
-          <p>Workers read disjoint integer ranges and evaluate assignments locally.</p>
+          <h2>Ready to solve in this browser</h2>
+          <p>Threads evaluate disjoint batches of candidate p-adic hyperplanes locally.</p>
         </div>
       </div>
       <div className="stepper">
-        <span>Workers</span>
+        <span>Threads</span>
         <button
           type="button"
           onClick={() => onWorkerCountChange(Math.max(1, workerCount - 1))}
@@ -487,14 +799,10 @@ function ReadyBand({
         </button>
       </div>
       <div className="runtime-card">
-        <span>Assignments</span>
+        <span>Hyperplanes</span>
         <strong>{plan ? plan.assignmentCount.toLocaleString() : "-"}</strong>
-        <small>range split across {workerCount} workers</small>
+        <small>split across {workerCount} threads</small>
       </div>
-      <button className="primary-button" type="button" onClick={onCompile}>
-        <Code2 size={18} />
-        Compile evaluator
-      </button>
       <button
         className="run-button"
         type="button"
@@ -502,7 +810,7 @@ function ReadyBand({
         disabled={!compiled}
       >
         <Play size={18} />
-        Start exhaustive search
+        Solve p-adic regression
       </button>
     </section>
   );
@@ -525,75 +833,120 @@ function RunDashboard({
   const validation = bestAssignment
     ? evaluateAssignment(compiled, bestAssignment)
     : null;
+  const isComplete = snapshot.status === "complete";
+  const isPaused = snapshot.status === "paused";
+  const solutionEquation = bestAssignment
+    ? formatRegressionEquation(compiled, bestAssignment)
+    : null;
+  const regressionFloor = compiled.scoring.theoreticalFloor;
+  const bestRegressionLoss =
+    snapshot.bestLoss == null ? null : snapshot.bestLoss + regressionFloor;
+  const regressionHistory = snapshot.history.map((point) => ({
+    ...point,
+    loss: point.loss + regressionFloor
+  }));
 
   return (
     <main className="run-grid">
       <section className="panel compiled-summary">
-        <PanelHeader icon={<FileText size={20} />} title="Compiled problem" />
-        <MetricRow label="Variables" value={`${compiled.variables.length}`} />
-        <MetricRow label="Clauses" value={`${compiled.constraints.length}`} />
-        <MetricRow label="Assignment count" value={assignmentCount.toLocaleString()} />
-        <MetricRow label="Mask range" value={`0 ... ${assignmentCount - 1}`} />
-        <MetricRow label="Workers" value={`${workerCount}`} />
+        <PanelHeader icon={<FileText size={20} />} title="Regression problem" />
+        <MetricRow label="Coefficients" value={`${compiled.variables.length}`} />
+        <MetricRow label="Linear constraints" value={`${compiled.constraints.length}`} />
+        <MetricRow label="Candidate hyperplanes" value={assignmentCount.toLocaleString()} />
+        <MetricRow label="Hyperplane index span" value={`H0 ... H${assignmentCount - 1}`} />
+        <MetricRow label="Threads" value={`${workerCount}`} />
         <div className="scoring-card">
-          <strong>Scoring model</strong>
-          <code>loss(mask) = #&#123;clauses : |u·x − t|ₚ = 0&#125;</code>
-          <span>Each clause reward is 0 (unsatisfied) or 1 (satisfied) for p &gt; 3. Floor = 0.</span>
+          <strong>p-adic linear objective</strong>
+          <code>L(H) = #&#123;i : |u_i · H − t_i|ₚ = 0&#125;</code>
+          <span>The unit wells force a floor of {regressionFloor}; CNF violations add above that.</span>
         </div>
       </section>
 
       <section className="panel worker-dashboard">
         <div className="run-stats">
-          <Stat label="Total tested" value={`${snapshot.totalTested.toLocaleString()} / ${assignmentCount.toLocaleString()}`} />
-          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} masks/s`} />
-          <Stat label="Best loss" value={`${snapshot.bestLoss ?? "-"}`} />
-          <Stat label="Solutions found" value={`${snapshot.solutions}`} />
+          <Stat label="Hyperplanes tested" value={`${snapshot.totalTested.toLocaleString()} / ${assignmentCount.toLocaleString()}`} />
+          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} hyperplanes/s`} />
+          <Stat label="Best loss" value={`${bestRegressionLoss ?? "-"}`} />
+          <Stat label="Floor hyperplanes" value={`${snapshot.solutions}`} />
         </div>
         <div className="global-progress">
           <span style={{ width: `${progress * 100}%` }} />
         </div>
         <WorkerTable compiled={compiled} lanes={snapshot.lanes} />
-        <LossChart history={snapshot.history} />
+        <LossChart floor={regressionFloor} history={regressionHistory} />
       </section>
 
       <section className="panel assignment-panel">
-        <PanelHeader icon={<ShieldCheck size={20} />} title="Best assignment" />
+        <PanelHeader icon={<ShieldCheck size={20} />} title="Best p-adic regression solution" />
         {bestAssignment ? (
           <>
-            <div className="assignment-list">
+            {solutionEquation && (
+              <div className="solution-equation">
+                <code>{solutionEquation}</code>
+              </div>
+            )}
+            <div className="solution-list">
               {compiled.variables.slice(0, 10).map((variable) => (
-                <div className="assignment-row" key={variable.name}>
+                <div className="solution-row" key={variable.name}>
                   <strong>{variable.name}</strong>
-                  <span>{bestAssignment[variable.name] ? "True" : "False"}</span>
-                  <span className={bestAssignment[variable.name] ? "toggle on" : "toggle"} />
+                  <span>{bestAssignment[variable.name] ? 1 : 0}</span>
                 </div>
               ))}
             </div>
             <div className="constraint-check">
               <MetricRow
-                label="Unit-well violations"
-                value={`${validation?.unitWellViolations ?? 0} / 0`}
+                label="Unit-well floor"
+                value={`${validation?.theoreticalFloor ?? regressionFloor}`}
               />
               <MetricRow
-                label="Non-unit constraints zero"
+                label="Linear constraints satisfied"
                 value={`${validation?.nonUnitSatisfied ?? 0} / ${compiled.constraints.length}`}
               />
               <MetricRow
-                label="Clauses unsatisfied"
+                label="Regression loss"
                 value={`${validation?.loss ?? "-"}`}
               />
             </div>
           </>
         ) : (
-          <EmptyState text="Best assignment will appear after the first worker update." />
+          <EmptyState text="Best coefficient vector will appear after the first thread update." />
         )}
-        <div className="run-actions">
-          <button className="secondary-button" type="button" onClick={controller.pause}>
-            <CirclePause size={17} /> Pause
-          </button>
-          <button className="danger-button" type="button" onClick={controller.reset}>
-            <Square size={15} /> Stop
-          </button>
+        <div
+          className={isComplete ? "run-actions complete-actions" : "run-actions"}
+          aria-label="Search controls"
+        >
+          {isComplete ? (
+            <>
+              <span className="run-status complete">
+                <Check size={17} /> Search complete
+              </span>
+              <button className="secondary-button" type="button" onClick={controller.reset}>
+                <RotateCcw size={17} /> Back to setup
+              </button>
+            </>
+          ) : isPaused ? (
+            <>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => controller.start(workerCount, compiled)}
+              >
+                <Play size={17} /> Restart search
+              </button>
+              <button className="danger-button" type="button" onClick={controller.reset}>
+                <Square size={15} /> Stop
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="secondary-button" type="button" onClick={controller.pause}>
+                <CirclePause size={17} /> Pause
+              </button>
+              <button className="danger-button" type="button" onClick={controller.reset}>
+                <Square size={15} /> Stop
+              </button>
+            </>
+          )}
           <button className="proof-button" type="button">
             <Download size={17} /> Export proof (JSON)
           </button>
@@ -605,27 +958,27 @@ function RunDashboard({
         <pre>
           {snapshot.logs.length
             ? snapshot.logs.map((entry) => entry.text).join("\n")
-            : "[sys] waiting for worker updates..."}
+            : "[sys] waiting for thread updates..."}
         </pre>
       </section>
 
       <section className="panel split-panel">
-        <PanelHeader icon={<RotateCcw size={20} />} title="How the search is split" />
-        <p>Each integer mask encodes one truth assignment. Workers scan contiguous ranges.</p>
-        <div className="bit-diagram">
+        <PanelHeader icon={<RotateCcw size={20} />} title="Hyperplane batches" />
+        <p>Each candidate hyperplane is a coefficient vector. Threads scan disjoint hyperplane batches.</p>
+        <div className="basis-diagram">
           {compiled.variables.slice(0, 8).map((variable) => (
             <span key={variable.name}>
-              bit {variable.index}
+              coordinate {variable.index + 1}
               <strong>{variable.name}</strong>
             </span>
           ))}
         </div>
-        <div className="range-table">
+        <div className="hyperplane-table">
           {snapshot.lanes.map((lane) => (
             <div key={lane.workerId}>
-              <strong>W{lane.workerId}</strong>
-              <span>{lane.start.toLocaleString()}</span>
-              <span>{(lane.endExclusive - 1).toLocaleString()}</span>
+              <strong>T{lane.workerId}</strong>
+              <span>H{lane.start.toLocaleString()}</span>
+              <span>H{(lane.endExclusive - 1).toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -642,12 +995,12 @@ function WorkerTable({
   lanes: ReturnType<typeof useSearchController>["snapshot"]["lanes"];
 }) {
   return (
-    <div className="worker-table" role="table" aria-label="Worker lanes">
+    <div className="worker-table" role="table" aria-label="Thread hyperplane batches">
       <div className="worker-row worker-head" role="row">
-        <span>Worker</span>
-        <span>Assigned range</span>
-        <span>Current mask</span>
-        <span>Masks/sec</span>
+        <span>Thread</span>
+        <span>Hyperplane batch</span>
+        <span>Current hyperplane</span>
+        <span>Hyperplanes/sec</span>
         <span>Progress</span>
         <span>Best loss</span>
       </div>
@@ -656,11 +1009,11 @@ function WorkerTable({
           (lane.currentMask - lane.start) / Math.max(lane.endExclusive - lane.start, 1);
         return (
           <div className="worker-row" key={lane.workerId} role="row">
-            <span className="worker-id">W{lane.workerId}</span>
+            <span className="worker-id">T{lane.workerId}</span>
             <span>
-              {lane.start.toLocaleString()} - {(lane.endExclusive - 1).toLocaleString()}
+              H{lane.start.toLocaleString()} - H{(lane.endExclusive - 1).toLocaleString()}
             </span>
-            <span>{lane.currentMask.toLocaleString()}</span>
+            <span>H{lane.currentMask.toLocaleString()}</span>
             <span>{formatRate(lane.speed)}</span>
             <span className="lane-progress">
               <i style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }} />
@@ -672,7 +1025,7 @@ function WorkerTable({
       {!lanes.length && (
         <div className="worker-row">
           <span>Waiting</span>
-          <span>0 - {compiled.assignmentCount - 1}</span>
+          <span>H0 - H{compiled.assignmentCount - 1}</span>
           <span>-</span>
           <span>-</span>
           <span className="lane-progress" />
@@ -684,14 +1037,17 @@ function WorkerTable({
 }
 
 function LossChart({
+  floor,
   history
 }: {
+  floor: number;
   history: Array<{ second: number; loss: number }>;
 }) {
-  const points = history.length ? history : [{ second: 0, loss: 4 }];
-  const maxLoss = Math.max(4, ...points.map((point) => point.loss));
+  const points = history.length ? history : [{ second: 0, loss: Math.max(floor, 1) }];
+  const maxLoss = Math.max(floor + 1, ...points.map((point) => point.loss));
   const width = 640;
   const height = 158;
+  const floorY = height - (floor / maxLoss) * (height - 28) - 14;
   const path = points
     .map((point, index) => {
       const x = points.length === 1 ? 0 : (index / (points.length - 1)) * width;
@@ -707,10 +1063,10 @@ function LossChart({
         <span>lower is better</span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="p-adic loss over time">
-        <line x1="0" x2={width} y1={height - 14} y2={height - 14} className="floor-line" />
+        <line x1="0" x2={width} y1={floorY} y2={floorY} className="floor-line" />
         <path d={path} className="loss-line" />
         <text x="14" y={height - 20}>
-          minimum possible loss / theoretical floor
+          unit-well floor = {floor}
         </text>
       </svg>
     </div>
@@ -782,27 +1138,111 @@ function Footer({ compiled }: { compiled: CompiledProblem | null }) {
       <span>CSP</span>
       <span>Ternary</span>
       <span>p-adic loss</span>
-      {compiled && <span>2^{compiled.variables.length} assignments</span>}
+      {compiled && <span>2^{compiled.variables.length} candidate hyperplanes</span>}
       <span className="footer-lock">All computation stays in your browser.</span>
     </footer>
   );
 }
 
-function Mascot() {
-  return (
-    <svg className="mascot" viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M17 25 12 10l13 7h14l13-7-5 15" fill="#fff" stroke="#111827" strokeWidth="3" />
-      <circle cx="32" cy="35" r="20" fill="#fff" stroke="#111827" strokeWidth="3" />
-      <circle cx="24" cy="34" r="3" fill="#0f8f8f" />
-      <circle cx="40" cy="34" r="3" fill="#0f8f8f" />
-      <path d="M29 40h6M25 45c4 4 10 4 14 0" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
-      <path d="M20 18h24l-12-7-12 7Z" fill="#16a3a3" stroke="#111827" strokeWidth="3" />
-      <circle cx="49" cy="49" r="8" fill="#f59e0b" stroke="#111827" strokeWidth="3" />
-      <text x="46" y="53" fontSize="10" fontWeight="700" fill="#111827">
-        p
-      </text>
-    </svg>
+function statusFromGenerationMessage(message: string): string {
+  if (/download/i.test(message)) {
+    return "Preparing the local model";
+  }
+  if (/session ready/i.test(message)) {
+    return "Decoding terms and finding variables";
+  }
+  if (/availability|creating/i.test(message)) {
+    return "Checking the local model";
+  }
+  if (/typed JSON schema|assignment CSP/i.test(message)) {
+    return "Decoding terms and finding variables";
+  }
+  if (/^\s*\{/.test(message) || /```json/i.test(message)) {
+    return "Compiling typed terms into CNF";
+  }
+
+  return "Decoding terms and finding variables";
+}
+
+function measureColumnWidths(grid: HTMLElement | null): ColumnWidths | null {
+  if (!grid) {
+    return null;
+  }
+
+  const problem = grid.querySelector<HTMLElement>(".problem-panel");
+  const cnf = grid.querySelector<HTMLElement>(".cnf-panel");
+  const regression = grid.querySelector<HTMLElement>(".regression-column");
+  if (!problem || !cnf || !regression) {
+    return null;
+  }
+
+  const widths = {
+    problem: problem.getBoundingClientRect().width,
+    cnf: cnf.getBoundingClientRect().width,
+    regression: regression.getBoundingClientRect().width
+  };
+
+  return Object.values(widths).every((width) => width > 0) ? widths : null;
+}
+
+function resizeAdjacentColumns(
+  widths: ColumnWidths,
+  divider: ColumnDivider,
+  delta: number
+): ColumnWidths {
+  if (divider === "problem-cnf") {
+    const pairWidth = widths.problem + widths.cnf;
+    const problem = clamp(
+      widths.problem + delta,
+      MIN_COLUMN_WIDTHS.problem,
+      pairWidth - MIN_COLUMN_WIDTHS.cnf
+    );
+    return {
+      problem,
+      cnf: pairWidth - problem,
+      regression: widths.regression
+    };
+  }
+
+  const pairWidth = widths.cnf + widths.regression;
+  const cnf = clamp(
+    widths.cnf + delta,
+    MIN_COLUMN_WIDTHS.cnf,
+    pairWidth - MIN_COLUMN_WIDTHS.regression
   );
+  return {
+    problem: widths.problem,
+    cnf,
+    regression: pairWidth - cnf
+  };
+}
+
+function columnDividerValue(widths: ColumnWidths, divider: ColumnDivider): number {
+  const leading = divider === "problem-cnf" ? widths.problem : widths.cnf;
+  const trailing = divider === "problem-cnf" ? widths.cnf : widths.regression;
+  return Math.round((leading / (leading + trailing)) * 100);
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || /cancelled|aborted/iu.test(error.message))
+  );
+}
+
+function formatRegressionEquation(
+  compiled: CompiledProblem,
+  coefficients: Record<string, boolean>
+): string {
+  const terms = compiled.variables.map((variable) => {
+    const coefficient = coefficients[variable.name] ? 1 : 0;
+    return `${coefficient} * ${variable.name}`;
+  });
+  return `y = ${terms.join(" + ")}`;
 }
 
 function formatRate(value: number): string {
@@ -813,6 +1253,10 @@ function formatRate(value: number): string {
     return `${(value / 1_000).toFixed(1)}K`;
   }
   return value.toFixed(0);
+}
+
+function compileCspSource(source: string): CompiledProblem | null {
+  return source.trim() ? compileProblem(source) : null;
 }
 
 export default App;

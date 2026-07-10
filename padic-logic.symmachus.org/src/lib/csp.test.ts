@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildRegressionDataFrame,
   compileProblem,
   evaluateAssignment,
   parseProblem,
@@ -55,11 +56,30 @@ describe("CSP compiler", () => {
     const assignment = { A: true, B: true, C: false, D: true };
 
     expect(evaluateAssignment(compiled, assignment)).toMatchObject({
-      loss: 0,
+      loss: 4,
       nonUnitSatisfied: 6,
-      theoreticalFloor: 0,
+      theoreticalFloor: 4,
       unitWellViolations: 0
     });
+  });
+
+  it("builds the p-adic regression dataframe with unit wells", () => {
+    const compiled = compileProblem("A or not B");
+    const rows = buildRegressionDataFrame(compiled);
+
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toMatchObject({
+      kind: "constraint",
+      coefficients: { A: 1, B: -1 },
+      target: 1
+    });
+    expect(rows.slice(1).map((row) => row.kind)).toEqual([
+      "unit-well",
+      "unit-well",
+      "unit-well",
+      "unit-well"
+    ]);
+    expect(rows.slice(1).map((row) => row.target)).toEqual([0, 1, 0, 1]);
   });
 
   it("generates an executable bit-mask evaluator", () => {

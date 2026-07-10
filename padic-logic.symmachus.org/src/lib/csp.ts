@@ -56,6 +56,15 @@ export interface AssignmentEvaluation {
   totalConstraints: number;
 }
 
+export interface RegressionDataFrameRow {
+  id: string;
+  kind: "constraint" | "unit-well";
+  label: string;
+  coefficients: Record<string, number>;
+  target: number;
+  source: string;
+}
+
 type TokenKind =
   | "identifier"
   | "not"
@@ -122,12 +131,12 @@ export function compileProblem(source: string): CompiledProblem {
     validation: {
       maxClauseWidth,
       sourceClausesPreserved: parsed.constraints.length > 0,
-      readyForSearch: parsed.constraints.length > 0 && maxClauseWidth <= 3
+      readyForSearch: parsed.constraints.length > 0 && maxClauseWidth < 17
     },
     scoring: {
       prime: 17,
       power: 4,
-      theoreticalFloor: 0,
+      theoreticalFloor: parsed.variables.length,
       unitWellViolationsAllowed: 0,
       nonUnitConstraintTarget: 0
     }
@@ -155,12 +164,51 @@ export function evaluateAssignment(
   }
 
   return {
-    loss,
+    loss: loss + compiled.scoring.theoreticalFloor,
     theoreticalFloor: compiled.scoring.theoreticalFloor,
     unitWellViolations: 0,
     nonUnitSatisfied,
     totalConstraints: compiled.ternaryClauses.length
   };
+}
+
+export function buildRegressionDataFrame(
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses">
+): RegressionDataFrameRow[] {
+  const rows: RegressionDataFrameRow[] = compiled.ternaryClauses.map((clause) => {
+    const residual = clauseAffineResidual(clause);
+    const coefficients = zeroCoefficientRow(compiled.variables);
+    for (const coefficient of residual.coeffs) {
+      coefficients[coefficient.name] = coefficient.sign;
+    }
+
+    return {
+      id: `C${clause.id}`,
+      kind: "constraint",
+      label: `C${clause.id}`,
+      coefficients,
+      target: residual.t,
+      source: clause.source
+    };
+  });
+
+  for (const variable of compiled.variables) {
+    for (const target of [0, 1]) {
+      rows.push({
+        id: `U${variable.index + 1}-${target}`,
+        kind: "unit-well",
+        label: `${variable.name} = ${target}`,
+        coefficients: {
+          ...zeroCoefficientRow(compiled.variables),
+          [variable.name]: 1
+        },
+        target,
+        source: `Unit well for ${variable.name} at ${target}`
+      });
+    }
+  }
+
+  return rows;
 }
 
 export function renderClause(clause: TernaryClause): string {
@@ -271,6 +319,10 @@ function evaluateClause(
   readVariable: (name: string) => boolean
 ): boolean {
   return clause.terms.some((term) => evaluateExpression(term, readVariable));
+}
+
+function zeroCoefficientRow(variables: Variable[]): Record<string, number> {
+  return Object.fromEntries(variables.map((variable) => [variable.name, 0]));
 }
 
 export function buildEvaluatorSource(compiled: Pick<CompiledProblem, "variables" | "ternaryClauses">): string {
