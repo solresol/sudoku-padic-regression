@@ -39,23 +39,23 @@ SOLVED_GRID = [
     )
 ]
 
-EXPECTED_SEED_7_PUZZLE = (
-    "531.64279"
-    "9723514.6"
-    "6847921.5"
-    ".4528691."
-    "719435628"
-    "826179543"
-    "15764389."
-    "2.85173.4"
-    "46.928751"
+EXPECTED_SEED_42_PUZZLE = (
+    ".....96.8"
+    ".798642.."
+    "6.....5.."
+    "..3...4.."
+    ".2....1.6"
+    "45.61..7."
+    "71..8..6."
+    "3....2..9"
+    ".9....7.."
 )
 
 Solver = Callable[..., SolveResult]
 
 
 @pytest.fixture(scope="module")
-def generated_puzzle() -> Grid:
+def solver_smoke_puzzle() -> Grid:
     return generate_unique_puzzle(72, seed=7)
 
 
@@ -85,9 +85,11 @@ def test_shared_objective_fixture() -> None:
         assert conflicts_all_units(grid) == case["all_unit_conflicts"], case["name"]
 
 
-def test_unique_generator_is_deterministic(generated_puzzle: Grid) -> None:
-    assert grid_to_string(generated_puzzle) == EXPECTED_SEED_7_PUZZLE
-    assert generate_unique_puzzle(72, seed=7) == generated_puzzle
+def test_unique_generator_is_deterministic() -> None:
+    generated_puzzle = generate_unique_puzzle(30, seed=42)
+
+    assert grid_to_string(generated_puzzle) == EXPECTED_SEED_42_PUZZLE
+    assert generate_unique_puzzle(30, seed=42) == generated_puzzle
     assert count_solutions(generated_puzzle, limit=2) == 1
 
 
@@ -102,10 +104,10 @@ def test_unique_generator_is_deterministic(generated_puzzle: Grid) -> None:
         solve_zubarev_local_edit,
     ],
 )
-def test_fixed_seed_solver_smoke_test(solver: Solver, generated_puzzle: Grid) -> None:
-    result = solver(generated_puzzle, seed=11, max_steps=2_000, restarts=3)
+def test_fixed_seed_solver_smoke_test(solver: Solver, solver_smoke_puzzle: Grid) -> None:
+    result = solver(solver_smoke_puzzle, seed=11, max_steps=2_000, restarts=3)
 
     assert result.solved
     assert result.final_conflicts == 0
     assert is_valid_complete(result.grid)
-    assert respects_clues(result.grid, generated_puzzle)
+    assert respects_clues(result.grid, solver_smoke_puzzle)
