@@ -7,6 +7,7 @@ This project contains:
 - code/run_experiments.py : generates quick experiment CSV and loss plot
 - outputs/experiment_results.csv : results from a small run
 - outputs/loss_curve.pdf/png : example loss trajectory
+- padic-logic.symmachus.org/ : source for the interactive CSP/Sudoku compiler
 
 Quick start
 -----------
@@ -64,7 +65,14 @@ Reproduce experiments (fast carving, not uniqueness-checked):
 Related
 -------
 - The neighbour-hyperplane landscape code lives in the sibling repo: ../padic-landscapes
-- Website: sudoku.symmachus.org
+- Interactive compiler: https://padic-logic.symmachus.org
+- Sudoku route: https://padic-logic.symmachus.org/#sudoku
+
+Build the paper
+---------------
+
+  make paper
+  make site
 
 Notes
 -----

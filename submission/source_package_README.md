@@ -11,8 +11,12 @@ https://huggingface.co/datasets/gregb/sudoku-padic-regression-experiments
 - `paper/sudoku_padic_regression.pdf`: compiled reference PDF.
 - `code/padic_sudoku_regression.py`: solver and puzzle-generation implementation.
 - `code/run_experiments.py`: experiment driver for the computational appendix.
+- `paper/figures/padic_logic_sudoku_solution.png`: live-site screenshot reproduced in the manuscript.
 - `outputs/paper_stepwise/`: stepwise experiment CSV, summary, trace puzzle, trace solution, and loss curve.
 - `outputs/paper_zubarev/`: Zubarev-walk experiment CSV, summary, trace puzzle, trace solution, and loss curve.
+- `archive/scripts/run_experiments.py`: powers-of-two experiment driver.
+- `archive/results/e1_prime_sweep.csv` and `archive/results/e2_heuristic_comparison.csv`: raw powers-of-two results.
+- `padic-logic.symmachus.org/`: source for the interactive Boolean-CSP and Sudoku compiler at https://padic-logic.symmachus.org.
 - `README.txt`: repository-level reproduction notes.
 - `submission/cover_letter.md`: cover letter draft.
 - `submission/reviewer_objections.md`: prepared responses to likely reviewer objections.

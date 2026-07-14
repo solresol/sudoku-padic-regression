@@ -218,6 +218,9 @@ paper/*.bbl
 paper/*.blg
 paper/*.bcf
 paper/*.run.xml
+
+# Local document-correction renderings and comparison artefacts
+/scratch/
 paper/*.nav
 paper/*.snm
 paper/*.xdv
