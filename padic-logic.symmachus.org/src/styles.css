@@ -730,6 +730,8 @@ button {
 }
 
 .dataframe-table {
+  --target-column-width: 72px;
+  --weight-column-width: 78px;
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
@@ -768,13 +770,14 @@ button {
 .dataframe-table tbody th {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 3;
   min-width: 112px;
   max-width: 148px;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-shadow: 2px 0 0 var(--line);
 }
 
 .feature-heading {
@@ -795,15 +798,38 @@ button {
 
 .target-heading,
 .target-cell {
-  min-width: 64px !important;
+  width: var(--target-column-width);
+  min-width: var(--target-column-width) !important;
   font-weight: 800;
   color: #8a5a00;
 }
 
 .weight-heading,
 .signed-weight-cell {
-  min-width: 70px !important;
+  width: var(--weight-column-width);
+  min-width: var(--weight-column-width) !important;
   font-weight: 800;
+}
+
+.dataframe-table .target-heading,
+.dataframe-table .target-cell {
+  position: sticky;
+  right: var(--weight-column-width);
+  z-index: 2;
+  box-shadow: -2px 0 0 var(--line);
+}
+
+.dataframe-table .weight-heading,
+.dataframe-table .signed-weight-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+
+.dataframe-table thead .target-heading,
+.dataframe-table thead .weight-heading {
+  z-index: 4;
+  background: #f8fafc;
 }
 
 .dataframe-row.row-constraint th,
@@ -1617,9 +1643,16 @@ button {
   grid-template-columns: minmax(340px, 440px) 1fr 320px;
   grid-template-areas:
     "board objective search"
-    "board chart chart";
+    "dataframe dataframe dataframe";
   gap: 16px;
   align-items: start;
+}
+
+.sudoku-mode.has-loss-history {
+  grid-template-areas:
+    "board objective search"
+    "chart chart chart"
+    "dataframe dataframe dataframe";
 }
 
 .sudoku-board-panel {
@@ -1636,6 +1669,26 @@ button {
 
 .sudoku-chart-panel {
   grid-area: chart;
+}
+
+.sudoku-dataframe-panel {
+  grid-area: dataframe;
+}
+
+.sudoku-dataframe-scroll {
+  max-height: 480px;
+}
+
+.dataframe-window-status {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dataframe-virtual-spacer td {
+  padding: 0 !important;
+  border: 0 !important;
+  background: #fff !important;
 }
 
 .sudoku-grid {
@@ -1661,6 +1714,33 @@ button {
   font-weight: 600;
   color: var(--teal-strong);
   transition: background 120ms ease;
+}
+
+.sudoku-cell input {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: center;
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+}
+
+.sudoku-grid.is-editable .sudoku-cell {
+  cursor: text;
+}
+
+.sudoku-grid.is-editable .sudoku-cell:focus-within {
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--teal);
 }
 
 .sudoku-cell.box-right {
@@ -1886,6 +1966,7 @@ button {
   .sudoku-board-panel,
   .sudoku-objective-panel,
   .sudoku-search-panel,
+  .sudoku-dataframe-panel,
   .sudoku-chart-panel {
     grid-area: auto;
   }

@@ -6,6 +6,7 @@ import {
   PEERS,
   UNITS,
   buildPuzzleModel,
+  buildSudokuRegressionDataFrame,
   conflictsAllUnits,
   conflictsColsBoxes,
   dedupedPeerConflicts,
@@ -103,6 +104,42 @@ describe("signed p-adic residual objective", () => {
     expect(model.positiveObservationsMinimal).toBe(729 - 8 * 30);
     expect(model.unaryConstant).toBe(8 * (81 - 30));
     expect(model.theoreticalFloor).toBe(ALPHA_DEFAULT * 408 - 810); // 7758
+  });
+
+  it("builds the sparse p-adic regression dataframe defined by the puzzle", () => {
+    const model = buildPuzzleModel(parsePuzzle(EXAMPLE_PUZZLE));
+    const dataframe = buildSudokuRegressionDataFrame(model);
+
+    expect(dataframe.variables).toHaveLength(81);
+    expect(dataframe.variables.slice(0, 3).map((variable) => variable.name)).toEqual([
+      "x_r1c1",
+      "x_r1c2",
+      "x_r1c3"
+    ]);
+    expect(dataframe.pinningRowCount).toBe(489);
+    expect(dataframe.peerRewardRowCount).toBe(810);
+    expect(dataframe.rows).toHaveLength(1_299);
+    expect(dataframe.rows[0]).toMatchObject({
+      kind: "pinning",
+      label: "P1",
+      coefficients: { x_r1c1: 1 },
+      relation: "=",
+      target: 5,
+      sign: 1,
+      weight: ALPHA_DEFAULT
+    });
+    expect(dataframe.rows.slice(2, 11).map((row) => row.target)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9
+    ]);
+    expect(dataframe.rows[489]).toMatchObject({
+      kind: "peer-reward",
+      label: "E1",
+      coefficients: { x_r1c1: 1, x_r1c2: -1 },
+      relation: "≠",
+      target: 0,
+      sign: -1,
+      weight: 1
+    });
   });
 
   it("hits the theoretical floor exactly on a valid completion", () => {

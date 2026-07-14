@@ -267,6 +267,30 @@ export interface PuzzleModel {
   theoreticalFloor: number; // alpha * unaryConstant - |P|
 }
 
+export interface SudokuRegressionVariable {
+  index: number;
+  name: string;
+}
+
+export interface SudokuRegressionRow {
+  id: string;
+  kind: "pinning" | "peer-reward";
+  label: string;
+  coefficients: Record<string, number>;
+  relation: "=" | "≠";
+  target: number;
+  sign: 1 | -1;
+  weight: number;
+  source: string;
+}
+
+export interface SudokuRegressionDataFrame {
+  variables: SudokuRegressionVariable[];
+  rows: SudokuRegressionRow[];
+  pinningRowCount: number;
+  peerRewardRowCount: number;
+}
+
 export function buildPuzzleModel(
   puzzle: Grid,
   options: { p?: number; alpha?: number } = {}
@@ -296,6 +320,63 @@ export function buildPuzzleModel(
     unaryConstant,
     theoreticalFloor: alpha * unaryConstant - PEER_COUNT
   };
+}
+
+export function buildSudokuRegressionDataFrame(
+  model: PuzzleModel
+): SudokuRegressionDataFrame {
+  const variables = Array.from({ length: 81 }, (_, index) => ({
+    index,
+    name: sudokuVariableName(index)
+  }));
+  const pinningRows: SudokuRegressionRow[] = [];
+
+  for (const variable of variables) {
+    const clue = model.puzzle[variable.index];
+    const allowedDigits: readonly number[] = clue === 0 ? DIGITS : [clue];
+    for (const digit of allowedDigits) {
+      const rowNumber = pinningRows.length + 1;
+      pinningRows.push({
+        id: `pinning-${rowNumber}`,
+        kind: "pinning",
+        label: `P${rowNumber}`,
+        coefficients: { [variable.name]: 1 },
+        relation: "=",
+        target: digit,
+        sign: 1,
+        weight: model.alpha,
+        source: `${clue === 0 ? "Digit" : "Clue"} well ${variable.name} = ${digit}`
+      });
+    }
+  }
+
+  const peerRows = PEER_PAIRS.map(([leftIndex, rightIndex], index) => {
+    const left = variables[leftIndex].name;
+    const right = variables[rightIndex].name;
+    return {
+      id: `peer-${index + 1}`,
+      kind: "peer-reward" as const,
+      label: `E${index + 1}`,
+      coefficients: { [left]: 1, [right]: -1 },
+      relation: "≠" as const,
+      target: 0,
+      sign: -1 as const,
+      weight: 1,
+      source: `Peer reward ${left} != ${right}`
+    };
+  });
+
+  return {
+    variables,
+    rows: [...pinningRows, ...peerRows],
+    pinningRowCount: pinningRows.length,
+    peerRewardRowCount: peerRows.length
+  };
+}
+
+function sudokuVariableName(index: number): string {
+  const [row, column] = indexToRc(index);
+  return `x_r${row + 1}c${column + 1}`;
 }
 
 // -------------------------

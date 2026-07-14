@@ -42,6 +42,7 @@ describe("p-adic logic app", () => {
     clearLanguageModel();
     MockWorker.instances = [];
     globalThis.Worker = MockWorker as unknown as typeof Worker;
+    window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
@@ -64,6 +65,24 @@ describe("p-adic logic app", () => {
     expect(screen.queryByText(/Local browser model available/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Generated with the deterministic fallback template/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/No problem text leaves this browser/i)).not.toBeInTheDocument();
+  });
+
+  it("opens Sudoku directly from the URL hash and keeps tab changes linkable", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/#sudoku");
+
+    await renderApp();
+
+    expect(screen.getByRole("tab", { name: /^Sudoku/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/Signed p-adic objective/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /Boolean CSP\/SAT/i }));
+    expect(window.location.hash).toBe("#csp");
+    expect(screen.getByText("CSP clauses")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /^Sudoku/i }));
+    expect(window.location.hash).toBe("#sudoku");
+    expect(screen.getByText(/All-different instance/i)).toBeInTheDocument();
   });
 
   it("shows manual syntax hints unless a browser language model is exposed", async () => {
@@ -488,7 +507,6 @@ describe("p-adic logic app", () => {
     expect(screen.queryByRole("button", { name: /^Pause$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Stop$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Clear results/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Export proof/i })).toBeInTheDocument();
     expect(screen.getByText(/Best p-adic regression solution/i)).toBeInTheDocument();
     expect(screen.getByText(/y = /i)).toBeInTheDocument();
     expect(screen.queryByText(/Regression problem/i)).not.toBeInTheDocument();
@@ -514,6 +532,7 @@ describe("p-adic logic app", () => {
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/candidate hyperplanes/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/mask/i)).not.toBeInTheDocument();
+
   });
 
   it("switches to Sudoku mode and shows the signed p-adic objective", async () => {
@@ -524,6 +543,62 @@ describe("p-adic logic app", () => {
 
     expect(screen.getByText(/Signed p-adic objective/i)).toBeInTheDocument();
     expect(screen.getByText(/All-different instance/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "p-adic loss over time" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText("Conflict count over time")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Sudoku p-adic loss over time" }))
+      .not.toBeInTheDocument();
+    const dataframe = screen.getByRole("region", {
+      name: "Sudoku p-adic linear regression dataframe"
+    });
+    expect(within(dataframe).getByRole("table", { name: "Sudoku regression observations" }))
+      .toBeInTheDocument();
+    expect(dataframe).toHaveTextContent("1,299 rows · 81 coefficients");
+    expect(dataframe).toHaveTextContent("Digit-pinning wells (+21)");
+    expect(dataframe).toHaveTextContent("Peer inequality rewards (−1)");
     expect(screen.getByRole("button", { name: /Start search/i })).toBeEnabled();
+  });
+
+  it("edits Sudoku clues on the board and locks cells after search starts", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("tab", { name: /^Sudoku/i }));
+
+    const firstCell = screen.getByRole("textbox", { name: "Row 1, column 1" });
+    const blankCell = screen.getByRole("textbox", { name: "Row 1, column 3" });
+    expect(firstCell).toHaveValue("5");
+    expect(blankCell).toHaveValue("");
+    expect(firstCell).toBeEnabled();
+
+    await user.clear(firstCell);
+    await user.type(blankCell, "4");
+
+    expect(firstCell).toHaveValue("");
+    expect(blankCell).toHaveValue("4");
+    const clueMetric = screen.getByText("Clues (singleton domains)").closest(".metric-row");
+    expect(clueMetric).not.toBeNull();
+    expect(within(clueMetric as HTMLElement).getByText("30")).toBeInTheDocument();
+    expect((screen.getByLabelText(/81-character puzzle/i) as HTMLTextAreaElement).value)
+      .toMatch(/^\.34/u);
+
+    await user.click(screen.getByRole("button", { name: /Start search/i }));
+    expect(firstCell).toBeDisabled();
+    expect(blankCell).toBeDisabled();
+    await waitFor(() => {
+      expect(Number(
+        screen.getByRole("img", { name: "Sudoku p-adic loss over time" })
+          .getAttribute("data-points")
+      )).toBeGreaterThan(0);
+    });
+    const lossPanel = screen.getByRole("heading", { name: "p-adic loss over time" })
+      .closest("section");
+    const dataframe = screen.getByRole("region", {
+      name: "Sudoku p-adic linear regression dataframe"
+    });
+    expect(lossPanel).not.toBeNull();
+    expect(
+      lossPanel?.compareDocumentPosition(dataframe) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 });

@@ -3,7 +3,6 @@ import {
   CircleHelp,
   CirclePause,
   Code2,
-  Download,
   FileText,
   FlaskConical,
   Grid3x3,
@@ -85,8 +84,16 @@ const MIN_COLUMN_WIDTHS: ColumnWidths = {
 };
 const DESCRIPTION_FADE_MS = 180;
 
+function modeFromHash(hash: string): Mode {
+  return hash.toLowerCase() === "#sudoku" ? "sudoku" : "csp";
+}
+
+function hashForMode(mode: Mode): string {
+  return mode === "sudoku" ? "#sudoku" : "#csp";
+}
+
 function App() {
-  const [mode, setMode] = useState<Mode>("csp");
+  const [mode, setMode] = useState<Mode>(() => modeFromHash(window.location.hash));
   const [columnWidths, setColumnWidths] = useState<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
   const [source, setSource] = useState("");
   const [description, setDescription] = useState(DEFAULT_ASSIGNMENT_PROBLEM);
@@ -115,6 +122,18 @@ function App() {
   const columnResizeRef = useRef<ColumnResize | null>(null);
 
   useEffect(() => {
+    const syncModeFromLocation = () => {
+      setMode(modeFromHash(window.location.hash));
+    };
+    window.addEventListener("hashchange", syncModeFromLocation);
+    window.addEventListener("popstate", syncModeFromLocation);
+    return () => {
+      window.removeEventListener("hashchange", syncModeFromLocation);
+      window.removeEventListener("popstate", syncModeFromLocation);
+    };
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     detectLanguageModel()
       .then((availability) => {
@@ -138,7 +157,7 @@ function App() {
 
     if (currentStatus === "running" && previousStatus !== "running") {
       window.requestAnimationFrame(() => {
-        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        resultsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
       });
     }
   }, [controller.snapshot.status]);
@@ -439,6 +458,18 @@ function App() {
     controller.snapshot.status === "paused";
   const hasLanguageModel = modelStatus !== "unavailable";
 
+  const handleModeChange = (nextMode: Mode) => {
+    setMode(nextMode);
+    const nextHash = hashForMode(nextMode);
+    if (window.location.hash !== nextHash) {
+      window.history.pushState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}${nextHash}`
+      );
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="app-title-row">
@@ -446,7 +477,7 @@ function App() {
           <h1>p-adic linear regression</h1>
           <p>Boolean CNF as a local regression dataframe over candidate hyperplanes.</p>
         </div>
-        <ModeSwitch mode={mode} onChange={setMode} />
+        <ModeSwitch mode={mode} onChange={handleModeChange} />
       </header>
 
       {mode === "sudoku" ? (
@@ -1307,9 +1338,6 @@ function RunDashboard({
                 </button>
               </>
             )}
-            <button className="proof-button" type="button">
-              <Download size={17} /> Export proof (JSON)
-            </button>
           </div>
         </section>
       </section>
