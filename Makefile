@@ -13,7 +13,9 @@ TMP_PDF_DIR := tmp/pdfs
 PAPER_NAME := sudoku_padic_regression
 PAPER_TEX := $(PAPER_DIR)/$(PAPER_NAME).tex
 PAPER_PDF := $(PAPER_DIR)/$(PAPER_NAME).pdf
-PAPER_ASSETS := $(PAPER_DIR)/loss_curve.pdf
+PAPER_ASSETS := \
+	$(PAPER_DIR)/loss_curve.pdf \
+	$(PAPER_DIR)/figures/padic_logic_sudoku_solution.png
 SITE_PDF := $(SITE_DIR)/$(PAPER_NAME).pdf
 
 KINDLE_NAME := $(PAPER_NAME)_kindle
