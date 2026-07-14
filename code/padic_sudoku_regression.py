@@ -115,6 +115,16 @@ def unit_cells_boxes() -> List[List[int]]:
 ROWS = unit_cells_rows()
 COLS = unit_cells_cols()
 BOXS = unit_cells_boxes()
+PEER_PAIRS = tuple(
+    sorted(
+        {
+            (min(i, j), max(i, j))
+            for unit in ROWS + COLS + BOXS
+            for offset, i in enumerate(unit)
+            for j in unit[offset + 1 :]
+        }
+    )
+)
 
 
 # -------------------------
@@ -338,6 +348,11 @@ def conflicts_all_units(grid: Grid) -> int:
     for unit in ROWS + COLS + BOXS:
         total += unit_conflict_pairs([grid[i] for i in unit])
     return total
+
+
+def deduped_peer_conflicts(grid: Grid) -> int:
+    """Equal peer pairs, counting a row/column/box pair only once."""
+    return sum(grid[i] != 0 and grid[i] == grid[j] for i, j in PEER_PAIRS)
 
 
 def _unit_cells_for_ref(unit_type: str, idx: int) -> List[int]:

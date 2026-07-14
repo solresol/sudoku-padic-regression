@@ -1,0 +1,26 @@
+{
+  "description": "Shared objective cases for the Python experiments and TypeScript browser implementation.",
+  "cases": [
+    {
+      "name": "valid completion",
+      "grid": "534678912672195348198342567859761423426853791713924856961537284287419635345286179",
+      "deduped_peer_conflicts": 0,
+      "column_box_conflicts": 0,
+      "all_unit_conflicts": 0
+    },
+    {
+      "name": "seed-zero row-permutation initialisation",
+      "grid": "538472196628195347398147265829564713457893261731825496361795284263419785324685179",
+      "deduped_peer_conflicts": 47,
+      "column_box_conflicts": 56,
+      "all_unit_conflicts": 56
+    },
+    {
+      "name": "all-one domain state",
+      "grid": "111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+      "deduped_peer_conflicts": 810,
+      "column_box_conflicts": 648,
+      "all_unit_conflicts": 972
+    }
+  ]
+}

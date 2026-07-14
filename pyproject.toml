@@ -1,0 +1,19 @@
+[project]
+name = "sudoku-padic-regression"
+version = "0.1.0"
+description = "Reference experiments for finite-domain p-adic regression"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.9,<4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["code"]
+testpaths = ["tests"]
