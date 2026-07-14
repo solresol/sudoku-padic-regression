@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import objectiveFixture from "../../../fixtures/sudoku_objective_golden.json";
 import {
   ALPHA_DEFAULT,
   MAX_DEGREE,
@@ -93,6 +94,18 @@ describe("conflict counting", () => {
     expect(conflictsColsBoxes(grid)).toBe(648); // 9*C(9,2) cols + 9*C(9,2) boxes
     expect(conflictsAllUnits(grid)).toBe(972); // + rows
     expect(isValidComplete(grid)).toBe(false);
+  });
+
+  it.each(objectiveFixture.cases)("matches the shared objective fixture: $name", (fixture) => {
+    const grid = parsePuzzle(fixture.grid);
+    const model = buildPuzzleModel(new Array(81).fill(0));
+    const objective = evaluateObjective(grid, model);
+
+    expect(dedupedPeerConflicts(grid)).toBe(fixture.deduped_peer_conflicts);
+    expect(conflictsColsBoxes(grid)).toBe(fixture.column_box_conflicts);
+    expect(conflictsAllUnits(grid)).toBe(fixture.all_unit_conflicts);
+    expect(objective.dedupedConflicts).toBe(fixture.deduped_peer_conflicts);
+    expect(objective.hcbConflicts).toBe(fixture.column_box_conflicts);
   });
 });
 
