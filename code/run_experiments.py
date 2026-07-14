@@ -213,7 +213,8 @@ def main() -> None:
         if solved:
             steps = [r["steps"] for r in solved]
             secs = [r["seconds"] for r in solved]
-            summary_lines.append(f"  median steps: {int(statistics.median(steps))}")
+            median_steps = statistics.median(steps)
+            summary_lines.append(f"  median steps: {median_steps:g}")
             summary_lines.append(f"  median seconds: {statistics.median(secs):.3f}")
     (outdir / "summary.txt").write_text("\n".join(summary_lines))
 
