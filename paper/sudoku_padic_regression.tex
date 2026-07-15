@@ -10,7 +10,7 @@
 \usepackage{sudoku}
 \usepackage{tikz}
 
-\title{Signed p-adic Residual Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study\thanks{This article presents material that also appears as a chapter of the author's PhD dissertation (Australian National University, in preparation); it is the standalone version of that work.}}
+\title{Signed p-adic Residual Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study}
 \author{Greg Baker\\\small School of Computing, Australian National University\\\small Canberra, Australia\\\small \href{mailto:greg.baker@anu.edu.au}{greg.baker@anu.edu.au}\\\small ORCID: \href{https://orcid.org/0000-0002-6910-3011}{0000-0002-6910-3011}}
 \date{}
 \hypersetup{
@@ -40,10 +40,26 @@ We give a mechanical translation from finite-domain all-different graphs and CNF
 
 \noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
 
-\section{From an all-different graph to a regression dataframe}
+\section{\texorpdfstring{\(p\)-adic}{p-adic} linear regression}
+\label{sec:padic-regression-background}
+
+Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent of \(p\) in its factorisation and define
+\[
+|n|_p=p^{-v_p(n)},
+\qquad
+|0|_p=0.
+\]
+This norm makes numbers close when their difference is divisible by a large power of \(p\). In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and an ordinary weighted objective sums terms of the form
+\[
+\gamma\,|u^\top x-b|_p,
+\qquad \gamma>0.
+\]
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. The construction below also permits negative weights, but only after sufficiently strong positive terms have confined every global minimiser to a prescribed finite domain. On that domain the residual norms used here are zero--one indicators, so the signed regression objective becomes an exact finite constraint objective.
+
+\subsection{An example}
 \label{sec:worked-all-different}
 
-We begin with the finite problem rather than the general theorem. Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
+We begin with an example rather than the general theorem. Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
 
 For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), while every nonzero integer residual that occurs below has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
 \[
@@ -66,7 +82,28 @@ to the objective. Positive rows of weight \(3\) pin each coefficient to its allo
 \label{fig:list-colouring-example}
 \end{figure}
 
-Figure~\ref{fig:list-colouring-regression} gives the eight observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\). Table~\ref{tab:list-colouring-dataframe} shows the same observations in dataframe form, with one column for each model coefficient.
+Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}crrrrc l@{}}
+\toprule
+Row & $x_1$ & $x_2$ & $x_3$ & Target & Signed weight & Role \\
+\midrule
+$P_1$ & $1$ & $0$ & $0$ & $1$ & $+3$ & domain well \\
+$P_2$ & $1$ & $0$ & $0$ & $2$ & $+3$ & domain well \\
+$P_3$ & $0$ & $1$ & $0$ & $2$ & $+3$ & domain well \\
+$P_4$ & $0$ & $1$ & $0$ & $3$ & $+3$ & domain well \\
+$P_5$ & $0$ & $0$ & $1$ & $1$ & $+3$ & domain well \\
+$P_6$ & $0$ & $0$ & $1$ & $3$ & $+3$ & domain well \\
+$E_1$ & $1$ & $-1$ & $0$ & $0$ & $-1$ & reward $x_1\ne x_2$ \\
+$E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$ & reward $x_2\ne x_3$ \\
+\bottomrule
+\end{tabular}
+\caption{Dataframe view of Figure~\ref{fig:list-colouring-regression}. The three coefficient columns form the feature vector, and each row contributes its signed weight times the \(5\)-adic norm of feature dot coefficient minus target.}
+\label{tab:list-colouring-dataframe}
+\end{table}
 
 \begin{figure}[H]
 \centering
@@ -89,36 +126,15 @@ $E_2$ & negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
 \label{fig:list-colouring-regression}
 \end{figure}
 
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}crrrr l@{}}
-\toprule
-Row & $x_1$ & $x_2$ & $x_3$ & Target & Signed weight and role \\
-\midrule
-$P_1$ & $1$ & $0$ & $0$ & $1$ & $+3$; domain well \\
-$P_2$ & $1$ & $0$ & $0$ & $2$ & $+3$; domain well \\
-$P_3$ & $0$ & $1$ & $0$ & $2$ & $+3$; domain well \\
-$P_4$ & $0$ & $1$ & $0$ & $3$ & $+3$; domain well \\
-$P_5$ & $0$ & $0$ & $1$ & $1$ & $+3$; domain well \\
-$P_6$ & $0$ & $0$ & $1$ & $3$ & $+3$; domain well \\
-$E_1$ & $1$ & $-1$ & $0$ & $0$ & $-1$; reward $x_1\ne x_2$ \\
-$E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$; reward $x_2\ne x_3$ \\
-\bottomrule
-\end{tabular}
-\caption{Dataframe view of Figure~\ref{fig:list-colouring-regression}. The three coefficient columns form the feature vector, and each row contributes its signed weight times the \(5\)-adic norm of feature dot coefficient minus target.}
-\label{tab:list-colouring-dataframe}
-\end{table}
-
 The zero-intercept model is the hyperplane
 \[
 b=u^\top x=u_1x_1+u_2x_2+u_3x_3.
 \]
-Because \(e_1,e_2,e_3\) form a basis, choosing one pinning row for each coefficient determines a model. There are only
+Choosing one domain-pinning row for each coefficient gives
 \[
 |D_1|\,|D_2|\,|D_3|=2\cdot2\cdot2=8
 \]
-relevant three-point supports to try. Three observations suffice here because the intercept is fixed at zero and the selected feature rows form a basis; this is not an appeal to the \(n+1\)-point theorem for unrestricted affine \(p\)-adic regression.
+candidate zero-intercept hyperplanes. The general theorem below guarantees that at least one global minimum occurs among these finitely many candidates.
 
 On a domain-respecting vector the six positive rows contribute \(9\), while each unequal edge subtracts one. Thus
 \[
@@ -147,10 +163,10 @@ $(2,3,3)$ & $8$ & no \\
 \label{tab:list-colouring-candidates}
 \end{table}
 
-\section{A CNF formula as the same kind of data}
+\subsection{\texorpdfstring{\(p\)-adic}{p-adic} linear regression can express CNF statements as well}
 \label{sec:worked-cnf}
 
-The construction is mechanical for clauses as well. Consider
+Consider
 \[
 \Phi=(z_1)\wedge(\neg z_1\vee z_2),
 \]
@@ -159,16 +175,16 @@ and encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{fal
 \begin{table}[H]
 \centering
 \small
-\begin{tabular}{@{}crrrl@{}}
+\begin{tabular}{@{}crrrcl@{}}
 \toprule
-Row & $x_1$ & $x_2$ & Target & Signed weight and role \\
+Row & $x_1$ & $x_2$ & Target & Signed weight & Role \\
 \midrule
-$C_1$ & $1$ & $0$ & $1$ & $-1$; reward $(z_1)$ \\
-$C_2$ & $-1$ & $1$ & $1$ & $-1$; reward $(\neg z_1\vee z_2)$ \\
-$U_{1,0}$ & $1$ & $0$ & $0$ & $+3$; Boolean well \\
-$U_{1,1}$ & $1$ & $0$ & $1$ & $+3$; Boolean well \\
-$U_{2,0}$ & $0$ & $1$ & $0$ & $+3$; Boolean well \\
-$U_{2,1}$ & $0$ & $1$ & $1$ & $+3$; Boolean well \\
+$C_1$ & $1$ & $0$ & $1$ & $-1$ & reward $(z_1)$ \\
+$C_2$ & $-1$ & $1$ & $1$ & $-1$ & reward $(\neg z_1\vee z_2)$ \\
+$U_{1,0}$ & $1$ & $0$ & $0$ & $+3$ & Boolean well \\
+$U_{1,1}$ & $1$ & $0$ & $1$ & $+3$ & Boolean well \\
+$U_{2,0}$ & $0$ & $1$ & $0$ & $+3$ & Boolean well \\
+$U_{2,1}$ & $0$ & $1$ & $1$ & $+3$ & Boolean well \\
 \bottomrule
 \end{tabular}
 \caption{Signed regression dataframe compiled from the two-clause formula \(\Phi\). Constraint rows reward nonzero residuals; well rows force Boolean coefficients.}
@@ -196,7 +212,7 @@ $(1,1)$ & $(\mathrm{false},\mathrm{false})$ & $1$ & $5$ \\
 
 This small example is the paper's claim in operational form: a CNF formula becomes an ordinary coefficient-and-target dataframe, a finite set of candidate hyperplanes is evaluated, and the best regression coefficients decode to a logical assignment.
 
-\section{Polynomial-valued false labels}
+\subsection{Polynomial-valued false labels}
 \label{sec:polynomial-labels}
 
 The scalar clause loss records how many clauses are false, but not which ones. It is possible to retain the identities algebraically. Let \(V_C(x)\) be \(1\) when clause \(C\) is false and \(0\) when it is true, choose pairwise coprime nonconstant polynomials \(P_C(T)\), and form
@@ -205,6 +221,23 @@ R_x(T)=\prod_{C\in\Phi}\bigl(1-V_C(x)+V_C(x)P_C(T)\bigr)
 =\prod_{C\text{ false under }x}P_C(T).
 \]
 Factoring \(R_x\) recovers the false-clause labels, and \(\deg R_x\) is a weighted false-clause count. Equivalently, the Boolean failure indicator itself can be written as the multilinear product of the literal-failure indicators, giving one positive nonlinear residual per clause \cite{deloera2007nullstellensatz}.
+
+For the preceding formula
+\[
+\Phi=C_1\wedge C_2=(z_1)\wedge(\neg z_1\vee z_2),
+\]
+take \(P_{C_1}(T)=T\) and \(P_{C_2}(T)=T+1\). Then
+\[
+\begin{array}{c|c|c}
+x & R_x(T) & \deg R_x\\
+\hline
+(0,0) & 1 & 0\\
+(0,1) & T+1 & 1\\
+(1,0) & T & 1\\
+(1,1) & T & 1
+\end{array}
+\]
+so minimising \(\deg R_x\) gives the same unique satisfying assignment as Table~\ref{tab:cnf-candidates}. With unit-degree labels the degree is exactly the number of false clauses, while factorisation retains their identities.
 
 We do not use this representation in the algorithm or the browser. Constructing it still requires evaluating the clauses, its factors reproduce the violation list already available from that evaluation, and its degree discards the extra labels again. It may be useful in a setting where polynomial-valued certificates are transmitted or manipulated independently, but no such use is established here. We therefore record it only as a possible direction for future research.
 
@@ -217,7 +250,7 @@ The worked examples can now be put on a general footing. Fix a prime $p$. The $p
 \]
 We work first in the $p$-adic integers $\mathbb Z_p$, where every norm is at most $1$. If $p>q$, every nonzero difference between values in $\{1,\dots,q\}$ has norm $1$. For comparison, the discrete metric \(d_{\mathrm{disc}}(s,t):=\mathbf 1_{s\neq t}\) is also an ultrametric; a discrete version of the construction is stated after the main theorem.
 
-Many finite-domain all-different systems can be viewed as list-colouring problems. Each variable $x_i$ has a finite allowed set $D_i$, and an edge $\{i,j\}$ requires $x_i\neq x_j$. An all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique. This paper uses that pairwise graph, not the stronger propagation of a global \emph{alldifferent} constraint.
+Many finite-domain all-different systems can be viewed as list-colouring problems. Each variable $x_i$ has a finite allowed set $D_i$, and an edge \(\{i,j\}\) requires \(x_i\neq x_j\). An all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique.
 
 \begin{definition}[Signed synthetic $p$-adic residual dataset]
 \label{def:signed-dataset}
@@ -460,12 +493,6 @@ Any finite-domain all-different constraint system can be encoded, in polynomial 
 Relabel the union of the explicitly listed domain values by \(\{1,\dots,q\}\), preserving equality across domains. Here \(q\leq\sum_i|D_i|\). Choose a prime \(p>q\) (for \(q>1\), Bertrand's postulate gives one below \(2q\)); because \(q\) is bounded by the explicit input length, scanning this interval with deterministic primality testing is polynomial in that input length. Form the primal graph: the vertices are the variables, and two variables are adjacent if they appear together in some all-different constraint. The satisfying assignments are exactly the proper list-colourings of this graph, with the variable domains as lists, and the minimum-conflict assignments are exactly the domain-respecting assignments minimising the corresponding deduplicated edge-conflict sum. Apply Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, and Theorem~\ref{thm:all-different}.
 \end{proof}
 
-\paragraph{Unsatisfiable instances and minimum conflicts.}
-The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
-
-\paragraph{Relation to Potts energies.}
-On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
-
 \paragraph{Discrete-metric variant.}
 The same synthetic dataset also works with the discrete metric
 \[
@@ -491,7 +518,7 @@ U_i^{\mathrm{disc}}(t):=\sum_{a\in D_i}\mathbf 1_{t\neq a}
 Hence replacing any \(x_i\notin D_i\) by a value \(b\in D_i\) decreases the positive part by exactly \(\lambda\), while the total increase in the negative part is at most \(\sum_j w_{ij}\le \Delta\). Since \(\lambda=1+\Delta\), the same snapping argument goes through. Therefore the conclusions of Theorem~\ref{thm:all-different} and Corollary~\ref{cor:all-different-csp} remain valid for the discrete metric as well. The \(p\)-adic case remains the main one because it realises the same indicator behaviour inside the affine \(p\)-adic regression framework used throughout the paper.
 
 \paragraph{Boolean clause rewards.}
-The same signed-residual idea also applies beyond all-different constraints. Let
+Let
 \[
 \Phi=\bigwedge_{r=1}^{m} C_r
 \]
@@ -563,6 +590,15 @@ and the allowed set \(S_C=\{0,\dots,s-1\}\). For \(S\subseteq\{0,\dots,s\}\), se
 W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
 When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship; it does not show that a positive encoding is impossible. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
+
+\section{Minimum conflicts and Potts energies}
+\label{sec:minimum-conflicts-potts}
+
+\subsection{Unsatisfiable instances}
+The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
+
+\subsection{Potts energies}
+On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
 \section{Sudoku as a special case}
 Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly.
@@ -697,7 +733,7 @@ Because each row is kept as a permutation of \(\{1,\dots,9\}\), the correspondin
 
 We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
 
-On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These runs are a deterministic smoke test of the implementation, not a solver benchmark.
+On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
 
 \section{Representational parsimony}
 
@@ -720,56 +756,29 @@ Appendix~\ref{app:powers-two} records an alternative encoding that maps digits t
 \section{Interactive compiler and reproducibility}
 \label{sec:interactive-demo}
 
-The companion implementation at
 \begin{quote}\small
 \url{https://padic-logic.symmachus.org}
 \end{quote}
-makes the two main compilation paths inspectable without installing software. All computation runs in the browser, and the interface exposes the coefficient vector, target, sign, weight, and residual value of each synthetic observation rather than presenting only a solver result.
 
-\paragraph{Boolean CSP route.}
-At the main URL, a reader can enter a Boolean CSP or load one of the bundled examples. A deterministic compiler expands the supported constraint language into CNF, displays every clause as its single forbidden affine equality \(u_C^\top x=t_C\), adds the positive Boolean wells, and constructs the signed regression dataframe. The browser then exhaustively enumerates the \(2^n\) Boolean hyperplanes in worker threads and reports the theoretical floor, the best loss, the number of floor-attaining assignments, and each residual calculation. For example, the bundled four-person job-assignment problem compiles to \(16\) variables and \(60\) clauses. With \(p=17\) and Boolean-well weight \(61\), the displayed dataset has \(60\) negative clause observations and \(32\) positive well observations; exhaustive search tests all \(65{,}536\) assignments and verifies that the best loss equals the displayed floor.
-
-Where a browser exposes the on-device Prompt API, an optional natural-language front end precedes this exact compiler. The language model does not generate the final residual rows. It extracts a typed assignment schema---entities, allowed values, exactly-one conditions, forbidden combinations, and implications---after which deterministic code validates the schema, expands it into CNF, and constructs the signed \(p\)-adic residual dataset. This gives a natural-language-description \(\rightarrow\) CSP schema \(\rightarrow\) CNF \(\rightarrow\) signed \(p\)-adic regression pipeline while keeping the mathematically consequential stages checkable. Browser support and local-model download are platform-dependent, so this front end is experimental; direct CSP entry remains the reproducible route on browsers without that API.
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[every node/.style={font=\footnotesize,align=center},>=stealth]
-\node[draw,dashed,rounded corners,text width=2.15cm,minimum height=1.15cm] (nl) at (-6,0) {natural-language\\description\\\emph{optional}};
-\node[draw,rounded corners,text width=2.15cm,minimum height=1.15cm] (schema) at (-3,0) {typed CSP\\schema\\validated};
-\node[draw,rounded corners,text width=1.75cm,minimum height=1.15cm] (cnf) at (0,0) {CNF\\clauses};
-\node[draw,rounded corners,text width=2.25cm,minimum height=1.15cm] (rows) at (3,0) {signed residual\\dataframe};
-\node[draw,rounded corners,text width=2.1cm,minimum height=1.15cm] (search) at (6,0) {browser\\search and\\row audit};
-\draw[->] (nl) -- (schema);
-\draw[->] (schema) -- (cnf);
-\draw[->] (cnf) -- (rows);
-\draw[->] (rows) -- (search);
-\end{tikzpicture}
-\caption{The browser compiler's trust boundary. The dashed language-model stage is optional and platform-dependent. Schema validation, CNF expansion, residual construction, and search are deterministic and exposed for inspection.}
-\label{fig:browser-compiler}
-\end{figure}
-
-\paragraph{Sudoku route.}
-The dedicated \href{https://padic-logic.symmachus.org/\#sudoku}{Sudoku view} accepts an editable grid and compiles it into the native \(81\)-variable construction. For the bundled \(30\)-clue puzzle, the browser displays \(489\) positive domain-pinning observations and \(810\) negative peer observations, for \(1{,}299\) residual rows at \(p=11\) and pinning weight \(21\). It evaluates the genuine \(p\)-adic norms, displays the theoretical floor \(7{,}758\), and runs either the row-swap or discrete Zubarev-walk heuristic while showing both the regression loss and the corresponding conflict count. A successful run reaches loss \(7{,}758\) and zero peer conflicts, making the loss-floor identity visible row by row as well as in aggregate.
-
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figures/padic_logic_sudoku_solution.png}
 \caption{The Sudoku route after a row-swap run reaches a valid completion. The native \(81\)-cell grid, the \(1{,}299\)-row signed objective summary, the theoretical-floor equality, and the zero-conflict search result remain visible together.}
 \label{fig:browser-sudoku-solution}
 \end{figure}
 
-The site therefore reproduces the paper's construction-level results: the conversation-to-schema route where the browser supports it, deterministic CSP-to-CNF and CNF-to-residual compilation, row-by-row objective arithmetic, exact Boolean enumeration, and representative Sudoku searches. It is not an archival batch runner for every reported numerical result: the \(36\) method--puzzle runs over \(18\) paired puzzles and the \(50\)-puzzle powers-of-two experiment are reproduced from the versioned scripts, seeds, CSV files, and traces in the code and dataset archives listed below.
-
 \section{Related work and scope}
+
+\subsection{Earlier regression and constraint models}
 
 Two earlier results motivate the regression formulation. Baker, McCallum, and Pattinson show that an optimal unrestricted affine \(p\)-adic regression hyperplane can be chosen through at least \(n+1\) observations in \(n\) feature dimensions \cite{baker2025padic}. The three-point and two-point enumerations in Sections~\ref{sec:worked-all-different} and \ref{sec:worked-cnf} are narrower: their intercept is fixed at zero and their basis pinning rows determine the coefficient vector directly. Baker's later complexity result proves \(p\)-adic linear regression NP-hard by embedding \textsc{Max-Cut} with positive Boolean pinning rows \cite{baker2026nphard}. The present construction adds bounded negative affine rewards and extends the finite-domain interpretation from cuts to all-different and CNF constraints.
 
 From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts}. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. The contribution here is not a new constraint-solving primitive, but a compact signed affine \(p\)-adic representation on the original finite-domain variables.
 
-\section{Relation to Mihara's forcing and digitwise-noise regression}
+\subsection{Mihara's forcing and digitwise-noise regression}
 \label{sec:mihara-digitwise}
 
-\subsection{General forcing at arbitrary primes}
+\subsubsection{General forcing at arbitrary primes}
 
 Mihara's forcing theorem is the closest general comparison to Theorem~\ref{thm:compiler-template} \cite{mihara2026forcing}. It considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
 
@@ -793,7 +802,7 @@ Main consequence & Positive linear regression NP-hard for each fixed prime & Com
 \label{tab:forcing-comparison}
 \end{table}
 
-\subsection{Digitwise-noise regression}
+\subsubsection{Digitwise-noise regression}
 
 Mihara's linear-regression algorithm \cite{mihara2026digitwise} addresses an inverse statistical problem. The data are samples
 \[
@@ -817,24 +826,24 @@ An equal-characteristic analogue over \(\mathbb F_q[[T]]\) would make additive d
 
 Those assumptions do not match the Sudoku construction. In this paper the unknowns \(x_i\) are the cell values themselves, not coefficients of an observed response law. The residual rows are exact synthetic constraints chosen by the modeller: unary wells pin cells to allowed digits, while negative residuals \(-|x_i-x_j|_p\) reward inequality across peer edges. After digit snapping, the problem is exactly a finite-domain conflict-minimisation problem. There is no response vector \(Y\), no hidden coefficient vector \(c\) to recover from random samples, and no large noise-free affine locus whose graph could be estimated digit by digit.
 
-The mismatch is even sharper for the Boolean clause remark. A clause becomes one \emph{forbidden} affine equality
+Mihara's method also does not apply to the CNF construction. A clause becomes one \emph{forbidden} affine equality
 \[
 u_C^\top x=t_C,
 \]
 and a satisfying assignment is rewarded because the residual is nonzero. Mihara's modulo-\(p\) stage is designed to recover an affine equality satisfied by most noise-free samples. The Boolean CSP task asks for one point avoiding many clause-specific forbidden hyperplanes, or, in the Max-CSP case, avoiding as many as possible. Failed clauses are not random digitwise outliers from a single affine law; they are exact, structured constraints sharing variables.
 
-Thus Mihara's algorithm is relevant background for \(p\)-adic regression with digitwise noise, but it is not a drop-in replacement for the search procedures here. It would be appropriate if the task were to estimate an unknown affine or polynomial \(p\)-adic rule from noisy sampled evaluations. Sudoku and the finite-domain CSP objectives instead compile known constraints into a signed residual objective whose minimisers are discrete assignments. Any use of Mihara's method here would first require changing the problem into a different statistical estimation task, and would no longer preserve the exact minimiser characterisation in Theorem~\ref{thm:all-different} or the clause-reward calculation of Section~\ref{construction}.
+Mihara's algorithm is therefore not a drop-in replacement for the search procedures here.
 
 
 \section{Conclusion}
 
 Negative weights in Euclidean squared-loss regression are usually treated as anti-shrinkage terms in selected directions. Here signed residuals have a different role. Positive synthetic terms pin variables to a finite set; after that, negative \(p\)-adic terms are bounded rewards for inequality on domain-respecting states.
 
-The paper does not propose a competitive Sudoku solver. Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. The main result is the compiler theorem: coordinatewise-dominating unary wells permit signed affine interactions while forcing every global minimiser onto the intended finite domain. All-different systems then admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
+Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
 The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:polynomial-labels} notes that different false clauses can be given different polynomial labels, but the resulting factorisation merely repackages the already-computed violation list. No optimisation or verification advantage is claimed for it.
 
-The companion site in Section~\ref{sec:interactive-demo} turns both constructions into inspectable browser computations. Readers can trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor. The optional natural-language front end goes one step further: it extracts a typed CSP schema from a problem description before the deterministic CSP and residual compilers take over. This makes the modelling chain concrete while keeping the exact compilation stages visible and testable.
+The companion site in Section~\ref{sec:interactive-demo} lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor.
 
 \appendix
 
