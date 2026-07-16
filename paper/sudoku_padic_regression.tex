@@ -718,20 +718,7 @@ An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large diffe
 \label{sec:illustrative-computations}
 These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
 
-To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
-\[
-H_{\mathrm{cb}}(x):=
-\sum_{c=1}^{9} \operatorname{conf}(C_c;x)
-\;+\;
-\sum_{b=1}^{9} \operatorname{conf}(B_b;x),
-\]
-where \(C_c\) and \(B_b\) are the cells in column \(c\) and box \(b\), and
-\[
-\operatorname{conf}(U;x):=\sum_{d=1}^{9} \binom{\#\{u\in U:x_u=d\}}{2}.
-\]
-Because each row is kept as a permutation of \(\{1,\dots,9\}\), the corresponding row contribution is identically zero and is omitted. This duplicated unit-scope loss is close to, but not identical with, the deduplicated peer-conflict objective coming from \(\mathcal P\): a conflicting pair that lies simultaneously in a column and a box is counted twice. For the seed-\(0\) initialisation shown later in Figure~\ref{fig:seed-zero-init}, the deduplicated peer-conflict count is \(47\) whereas \(H_{\mathrm{cb}}=56\), because nine conflicting pairs lie in both a column and a box.
-
-We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
+We implemented two simple local-search procedures: a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} defines their loss, records the algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
 
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
 
@@ -851,6 +838,19 @@ The companion site in Section~\ref{sec:interactive-demo} lets readers trace a Bo
 \label{app:heuristics}
 
 \subsection{Row-swap local search}
+To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
+\[
+H_{\mathrm{cb}}(x):=
+\sum_{c=1}^{9} \operatorname{conf}(C_c;x)
+\;+\;
+\sum_{b=1}^{9} \operatorname{conf}(B_b;x),
+\]
+where \(C_c\) and \(B_b\) are the cells in column \(c\) and box \(b\), and
+\[
+\operatorname{conf}(U;x):=\sum_{d=1}^{9} \binom{\#\{u\in U:x_u=d\}}{2}.
+\]
+Because each row is kept as a permutation of \(\{1,\dots,9\}\), the corresponding row contribution is identically zero and is omitted. This duplicated unit-scope loss is close to, but not identical with, the deduplicated peer-conflict objective coming from \(\mathcal P\): a conflicting pair that lies simultaneously in a column and a box is counted twice. For the seed-\(0\) initialisation shown later in Figure~\ref{fig:seed-zero-init}, the deduplicated peer-conflict count is \(47\) whereas \(H_{\mathrm{cb}}=56\), because nine conflicting pairs lie in both a column and a box.
+
 The general family of signed $p$-adic residual objectives produced by the compiler is NP-hard to optimise globally. For comparison, Mihara proves ordinary positive $p$-adic linear regression NP-hard for every individual prime, including the choice $p=11$ used here \cite{mihara2026forcing}. The heuristics, however, work directly on the digit-valued, clue-consistent row-permutation state space and minimise the duplicated unit-scope loss \(H_{\mathrm{cb}}\) from Section~\ref{sec:illustrative-computations}. Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space.
 
 \begin{lemma}[Locality of row swaps]
