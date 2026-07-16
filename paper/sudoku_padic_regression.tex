@@ -825,8 +825,6 @@ the method estimates \(c\bmod p^E\) recursively: first solve a modulo-\(p\) line
 \]
 and the condition that the noise-free samples have the right affine hull modulo \(p\) at each digit step.
 
-An equal-characteristic analogue over \(\mathbb F_q[[T]]\) would make additive digit extraction coefficientwise and carry-free; multiplication would still couple coefficients by convolution, and Mihara's probabilistic analysis is presently stated only over \(\mathbb Z_p\).
-
 Those assumptions do not match the Sudoku construction. In this paper the unknowns \(x_i\) are the cell values themselves, not coefficients of an observed response law. The residual rows are exact synthetic constraints chosen by the modeller: unary wells pin cells to allowed digits, while negative residuals \(-|x_i-x_j|_p\) reward inequality across peer edges. After digit snapping, the problem is exactly a finite-domain conflict-minimisation problem. There is no response vector \(Y\), no hidden coefficient vector \(c\) to recover from random samples, and no large noise-free affine locus whose graph could be estimated digit by digit.
 
 Mihara's method also does not apply to the CNF construction. A clause becomes one \emph{forbidden} affine equality
