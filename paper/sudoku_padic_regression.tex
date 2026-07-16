@@ -55,7 +55,7 @@ This norm makes numbers close when their difference is divisible by a large powe
 \qquad \gamma>0.
 \]
 This is a weighted \(p\)-adic linear-regression objective.
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a resulting trained model can be transformed mechanically into a solution of the CSP.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a global minimiser of the resulting objective can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment.
 
 \subsection{An example}
 \label{sec:worked-all-different}
@@ -614,7 +614,7 @@ If a best-effort solution should treat some constraints as more important than o
 On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
 \section{Sudoku as a special case}
-Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with \(p\)-adic machine-learning training methods and demonstrate that these techniques generally succeed at solving the Sudoku-devil instances.
+Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with \(p\)-adic machine-learning training methods on a small sample of randomly carved Sudoku instances.
 
 \subsection{Sudoku}
 A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
@@ -741,7 +741,7 @@ Appendix~\ref{app:powers-two} records an alternative encoding that maps digits t
 
 We implemented two simple local-search procedures: a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} defines their loss, records the algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
 
-These are \(p\)-adic machine-learning techniques in this setting because they train the coefficient vector by local moves that reduce a loss derived from the signed \(p\)-adic residual objective. In particular, row-swap search is a discrete graph walk on the state graph of clue-consistent row permutations, in the same spirit as earlier graph-walk experiments.
+These are \(p\)-adic machine-learning techniques in this setting because they train the coefficient vector by local moves whose selection is biased toward reducing a loss derived from the signed \(p\)-adic residual objective. In particular, row-swap search is a discrete graph walk on the state graph of clue-consistent row permutations, in the same spirit as earlier graph-walk experiments.
 
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
 
