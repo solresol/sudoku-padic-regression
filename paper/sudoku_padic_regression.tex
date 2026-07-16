@@ -49,11 +49,12 @@ Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent o
 \qquad
 |0|_p=0.
 \]
-This norm makes numbers close when their difference is divisible by a large power of \(p\). In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and an ordinary weighted objective sums terms of the form
+This norm makes numbers close when their difference is divisible by a large power of \(p\). Linear regression using sums of squared residuals needs little introduction: the familiar loss derives from the Euclidean distance formula, and weighted variants, including negatively weighted observations, are well known. Euclidean distance is not the only distance that can be used. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and a weighted objective sums terms of the form
 \[
 \gamma\,|u^\top x-b|_p,
 \qquad \gamma>0.
 \]
+This is a weighted \(p\)-adic linear-regression objective.
 Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a resulting trained model can be transformed mechanically into a solution of the CSP.
 
 \subsection{An example}
