@@ -784,14 +784,10 @@ On a small sample of \(18\) randomly carved puzzles, both heuristics solved ever
 
 From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts}. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}.
 
-\subsection{Mihara's forcing and digitwise-noise regression}
+\subsection{Why we could not use Mihara regression}
 \label{sec:mihara-digitwise}
 
-\subsubsection{General forcing at arbitrary primes}
-
-Mihara's forcing theorem is the closest general comparison to Theorem~\ref{thm:compiler-template} \cite{mihara2026forcing}. It considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
-
-The present theorem does not claim that finite-alphabet forcing itself is new. Its different ingredient is a direct domination bound for signed affine interactions. Each pinning weight \(\lambda_i\) exceeds the total absolute weight of the interaction rows incident on coordinate \(i\). This coordinatewise Lipschitz bound handles the subunit variation of negative residuals away from the finite domain without assuming Mihara's concentration condition. After snapping, one forbidden affine equality is represented by one negative row. Table~\ref{tab:forcing-comparison} summarises the distinction.
+Mihara's forcing theorem \cite{mihara2026forcing} considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
 
 \begin{table}[t]
 \centering
@@ -810,8 +806,6 @@ Main consequence & Positive linear regression NP-hard for each fixed prime & Com
 \caption{Comparison with Mihara's generalisation of Baker forcing \cite{mihara2026forcing}. The two results share finite-domain pinning but use different hypotheses to control the remaining objective.}
 \label{tab:forcing-comparison}
 \end{table}
-
-\subsubsection{Digitwise-noise regression}
 
 Mihara's linear-regression algorithm \cite{mihara2026digitwise} addresses an inverse statistical problem. The data are samples
 \[
