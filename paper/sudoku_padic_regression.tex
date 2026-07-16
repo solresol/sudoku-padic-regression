@@ -597,6 +597,8 @@ When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals 
 \subsection{Unsatisfiable instances}
 The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
 
+If a best-effort solution should treat some constraints as more important than others, assign them correspondingly higher or lower losses. Replacing the unit reward on an edge \(e\) by a weight \(w_e>0\), and raising each pinning weight \(\lambda_i\) above the total weight incident on coordinate \(i\), gives the weighted minimum-conflict objective by the same domination argument.
+
 \subsection{Potts energies}
 On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
