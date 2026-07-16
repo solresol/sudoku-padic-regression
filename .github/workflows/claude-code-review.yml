@@ -31,14 +31,91 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code Review
-        id: claude-review
+      - name: Classify changed files
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed_files="$(gh pr diff "$PR_NUMBER" --name-only)"
+          echo "Changed files:"
+          echo "$changed_files"
+
+          touches_paper=false
+          touches_code=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              paper/*|submission/*|correction-progress/*)
+                touches_paper=true ;;
+              *)
+                touches_code=true ;;
+            esac
+          done <<< "$changed_files"
+
+          if [ "$touches_paper" = true ] && [ "$touches_code" = false ]; then
+            focus=paper
+          elif [ "$touches_code" = true ] && [ "$touches_paper" = false ]; then
+            focus=code
+          else
+            focus=both
+          fi
+          echo "Review focus: $focus"
+          echo "focus=$focus" >> "$GITHUB_OUTPUT"
+
+      # Paper-only PRs: read the manuscript as a peer reviewer would, not as a code reviewer.
+      - name: Run Claude Code Review (paper)
+        if: steps.classify.outputs.focus == 'paper'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Pull request ${{ github.repository }}/pull/${{ github.event.pull_request.number }} only changes
+            the research paper (LaTeX/Markdown under paper/, submission/, or correction-progress/), not
+            application code.
+
+            Review it as a peer reviewer of the manuscript would, not as a code reviewer:
+            - Read the full current text of every changed .tex/.md file -- not just the diff hunks -- so
+              you understand the surrounding argument, not only the changed lines.
+            - Check mathematical claims, definitions, and notation for internal consistency with the rest
+              of the paper.
+            - Flag unsupported or overstated claims, unclear exposition, missing citations/references, and
+              inconsistencies with the implementation or results elsewhere in the repo (code/, tests/,
+              fixtures/, padic-logic.symmachus.org/).
+            - Ignore LaTeX formatting nits and code style; focus on correctness, clarity, and rigor of the
+              argument.
+            - Post your findings as a normal PR review.
+
+      # Code-only PRs: keep the existing plugin-based code review.
+      - name: Run Claude Code Review (code)
+        if: steps.classify.outputs.focus == 'code'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+
+      # Mixed PRs: do both, clearly separated.
+      - name: Run Claude Code Review (paper + code)
+        if: steps.classify.outputs.focus == 'both'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: |
+            Pull request ${{ github.repository }}/pull/${{ github.event.pull_request.number }} changes both
+            the research paper (paper/, submission/, correction-progress/) and application/test code.
+            Review both, clearly separated:
+
+            1. Paper: read the full current text of every changed .tex/.md file (not just the diff) and
+               review it as a peer reviewer would -- mathematical claims, notation, internal consistency,
+               clarity, and agreement with the code/results elsewhere in the repo.
+            2. Code: use /code-review:code-review to review the changed application/test code for
+               correctness bugs, regressions, missing coverage, and simplification opportunities.
+
+            Post the combined findings as a single PR review with the two sections clearly labelled.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
