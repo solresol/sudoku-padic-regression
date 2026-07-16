@@ -733,6 +733,8 @@ Because each row is kept as a permutation of \(\{1,\dots,9\}\), the correspondin
 
 We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
 
+These are \(p\)-adic machine-learning techniques in this setting because they train the coefficient vector by local moves that reduce a loss derived from the signed \(p\)-adic residual objective. In particular, row-swap search is a discrete graph walk on the state graph of clue-consistent row permutations, in the same spirit as earlier graph-walk experiments.
+
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
 
 \section{Representational parsimony}
