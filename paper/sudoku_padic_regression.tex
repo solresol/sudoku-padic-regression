@@ -714,9 +714,8 @@ For Sudoku, the bound is explicit. In the deduplicated peer graph, every cell ha
 \paragraph{Why ultrametric residuals help with negative weights.}
 An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large differences, not just nonzero differences, and needs separate bounds. An ultrametric residual distinguishes equality from inequality. The discrete metric has this property by definition, and for \(p>9\) the \(p\)-adic norm has the same behaviour on digit-valued differences: \(|x_i-x_j|_p\in\{0,1\}\).
 
-\section{Illustrative computations}
+\section{Computations using \texorpdfstring{\(p\)-adic}{p-adic} machine-learning techniques}
 \label{sec:illustrative-computations}
-These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
 
 To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
 \[
