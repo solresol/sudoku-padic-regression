@@ -49,12 +49,13 @@ Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent o
 \qquad
 |0|_p=0.
 \]
-This norm makes numbers close when their difference is divisible by a large power of \(p\). In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and an ordinary weighted objective sums terms of the form
+This norm makes numbers close when their difference is divisible by a large power of \(p\). Linear regression using sums of squared residuals needs little introduction: the familiar loss derives from the Euclidean distance formula, and weighted variants, including negatively weighted observations, are well known. Euclidean distance is not the only distance that can be used. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and a weighted objective sums terms of the form
 \[
 \gamma\,|u^\top x-b|_p,
 \qquad \gamma>0.
 \]
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. The construction below also permits negative weights, but only after sufficiently strong positive terms have confined every global minimiser to a prescribed finite domain. On that domain the residual norms used here are zero--one indicators, so the signed regression objective becomes an exact finite constraint objective.
+This is a weighted \(p\)-adic linear-regression objective.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a resulting trained model can be transformed mechanically into a solution of the CSP.
 
 \subsection{An example}
 \label{sec:worked-all-different}
@@ -82,8 +83,6 @@ to the objective. Positive rows of weight \(3\) pin each coefficient to its allo
 \label{fig:list-colouring-example}
 \end{figure}
 
-Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
-
 \begin{table}[H]
 \centering
 \small
@@ -104,6 +103,8 @@ $E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$ & reward $x_2\ne x_3$ \\
 \caption{Dataframe view of Figure~\ref{fig:list-colouring-regression}. The three coefficient columns form the feature vector, and each row contributes its signed weight times the \(5\)-adic norm of feature dot coefficient minus target.}
 \label{tab:list-colouring-dataframe}
 \end{table}
+
+Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 \begin{figure}[H]
 \centering
@@ -130,11 +131,7 @@ The zero-intercept model is the hyperplane
 \[
 b=u^\top x=u_1x_1+u_2x_2+u_3x_3.
 \]
-Choosing one domain-pinning row for each coefficient gives
-\[
-|D_1|\,|D_2|\,|D_3|=2\cdot2\cdot2=8
-\]
-candidate zero-intercept hyperplanes. The general theorem below guarantees that at least one global minimum occurs among these finitely many candidates.
+The general theorem below guarantees that at least one global minimum occurs among the finitely many domain-respecting candidates.
 
 On a domain-respecting vector the six positive rows contribute \(9\), while each unequal edge subtracts one. Thus
 \[
@@ -159,18 +156,20 @@ $(2,3,1)$ & $7$ & yes \\
 $(2,3,3)$ & $8$ & no \\
 \bottomrule
 \end{tabular}
-\caption{All eight hyperplanes determined by the domain-pinning rows. The minimum-loss coefficient vectors are exactly the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.}
+\caption{All eight hyperplanes determined by the domain-pinning rows.}
 \label{tab:list-colouring-candidates}
 \end{table}
+
+The minimum-loss coefficient vectors are exactly the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.
 
 \subsection{\texorpdfstring{\(p\)-adic}{p-adic} linear regression can express CNF statements as well}
 \label{sec:worked-cnf}
 
-Consider
+Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \[
 \Phi=(z_1)\wedge(\neg z_1\vee z_2),
 \]
-and encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
+What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
 
 \begin{table}[H]
 \centering
@@ -206,9 +205,11 @@ $(1,0)$ & $(\mathrm{false},\mathrm{true})$ & $1$ & $5$ \\
 $(1,1)$ & $(\mathrm{false},\mathrm{false})$ & $1$ & $5$ \\
 \bottomrule
 \end{tabular}
-\caption{Brute-force regression for \(\Phi\). The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying assignment \(z_1=z_2=\mathrm{true}\).}
+\caption{Brute-force regression for \(\Phi\).}
 \label{tab:cnf-candidates}
 \end{table}
+
+The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying assignment \(z_1=z_2=\mathrm{true}\).
 
 \subsection{Polynomial-valued false labels}
 \label{sec:polynomial-labels}
