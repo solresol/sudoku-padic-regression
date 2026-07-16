@@ -724,9 +724,6 @@ Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm
 
 In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; \(\alpha=21\) is enough. For the expanded objective \eqref{eq:objective}, the same claim requires \(\alpha_{\mathrm{clue}}>20\), because the all-digit wells are constant on clue cells. If one instead counts row, column, and box overlaps separately, each cell has \(8+8+8=24\) incident negative terms, and the safe unary bound becomes \(>24\).
 
-\paragraph{Why ultrametric residuals help with negative weights.}
-An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large differences, not just nonzero differences, and needs separate bounds. An ultrametric residual distinguishes equality from inequality. The discrete metric has this property by definition, and for \(p>9\) the \(p\)-adic norm has the same behaviour on digit-valued differences: \(|x_i-x_j|_p\in\{0,1\}\).
-
 \section{Illustrative computations}
 \label{sec:illustrative-computations}
 These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
