@@ -82,8 +82,6 @@ to the objective. Positive rows of weight \(3\) pin each coefficient to its allo
 \label{fig:list-colouring-example}
 \end{figure}
 
-Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
-
 \begin{table}[H]
 \centering
 \small
@@ -104,6 +102,8 @@ $E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$ & reward $x_2\ne x_3$ \\
 \caption{Dataframe view of Figure~\ref{fig:list-colouring-regression}. The three coefficient columns form the feature vector, and each row contributes its signed weight times the \(5\)-adic norm of feature dot coefficient minus target.}
 \label{tab:list-colouring-dataframe}
 \end{table}
+
+Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 \begin{figure}[H]
 \centering
