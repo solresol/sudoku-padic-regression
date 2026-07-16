@@ -582,6 +582,15 @@ Globally minimising signed affine \(p\)-adic residual objectives is NP-hard alre
 Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha>\Delta\). Its minimum equals \(\alpha n-m\) if and only if all \(m\) clauses can be satisfied. A global optimiser would therefore decide \textsc{3-SAT}, so the optimisation problem is NP-hard.
 \end{proof}
 
+\begin{corollary}[NP-hardness for the polynomial degree metric]
+\label{cor:degree-metric-nphard}
+Given pairwise coprime linear false-clause labels, minimising the degree-based ultrametric loss \(\deg R_x\) over Boolean assignments is NP-hard.
+\end{corollary}
+
+\begin{proof}
+Apply the construction of Section~\ref{sec:polynomial-labels} to a \(3\)-CNF formula, assigning each clause a distinct linear polynomial. Then \(\deg R_x\) is exactly the number of false clauses. In particular, its minimum is \(0\) if and only if the formula is satisfiable, so a global optimiser would decide \textsc{3-SAT}.
+\end{proof}
+
 \paragraph{Signed versus positive complement encodings.}
 The signed construction is compact rather than uniquely expressive. The same clause can be encoded positively through its failure sum
 \[
