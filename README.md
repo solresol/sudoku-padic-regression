@@ -7,8 +7,8 @@ integer p-adic regression data.
 ## Repository map
 
 - `paper/`: LaTeX source, figures, and compiled paper PDF.
-- `code/`: the 81-coefficient Sudoku solver, unique-puzzle generator, and
-  experiment driver.
+- `code/`: the 81-coefficient Sudoku solver, unique-puzzle generator, CNF
+  comparison algorithms, and experiment driver.
 - `padic-logic.symmachus.org/`: the TypeScript/React CSP and Sudoku compiler at
   <https://padic-logic.symmachus.org> (Sudoku: `#sudoku`).
 - `tests/`: Python regression tests.
@@ -45,8 +45,12 @@ uv run python code/padic_sudoku_regression.py solve \
 ```
 
 Available methods are `stepwise`, `greedy`, `zubarev`, `local-best`,
-`local-first`, and `local-zubarev`. The Zubarev methods also accept `--beta0`,
-`--beta1`, and `--beta-schedule`. Add `--moves 8` to print the first few moves.
+`local-first`, `local-zubarev`, and `mihara`. The Zubarev methods also accept
+`--beta0`, `--beta1`, and `--beta-schedule`. Add `--moves 8` to print the first
+few moves. `mihara` is deliberately a failed comparison: it treats the signed
+Sudoku dataframe as samples from one hidden equality, then reports equality
+inliers, off-domain coefficients, clue violations, and peer conflicts rather
+than claiming that the result is a Sudoku solution.
 
 Generate a unique-solution puzzle with:
 
@@ -57,6 +61,23 @@ uv run python code/padic_sudoku_regression.py generate --clues 30 --seed 42
 Swap-based methods preserve row permutations and optimise column-plus-box
 conflicts. The three `local-*` methods allow arbitrary non-clue digit edits and
 therefore optimise row-plus-column-plus-box conflicts.
+
+## Compare algorithms on CNF
+
+The CNF comparison script accepts DIMACS or uses a small built-in example. Its
+Zubarev walk applies Boltzmann-weighted single-bit moves to the actual signed
+regression loss. Its Mihara path implements the digitwise outer loop with a
+RANSAC-style modulo-p equality fit, then shows why that statistical model is
+wrong for forbidden CNF hyperplanes.
+
+```sh
+uv run python code/padic_comparison_algorithms.py --seed 0
+uv run python code/padic_comparison_algorithms.py --dimacs problem.cnf
+```
+
+The browser CSP page exposes ordered and randomly permuted exhaustive search,
+the Zubarev walk, and the Mihara diagnostic from the Algorithm selector. The
+Sudoku page exposes row-swap, Zubarev, and Mihara comparison buttons.
 
 ## Reproduce experiments
 

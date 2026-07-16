@@ -298,7 +298,7 @@ describe("p-adic logic app", () => {
       target: { value: "A or B" }
     });
 
-    await user.selectOptions(screen.getByLabelText("Search strategy"), "random");
+    await user.selectOptions(screen.getByLabelText("Search algorithm"), "random");
     expect(screen.getByText("Random-permutation exhaustive search")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
 
@@ -313,6 +313,32 @@ describe("p-adic logic app", () => {
         })
       }));
     }
+  });
+
+  it("offers Zubarev and Mihara algorithms for Boolean CSP", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    fireEvent.change(screen.getByLabelText("CSP source"), {
+      target: { value: "A or B" }
+    });
+
+    const algorithm = screen.getByLabelText("Search algorithm");
+    expect(within(algorithm).getByRole("option", { name: "Zubarev walk" })).toBeInTheDocument();
+    expect(within(algorithm).getByRole("option", { name: "Mihara digitwise attempt" }))
+      .toBeInTheDocument();
+
+    await user.selectOptions(algorithm, "zubarev");
+    expect(screen.getByText("Zubarev Boltzmann walk on Boolean bit flips"))
+      .toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
+
+    expect(MockWorker.instances).toHaveLength(2);
+    expect(MockWorker.instances[0].postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      strategy: "zubarev",
+      variableCount: 2,
+      miharaObservations: expect.any(Array),
+      prime: 17
+    }));
   });
 
   it("shows generation progress without the debug transcript", async () => {
@@ -557,6 +583,20 @@ describe("p-adic logic app", () => {
     expect(dataframe).toHaveTextContent("Digit-pinning wells (+21)");
     expect(dataframe).toHaveTextContent("Peer inequality rewards (−1)");
     expect(screen.getByRole("button", { name: /Start search/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Mihara attempt/i })).toBeEnabled();
+  });
+
+  it("labels the Mihara Sudoku option as an expected failed equality fit", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: /^Sudoku/i }));
+    await user.click(screen.getByRole("button", { name: /Mihara attempt/i }));
+
+    expect(screen.getByText(/Expected to fail: this fits equalities, not Sudoku/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/peer rows actually reward/i)).toBeInTheDocument();
+    expect(screen.getByText("Modulo-11 RANSAC trials")).toBeInTheDocument();
+    expect(screen.getByText("48")).toBeInTheDocument();
   });
 
   it("edits Sudoku clues on the board and locks cells after search starts", async () => {

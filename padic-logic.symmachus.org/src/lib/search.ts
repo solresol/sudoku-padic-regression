@@ -1,6 +1,6 @@
 import type { CompiledProblem } from "./csp";
 
-export type SearchStrategy = "ordered" | "random";
+export type SearchStrategy = "ordered" | "random" | "zubarev" | "mihara";
 
 export interface AssignmentPermutation {
   multiplier: number;
@@ -16,6 +16,8 @@ export interface AssignmentRange {
 export interface SearchPlan {
   strategy: SearchStrategy;
   assignmentCount: number;
+  workUnits: number;
+  workLabel: "hyperplanes" | "walk steps" | "RANSAC trials";
   lossFloor: number;
   ranges: AssignmentRange[];
 }
@@ -50,16 +52,49 @@ export function splitAssignmentRanges(
   return ranges;
 }
 
+export function splitWorkRanges(workUnits: number, workerCount: number): AssignmentRange[] {
+  const safeWorkerCount = Math.max(1, Math.floor(workerCount));
+  const safeWorkUnits = Math.max(0, Math.floor(workUnits));
+  const base = Math.floor(safeWorkUnits / safeWorkerCount);
+  const remainder = safeWorkUnits % safeWorkerCount;
+  const ranges: AssignmentRange[] = [];
+  let start = 0;
+  for (let workerIndex = 0; workerIndex < safeWorkerCount; workerIndex += 1) {
+    const width = base + (workerIndex < remainder ? 1 : 0);
+    ranges.push({
+      workerId: workerIndex + 1,
+      start,
+      endExclusive: start + width
+    });
+    start += width;
+  }
+  return ranges;
+}
+
 export function createSearchPlan(
   compiled: CompiledProblem,
   workerCount: number,
   strategy: SearchStrategy = "ordered"
 ): SearchPlan {
+  const assignmentCount = compiled.assignmentCount;
+  const workUnits = strategy === "mihara"
+    ? Math.max(1, Math.floor(workerCount)) * 48
+    : strategy === "zubarev"
+      ? Math.max(512, Math.min(100_000, assignmentCount * 2))
+      : assignmentCount;
   return {
     strategy,
-    assignmentCount: compiled.assignmentCount,
+    assignmentCount,
+    workUnits,
+    workLabel: strategy === "mihara"
+      ? "RANSAC trials"
+      : strategy === "zubarev"
+        ? "walk steps"
+        : "hyperplanes",
     lossFloor: compiled.scoring.theoreticalFloor,
-    ranges: splitAssignmentRanges(compiled.variables.length, workerCount)
+    ranges: strategy === "ordered" || strategy === "random"
+      ? splitAssignmentRanges(compiled.variables.length, workerCount)
+      : splitWorkRanges(workUnits, workerCount)
   };
 }
 

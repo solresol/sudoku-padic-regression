@@ -39,6 +39,12 @@ import time
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Iterable, Dict
 
+from padic_comparison_algorithms import (
+    AffineObservation,
+    MiharaDigitFit,
+    mihara_digitwise_regression,
+)
+
 Digits = List[int]
 Grid = List[int]  # length 81, row-major, 0 = blank
 
@@ -394,6 +400,99 @@ class SolveResult:
     moves: Optional[List[Tuple[int, int, int, int, int, int, str]]] = None
     # swap moves use (step, row, col1, col2, conf_before, conf_after, kind)
     # local-edit moves use (step, row, col, new_digit, conf_before, conf_after, kind)
+
+
+@dataclass
+class MiharaSudokuResult:
+    """Diagnostic result from applying equality recovery to signed Sudoku rows."""
+
+    solved: bool
+    raw_coefficients: Tuple[int, ...]
+    display_grid: Grid
+    fit: MiharaDigitFit
+    domain_violations: int
+    clue_violations: int
+    peer_conflicts: Optional[int]
+    explanation: str
+
+
+def sudoku_mihara_observations(puzzle: Grid) -> Tuple[AffineObservation, ...]:
+    """Forget the signs/relations of the Sudoku dataframe and keep equalities.
+
+    This is deliberately the wrong statistical interpretation.  In particular,
+    every peer reward ``x_i != x_j`` becomes the equality sample ``x_i-x_j=0``.
+    The resulting input is useful for demonstrating why Mihara's digitwise
+    regression assumptions do not describe the Sudoku compiler.
+    """
+
+    observations: List[AffineObservation] = []
+    for cell in range(81):
+        allowed = [puzzle[cell]] if puzzle[cell] else list(range(1, 10))
+        features = tuple(1 if index == cell else 0 for index in range(81))
+        for digit in allowed:
+            observations.append(
+                AffineObservation(features, digit, f"digit well x{cell + 1}={digit}")
+            )
+
+    for left, right in PEER_PAIRS:
+        features = tuple(
+            1 if index == left else -1 if index == right else 0
+            for index in range(81)
+        )
+        observations.append(
+            AffineObservation(
+                features,
+                0,
+                f"peer inequality x{left + 1}!=x{right + 1} treated as equality",
+            )
+        )
+    return tuple(observations)
+
+
+def solve_mihara_digitwise_attempt(
+    puzzle: Grid,
+    seed: int = 0,
+    trials: int = 32,
+    p: int = 11,
+) -> MiharaSudokuResult:
+    """Run a one-digit Mihara equality fit and report why it is not a solver."""
+
+    fit = mihara_digitwise_regression(
+        sudoku_mihara_observations(puzzle),
+        p=p,
+        precision=1,
+        seed=seed,
+        trials=trials,
+    )
+    raw = fit.coefficients
+    display_grid = [value if value in range(1, 10) else 0 for value in raw]
+    domain_violations = sum(value not in range(1, 10) for value in raw)
+    clue_violations = sum(
+        clue != 0 and raw[index] != clue
+        for index, clue in enumerate(puzzle)
+    )
+    domain_complete = domain_violations == 0
+    peer_conflicts = deduped_peer_conflicts(display_grid) if domain_complete else None
+    solved = (
+        domain_complete
+        and clue_violations == 0
+        and is_valid_complete(display_grid)
+        and respects_clues(display_grid, puzzle)
+    )
+    return MiharaSudokuResult(
+        solved=solved,
+        raw_coefficients=raw,
+        display_grid=display_grid,
+        fit=fit,
+        domain_violations=domain_violations,
+        clue_violations=clue_violations,
+        peer_conflicts=peer_conflicts,
+        explanation=(
+            "The digitwise method recovered a single equality consensus. "
+            "Sudoku peer rows are inequality rewards, so treating them as equality samples "
+            "favours equal peers instead of an all-different grid."
+        ),
+    )
 
 
 def _init_trace(record_trace: bool) -> Tuple[Optional[List[int]], Optional[List[int]]]:
@@ -1397,7 +1496,15 @@ def main() -> None:
         "--method",
         type=str,
         default="stepwise",
-        choices=["stepwise", "greedy", "zubarev", "local-best", "local-first", "local-zubarev"],
+        choices=[
+            "stepwise",
+            "greedy",
+            "zubarev",
+            "local-best",
+            "local-first",
+            "local-zubarev",
+            "mihara",
+        ],
     )
     ap_solve.add_argument("--seed", type=int, default=0)
     ap_solve.add_argument("--max-steps", type=int, default=200_000)
@@ -1407,6 +1514,12 @@ def main() -> None:
     ap_solve.add_argument("--beta-schedule", type=str, default="linear", choices=["constant", "linear", "exp"])
     ap_solve.add_argument("--trace", action="store_true")
     ap_solve.add_argument("--moves", type=int, default=0, help="Record and print the first N moves (restart 0).")
+    ap_solve.add_argument(
+        "--mihara-trials",
+        type=int,
+        default=32,
+        help="Mihara diagnostic: RANSAC-style modulo-p trials.",
+    )
 
     args = ap.parse_args()
 
@@ -1419,6 +1532,29 @@ def main() -> None:
 
     if args.cmd == "solve":
         puzzle = parse_puzzle(args.puzzle)
+        if args.method == "mihara":
+            attempt = solve_mihara_digitwise_attempt(
+                puzzle,
+                seed=args.seed,
+                trials=args.mihara_trials,
+            )
+            print("Solved:", attempt.solved)
+            print(
+                "Equality inliers:",
+                f"{attempt.fit.inliers}/{attempt.fit.total_observations}",
+            )
+            print(
+                "RANSAC samples:",
+                f"{attempt.fit.successful_trials} full-rank, "
+                f"{attempt.fit.singular_trials} singular",
+            )
+            print("Off-domain coefficients:", attempt.domain_violations)
+            print("Clue violations:", attempt.clue_violations)
+            print("Peer conflicts:", attempt.peer_conflicts if attempt.peer_conflicts is not None else "n/a")
+            print("Diagnosis:", attempt.explanation)
+            print()
+            print(pretty(attempt.display_grid))
+            return
         if args.method == "stepwise":
             res = solve_stepwise_swap(
                 puzzle,

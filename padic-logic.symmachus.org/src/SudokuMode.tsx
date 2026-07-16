@@ -113,7 +113,7 @@ function SudokuMode() {
     if (!solver || !model || !runningRef.current) {
       return;
     }
-    const steps = STEPS_PER_FRAME[speed];
+    const steps = method === "mihara" ? 1 : STEPS_PER_FRAME[speed];
     let latest = solver.snapshot();
     for (let i = 0; i < steps; i += 1) {
       latest = solver.advance();
@@ -139,7 +139,7 @@ function SudokuMode() {
       return;
     }
     rafRef.current = requestAnimationFrame(frame);
-  }, [model, speed, stopRaf]);
+  }, [method, model, speed, stopRaf]);
 
   const handleStart = useCallback(() => {
     if (!puzzle || !model) {
@@ -148,8 +148,8 @@ function SudokuMode() {
     solverRef.current = new SudokuSolver(puzzle, {
       method,
       seed: 0,
-      maxSteps,
-      restarts,
+      maxSteps: method === "mihara" ? 48 : maxSteps,
+      restarts: method === "mihara" ? 1 : restarts,
       beta0: 0.5,
       beta1: 6.0
     });
@@ -329,10 +329,10 @@ function SudokuMode() {
       <section className="panel sudoku-search-panel">
         <div className="panel-header">
           <FlaskConical size={21} />
-          <h2>Local search</h2>
+          <h2>Algorithm comparison</h2>
         </div>
         <div className="control-block">
-          <span className="control-label">Heuristic</span>
+          <span className="control-label">Algorithm</span>
           <div className="segmented small">
             <button
               type="button"
@@ -350,9 +350,17 @@ function SudokuMode() {
             >
               Zubarev walk
             </button>
+            <button
+              type="button"
+              className={method === "mihara" ? "seg on" : "seg"}
+              onClick={() => canEdit && setMethod("mihara")}
+              disabled={!canEdit}
+            >
+              Mihara attempt
+            </button>
           </div>
         </div>
-        <div className="control-block">
+        {method !== "mihara" && <div className="control-block">
           <span className="control-label">Speed</span>
           <div className="segmented small">
             {(["slow", "normal", "fast"] as const).map((s) => (
@@ -366,20 +374,66 @@ function SudokuMode() {
               </button>
             ))}
           </div>
-        </div>
-        <MetricRow label="Max steps / restart" value={maxSteps.toLocaleString()} />
-        <MetricRow label="Restarts" value={`${restarts}`} />
+        </div>}
+        <MetricRow
+          label={method === "mihara" ? "Modulo-11 RANSAC trials" : "Max steps / restart"}
+          value={method === "mihara" ? "48" : maxSteps.toLocaleString()}
+        />
+        {method !== "mihara" && <MetricRow label="Restarts" value={`${restarts}`} />}
+
+        {method === "mihara" && (
+          <div className="algorithm-diagnostic mihara-diagnostic" role="note">
+            <strong>Expected to fail: this fits equalities, not Sudoku.</strong>
+            <p>
+              The attempt deliberately presents every signed dataframe row as a sample from one
+              hidden affine equality. Peer rows actually reward xᵢ ≠ xⱼ, so the equality fit is
+              pulled toward repeated digits.
+            </p>
+          </div>
+        )}
 
         <div className="run-stats sudoku-stats">
           <Stat label="Conflicts H_cb" value={`${snap?.conflicts ?? objective?.hcbConflicts ?? 0}`} />
           <Stat label="Peer conflicts" value={`${dedupConf}`} />
-          <Stat label="Best" value={`${snap?.bestConflicts ?? "–"}`} />
-          <Stat label="Steps" value={`${snap?.totalSteps.toLocaleString() ?? 0}`} />
+          <Stat
+            label={method === "mihara" ? "Equality inliers" : "Best"}
+            value={method === "mihara"
+              ? `${snap?.miharaInliers ?? "–"} / ${snap?.miharaTotal ?? "–"}`
+              : `${snap?.bestConflicts ?? "–"}`}
+          />
+          <Stat label={method === "mihara" ? "Trials" : "Steps"} value={`${snap?.totalSteps.toLocaleString() ?? 0}`} />
         </div>
         {method === "zubarev" && snap?.beta != null && (
           <MetricRow label="Inverse temperature β" value={snap.beta.toFixed(2)} />
         )}
-        <MetricRow label="Restart" value={snap ? `${snap.restart + 1} / ${restarts}` : `–`} />
+        {method === "mihara" && snap && (
+          <MetricRow
+            label="Invertible samples"
+            value={`${snap.miharaSuccessfulTrials ?? 0} / ${snap.totalSteps}`}
+            accent={snap.done && (snap.miharaSuccessfulTrials ?? 0) === 0}
+          />
+        )}
+        {method === "mihara" && snap?.miharaCoefficients && (
+          <div className="mihara-result-summary">
+            <MetricRow
+              label="Off-domain coefficients"
+              value={`${snap.miharaDomainViolations ?? 0} / 81`}
+              accent={(snap.miharaDomainViolations ?? 0) > 0}
+            />
+            <MetricRow
+              label="Clue violations"
+              value={`${snap.miharaClueViolations ?? 0}`}
+              accent={(snap.miharaClueViolations ?? 0) > 0}
+            />
+            <div className="solution-equation">
+              <span>Recovered cell coefficients modulo 11</span>
+              <code>{snap.miharaCoefficients.join(", ")}</code>
+            </div>
+          </div>
+        )}
+        {method !== "mihara" && (
+          <MetricRow label="Restart" value={snap ? `${snap.restart + 1} / ${restarts}` : `–`} />
+        )}
 
         <div className="run-actions">
           {phase === "setup" && (
@@ -404,7 +458,11 @@ function SudokuMode() {
                   <ShieldCheck size={17} /> Solved in {snap?.totalSteps.toLocaleString()} steps
                 </>
               ) : (
-                <>Settled at {snap?.bestConflicts} conflicts (minimum-conflict)</>
+                method === "mihara" ? (
+                  <>Attempt finished: no Sudoku solution recovered</>
+                ) : (
+                  <>Settled at {snap?.bestConflicts} conflicts (minimum-conflict)</>
+                )
               )}
             </div>
           )}

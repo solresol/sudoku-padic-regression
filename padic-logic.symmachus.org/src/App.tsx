@@ -582,7 +582,7 @@ function ModeSwitch({
         <FileText size={18} />
         <span>
           <strong>Boolean CSP/SAT</strong>
-          <small>exhaustive search</small>
+          <small>three regression experiments</small>
         </span>
       </button>
       <button
@@ -1110,13 +1110,16 @@ function SearchPlanPanel({
             value={`2^${compiled.variables.length} = ${formatAssignmentCount(compiled.variables.length)}`}
           />
           <MetricRow
-            label="Strategy"
-            value={searchStrategy === "random"
-              ? "Random-permutation exhaustive search"
-              : "Ordered exhaustive search"}
+            label="Algorithm"
+            value={searchStrategyLabel(searchStrategy)}
             accent
           />
-          <MetricRow label="Thread split" value="Disjoint hyperplane batches" />
+          <MetricRow
+            label="Thread split"
+            value={searchStrategy === "ordered" || searchStrategy === "random"
+              ? "Disjoint hyperplane batches"
+              : `Independent ${plan.workLabel}`}
+          />
           <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17)" />
           <MetricRow
             label="Unit-well weight"
@@ -1127,13 +1130,25 @@ function SearchPlanPanel({
             label="Satisfiable floor"
             value={`${compiled.scoring.theoreticalFloor} = αn − clauses`}
           />
-          <MetricRow label="Success criterion" value="loss reaches the satisfiable floor" />
+          <MetricRow
+            label="Success criterion"
+            value={searchStrategy === "mihara"
+              ? "diagnostic only: recovered digits must decode and satisfy CNF"
+              : "loss reaches the satisfiable floor"}
+          />
         </>
       ) : (
         <EmptyState text="No compiled problem yet." />
       )}
     </section>
   );
+}
+
+function searchStrategyLabel(strategy: SearchStrategy): string {
+  if (strategy === "random") return "Random-permutation exhaustive search";
+  if (strategy === "zubarev") return "Zubarev Boltzmann walk on Boolean bit flips";
+  if (strategy === "mihara") return "Mihara digitwise equality recovery (diagnostic)";
+  return "Ordered exhaustive search";
 }
 
 function ReadyBand({
@@ -1168,15 +1183,17 @@ function ReadyBand({
         </div>
       </div>
       <label className="strategy-select">
-        <span>Search order</span>
+        <span>Algorithm</span>
         <select
-          aria-label="Search strategy"
+          aria-label="Search algorithm"
           disabled={!visible}
           value={searchStrategy}
           onChange={(event) => onSearchStrategyChange(event.target.value as SearchStrategy)}
         >
-          <option value="ordered">Ordered</option>
-          <option value="random">Random permutation</option>
+          <option value="ordered">Exhaustive · ordered</option>
+          <option value="random">Exhaustive · random order</option>
+          <option value="zubarev">Zubarev walk</option>
+          <option value="mihara">Mihara digitwise attempt</option>
         </select>
       </label>
       <div className="stepper">
@@ -1198,8 +1215,8 @@ function ReadyBand({
         </button>
       </div>
       <div className="runtime-card">
-        <span>Hyperplanes</span>
-        <strong>{plan ? plan.assignmentCount.toLocaleString() : "-"}</strong>
+        <span>{plan ? plan.workLabel : "Work"}</span>
+        <strong>{plan ? plan.workUnits.toLocaleString() : "-"}</strong>
         <small>split across {workerCount} threads</small>
       </div>
       <button
@@ -1229,9 +1246,8 @@ function RunDashboard({
   controller: ReturnType<typeof useSearchController>;
 }) {
   const { snapshot, bestAssignment } = controller;
-  const assignmentCount = compiled.assignmentCount;
-  const progress = assignmentCount
-    ? Math.min(snapshot.totalTested / assignmentCount, 1)
+  const progress = snapshot.workUnits
+    ? Math.min(snapshot.totalTested / snapshot.workUnits, 1)
     : 0;
   const validation = bestAssignment
     ? evaluateAssignment(compiled, bestAssignment)
@@ -1250,18 +1266,38 @@ function RunDashboard({
     <section className="run-grid" aria-label="Search results" ref={resultsRef}>
       <section className="panel worker-dashboard">
         <div className="run-stats">
-          <Stat label="Hyperplanes tested" value={`${snapshot.totalTested.toLocaleString()} / ${assignmentCount.toLocaleString()}`} />
-          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} hyperplanes/s`} />
+          <Stat label={snapshot.workLabel} value={`${snapshot.totalTested.toLocaleString()} / ${snapshot.workUnits.toLocaleString()}`} />
+          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} ${snapshot.workLabel}/s`} />
           <Stat label="Best loss" value={`${snapshot.bestLoss ?? "-"}`} />
-          <Stat label="Floor hyperplanes" value={`${snapshot.solutions}`} />
+          <Stat
+            label={searchStrategy === "mihara" ? "Equality inliers" : "Floor hits"}
+            value={searchStrategy === "mihara"
+              ? `${snapshot.algorithmScore ?? "-"} / ${snapshot.algorithmTotal ?? "-"}`
+              : `${snapshot.solutions}`}
+          />
         </div>
         <div className="global-progress">
           <span style={{ width: `${progress * 100}%` }} />
         </div>
-        <WorkerTable compiled={compiled} lanes={snapshot.lanes} />
-        <LossChart floor={regressionFloor} history={snapshot.history} />
+        <WorkerTable
+          compiled={compiled}
+          lanes={snapshot.lanes}
+          strategy={searchStrategy}
+          workLabel={snapshot.workLabel}
+        />
+        {searchStrategy !== "mihara" && (
+          <LossChart floor={regressionFloor} history={snapshot.history} />
+        )}
         <section className="solution-section" aria-label="Best p-adic regression solution">
-          <PanelHeader icon={<ShieldCheck size={20} />} title="Best p-adic regression solution" />
+          <PanelHeader
+            icon={<ShieldCheck size={20} />}
+            title={searchStrategy === "mihara"
+              ? "Mihara digitwise result"
+              : "Best p-adic regression solution"}
+          />
+          {searchStrategy === "mihara" && snapshot.bestCoordinates && (
+            <MiharaCspDiagnostic compiled={compiled} snapshot={snapshot} />
+          )}
           {bestAssignment ? (
             <>
               {solutionEquation && (
@@ -1299,6 +1335,8 @@ function RunDashboard({
                 />
               )}
             </>
+          ) : searchStrategy === "mihara" && snapshot.bestCoordinates ? (
+            <EmptyState text="The recovered modulo-17 coefficients are not Boolean, so there is no CSP assignment to validate." />
           ) : (
             <EmptyState text="Best coefficient vector will appear after the first thread update." />
           )}
@@ -1309,7 +1347,7 @@ function RunDashboard({
             {isComplete ? (
               <>
                 <span className="run-status complete">
-                  <Check size={17} /> Search complete
+                  <Check size={17} /> {searchStrategy === "mihara" ? "Attempt complete" : "Search complete"}
                 </span>
                 <button className="secondary-button" type="button" onClick={controller.reset}>
                   <RotateCcw size={17} /> Clear results
@@ -1352,8 +1390,17 @@ function RunDashboard({
       </section>
 
       <section className="panel split-panel">
-        <PanelHeader icon={<RotateCcw size={20} />} title="Hyperplane batches" />
-        <p>Each candidate hyperplane is a coefficient vector. Threads scan disjoint hyperplane batches.</p>
+        <PanelHeader
+          icon={<RotateCcw size={20} />}
+          title={searchStrategy === "ordered" || searchStrategy === "random"
+            ? "Hyperplane batches"
+            : "Parallel attempts"}
+        />
+        <p>{searchStrategy === "ordered" || searchStrategy === "random"
+          ? "Each candidate hyperplane is a coefficient vector. Threads scan disjoint hyperplane batches."
+          : searchStrategy === "zubarev"
+            ? "Each thread runs an independent Boltzmann-weighted walk over single-bit moves."
+            : "Each thread samples full-rank equality rows and estimates one modulo-17 coefficient digit."}</p>
         <div className="basis-diagram">
           {compiled.variables.slice(0, 8).map((variable) => (
             <span key={variable.name}>
@@ -1366,8 +1413,8 @@ function RunDashboard({
           {snapshot.lanes.map((lane) => (
             <div key={lane.workerId}>
               <strong>T{lane.workerId}</strong>
-              <span>H{lane.start.toLocaleString()}</span>
-              <span>H{(lane.endExclusive - 1).toLocaleString()}</span>
+              <span>{snapshot.workLabel} {lane.start.toLocaleString()}</span>
+              <span>{(lane.endExclusive - 1).toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -1376,38 +1423,87 @@ function RunDashboard({
   );
 }
 
+function MiharaCspDiagnostic({
+  compiled,
+  snapshot
+}: {
+  compiled: CompiledProblem;
+  snapshot: ReturnType<typeof useSearchController>["snapshot"];
+}) {
+  const coordinates = snapshot.bestCoordinates ?? [];
+  const invalid = coordinates.filter((coordinate) => coordinate !== 0 && coordinate !== 1).length;
+  return (
+    <div className="algorithm-diagnostic mihara-diagnostic" role="note">
+      <strong>This attempt fits the wrong statistical model on purpose.</strong>
+      <p>
+        Mihara recovers a coefficient digit from samples expected to lie mostly on one affine
+        equality. Here each CNF row names a forbidden equality, so an equality inlier is a failed
+        clause, not evidence for a satisfying assignment.
+      </p>
+      <div className="constraint-check">
+        <MetricRow
+          label="Equality consensus"
+          value={`${snapshot.algorithmScore ?? 0} / ${snapshot.algorithmTotal ?? 0} rows`}
+        />
+        <MetricRow label="Non-Boolean coefficients" value={`${invalid} / ${compiled.variables.length}`} />
+        <MetricRow
+          label="CNF verdict"
+          value={snapshot.bestMask == null
+            ? "cannot decode"
+            : snapshot.bestLoss === compiled.scoring.theoreticalFloor
+              ? "satisfying by coincidence"
+              : "failed"}
+          accent
+        />
+      </div>
+      <div className="solution-equation">
+        <span>Recovered coefficient digit modulo {compiled.scoring.prime}</span>
+        <code>{compiled.variables.map((variable, index) =>
+          `${variable.name}=${coordinates[index] ?? "?"}`
+        ).join(", ")}</code>
+      </div>
+    </div>
+  );
+}
+
 function WorkerTable({
   compiled,
-  lanes
+  lanes,
+  strategy,
+  workLabel
 }: {
   compiled: CompiledProblem;
   lanes: ReturnType<typeof useSearchController>["snapshot"]["lanes"];
+  strategy: SearchStrategy;
+  workLabel: string;
 }) {
+  const exhaustive = strategy === "ordered" || strategy === "random";
   return (
-    <div className="worker-table" role="table" aria-label="Thread hyperplane batches">
+    <div className="worker-table" role="table" aria-label="Thread work batches">
       <div className="worker-row worker-head" role="row">
         <span>Thread</span>
-        <span>Hyperplane batch</span>
-        <span>Current hyperplane</span>
-        <span>Hyperplanes/sec</span>
+        <span>{workLabel} batch</span>
+        <span>{exhaustive ? "Current hyperplane" : "Current candidate"}</span>
+        <span>Units/sec</span>
         <span>Progress</span>
-        <span>Best loss</span>
+        <span>{strategy === "mihara" ? "Best inliers" : "Best loss"}</span>
       </div>
       {lanes.map((lane) => {
-        const progress =
-          (lane.currentMask - lane.start) / Math.max(lane.endExclusive - lane.start, 1);
+        const progress = lane.tested / Math.max(lane.endExclusive - lane.start, 1);
         return (
           <div className="worker-row" key={lane.workerId} role="row">
             <span className="worker-id">T{lane.workerId}</span>
             <span>
-              H{lane.start.toLocaleString()} - H{(lane.endExclusive - 1).toLocaleString()}
+              {lane.start.toLocaleString()} - {(lane.endExclusive - 1).toLocaleString()}
             </span>
-            <span>H{lane.currentMask.toLocaleString()}</span>
+            <span>{lane.bestMask == null ? "-" : `H${lane.currentMask.toLocaleString()}`}</span>
             <span>{formatRate(lane.speed)}</span>
             <span className="lane-progress">
               <i style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }} />
             </span>
-            <span>{lane.bestLoss ?? "-"}</span>
+            <span>{strategy === "mihara"
+              ? `${lane.algorithmScore ?? "-"} / ${lane.algorithmTotal ?? "-"}`
+              : lane.bestLoss ?? "-"}</span>
           </div>
         );
       })}

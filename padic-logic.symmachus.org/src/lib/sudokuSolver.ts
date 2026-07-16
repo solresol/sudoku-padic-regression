@@ -14,14 +14,21 @@ import {
   BOXES,
   COLS,
   ROWS,
+  buildPuzzleModel,
+  buildSudokuRegressionDataFrame,
   boxIndex,
+  conflictsAllUnits,
   indexToRc,
   isValidComplete,
   respectsClues,
   unitConflictPairs
 } from "./sudoku";
+import {
+  fitMiharaLastDigit,
+  type ModPObservation
+} from "./mihara";
 
-export type SudokuMethod = "stepwise" | "zubarev";
+export type SudokuMethod = "stepwise" | "zubarev" | "mihara";
 
 export interface SolverOptions {
   method: SudokuMethod;
@@ -63,6 +70,13 @@ export interface SolverSnapshot {
   done: boolean; // exhausted all restarts without solving
   lastMove: SolverMove | null;
   beta: number | null; // active inverse temperature (Zubarev only)
+  miharaCoefficients: number[] | null;
+  miharaInliers: number | null;
+  miharaTotal: number | null;
+  miharaDomainViolations: number | null;
+  miharaClueViolations: number | null;
+  miharaSuccessfulTrials: number | null;
+  miharaSingularTrials: number | null;
 }
 
 // ---- deterministic RNG (mulberry32) so a seed is reproducible ----
@@ -201,15 +215,51 @@ export class SudokuSolver {
   private done = false;
   private lastMove: SolverMove | null = null;
   private beta: number | null = null;
+  private miharaObservations: ModPObservation[] = [];
+  private miharaCoefficients: number[] | null = null;
+  private miharaInliers: number | null = null;
+  private miharaDomainViolations: number | null = null;
+  private miharaClueViolations: number | null = null;
+  private miharaSuccessfulTrials = 0;
+  private miharaSingularTrials = 0;
 
   constructor(puzzle: Grid, options: SolverOptions) {
     this.puzzle = puzzle.slice();
     this.options = options;
     this.rng = makeRng(options.seed >>> 0);
+    if (options.method === "mihara") {
+      const dataframe = buildSudokuRegressionDataFrame(buildPuzzleModel(puzzle));
+      this.miharaObservations = dataframe.rows.map((row) => ({
+        coefficients: dataframe.variables.map((variable) =>
+          row.coefficients[variable.name] ?? 0
+        ),
+        target: row.target,
+        source: row.source
+      }));
+    }
     this.initRestart();
   }
 
   private initRestart(): void {
+    if (this.options.method === "mihara") {
+      this.grid = this.puzzle.slice();
+      this.fixed = this.puzzle.map((value) => value !== 0);
+      this.rowFree = [];
+      this.conf = conflictsAllUnits(this.grid);
+      this.initialConf = this.conf;
+      this.step = 0;
+      this.beta = null;
+      this.lastMove = null;
+      this.miharaCoefficients = null;
+      this.miharaInliers = null;
+      this.miharaDomainViolations = null;
+      this.miharaClueViolations = null;
+      this.miharaSuccessfulTrials = 0;
+      this.miharaSingularTrials = 0;
+      this.bestConf = this.conf;
+      this.bestGrid = this.grid.slice();
+      return;
+    }
     const grid = this.puzzle.slice();
     const fixed = this.puzzle.map((v) => v !== 0);
     for (let r = 0; r < 9; r += 1) {
@@ -267,6 +317,9 @@ export class SudokuSolver {
   advance(): SolverSnapshot {
     if (this.solved || this.done) {
       return this.snapshot();
+    }
+    if (this.options.method === "mihara") {
+      return this.advanceMiharaAttempt();
     }
     if (this.step >= this.options.maxSteps) {
       if (this.restart + 1 >= this.options.restarts) {
@@ -336,6 +389,47 @@ export class SudokuSolver {
     return this.snapshot();
   }
 
+  private advanceMiharaAttempt(): SolverSnapshot {
+    const trialLimit = Math.min(this.options.maxSteps, 48);
+    if (this.step >= trialLimit) {
+      this.done = true;
+      return this.snapshot();
+    }
+
+    const fit = fitMiharaLastDigit(
+      this.miharaObservations,
+      11,
+      this.options.seed ^ Math.imul(this.step + 1, 0x9e37_79b9),
+      1
+    );
+    this.step += 1;
+    this.totalSteps += 1;
+    this.miharaSuccessfulTrials += fit.successfulTrials;
+    this.miharaSingularTrials += fit.singularTrials;
+    if (fit.coefficients && (this.miharaInliers == null || fit.inliers > this.miharaInliers)) {
+      this.miharaCoefficients = fit.coefficients;
+      this.miharaInliers = fit.inliers;
+      this.miharaDomainViolations = fit.coefficients.filter(
+        (coefficient) => coefficient < 1 || coefficient > 9
+      ).length;
+      this.miharaClueViolations = this.puzzle.reduce(
+        (count, clue, index) => count + (
+          clue !== 0 && fit.coefficients?.[index] !== clue ? 1 : 0
+        ),
+        0
+      );
+      this.grid = fit.coefficients.map((coefficient) =>
+        coefficient >= 1 && coefficient <= 9 ? coefficient : 0
+      );
+      this.conf = conflictsAllUnits(this.grid);
+      this.bestConf = this.conf;
+      this.bestGrid = this.grid.slice();
+      this.solved = this.isSolvedState();
+    }
+    if (this.step >= trialLimit && !this.solved) this.done = true;
+    return this.snapshot();
+  }
+
   private applySwap(i1: number, i2: number, delta: number, kind: SolverMove["kind"]): void {
     [this.grid[i1], this.grid[i2]] = [this.grid[i2], this.grid[i1]];
     this.conf += delta;
@@ -368,7 +462,18 @@ export class SudokuSolver {
       solved: this.solved,
       done: this.done,
       lastMove: this.lastMove,
-      beta: this.beta
+      beta: this.beta,
+      miharaCoefficients: this.miharaCoefficients?.slice() ?? null,
+      miharaInliers: this.miharaInliers,
+      miharaTotal: this.options.method === "mihara" ? this.miharaObservations.length : null,
+      miharaDomainViolations: this.miharaDomainViolations,
+      miharaClueViolations: this.miharaClueViolations,
+      miharaSuccessfulTrials: this.options.method === "mihara"
+        ? this.miharaSuccessfulTrials
+        : null,
+      miharaSingularTrials: this.options.method === "mihara"
+        ? this.miharaSingularTrials
+        : null
     };
   }
 }

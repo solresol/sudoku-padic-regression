@@ -19,6 +19,7 @@ from padic_sudoku_regression import (
     solve_greedy_descent_swap,
     solve_greedy_local_edit_best,
     solve_greedy_local_edit_first,
+    solve_mihara_digitwise_attempt,
     solve_stepwise_swap,
     solve_zubarev_local_edit,
     solve_zubarev_walk,
@@ -91,6 +92,17 @@ def test_unique_generator_is_deterministic() -> None:
     assert grid_to_string(generated_puzzle) == EXPECTED_SEED_42_PUZZLE
     assert generate_unique_puzzle(30, seed=42) == generated_puzzle
     assert count_solutions(generated_puzzle, limit=2) == 1
+
+
+def test_mihara_equality_fit_is_exposed_as_a_failed_sudoku_attempt() -> None:
+    puzzle = [0 if index % 4 else value for index, value in enumerate(SOLVED_GRID)]
+    result = solve_mihara_digitwise_attempt(puzzle, seed=3, trials=4)
+
+    assert not result.solved
+    assert len(result.raw_coefficients) == 81
+    assert result.fit.inliers > 0
+    assert result.fit.total_observations > result.fit.inliers
+    assert "inequality rewards" in result.explanation
 
 
 @pytest.mark.parametrize(

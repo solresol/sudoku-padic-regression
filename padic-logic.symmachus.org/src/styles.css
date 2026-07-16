@@ -1246,6 +1246,37 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.algorithm-diagnostic {
+  margin: 12px 0 16px;
+  padding: 14px;
+  border: 1px solid #f2b8b5;
+  border-radius: 8px;
+  background: #fff7f6;
+  color: #6c2a26;
+}
+
+.algorithm-diagnostic > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #912018;
+}
+
+.algorithm-diagnostic p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.algorithm-diagnostic .constraint-check {
+  border-top-color: #f2cbc8;
+}
+
+.mihara-result-summary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .solution-equation {
   margin-bottom: 12px;
   padding: 12px;

@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { CompiledProblem } from "../lib/csp";
+import { buildRegressionDataFrame, type CompiledProblem } from "../lib/csp";
 import {
+  createSearchPlan,
   createSearchPermutation,
   maskToAssignment,
-  splitAssignmentRanges,
   type SearchStrategy
 } from "../lib/search";
 
@@ -16,6 +16,9 @@ export interface WorkerLane {
   speed: number;
   bestLoss: number | null;
   bestMask: number | null;
+  bestCoordinates: number[] | null;
+  algorithmScore: number | null;
+  algorithmTotal: number | null;
   solutions: number;
   done: boolean;
 }
@@ -28,9 +31,15 @@ export interface SearchLogEntry {
 export interface SearchSnapshot {
   status: "idle" | "running" | "paused" | "complete";
   startedAt: number | null;
+  strategy: SearchStrategy;
+  workUnits: number;
+  workLabel: "hyperplanes" | "walk steps" | "RANSAC trials";
   lanes: WorkerLane[];
   bestLoss: number | null;
   bestMask: number | null;
+  bestCoordinates: number[] | null;
+  algorithmScore: number | null;
+  algorithmTotal: number | null;
   totalTested: number;
   totalSpeed: number;
   solutions: number;
@@ -41,9 +50,15 @@ export interface SearchSnapshot {
 const INITIAL_SNAPSHOT: SearchSnapshot = {
   status: "idle",
   startedAt: null,
+  strategy: "ordered",
+  workUnits: 0,
+  workLabel: "hyperplanes",
   lanes: [],
   bestLoss: null,
   bestMask: null,
+  bestCoordinates: null,
+  algorithmScore: null,
+  algorithmTotal: null,
   totalTested: 0,
   totalSpeed: 0,
   solutions: 0,
@@ -59,6 +74,9 @@ interface WorkerProgress {
   speed: number;
   bestLoss: number | null;
   bestMask: number | null;
+  bestCoordinates: number[] | null;
+  algorithmScore: number | null;
+  algorithmTotal: number | null;
   solutions: number;
   done: boolean;
 }
@@ -89,7 +107,8 @@ export function useSearchController(compiled: CompiledProblem | null) {
       }
 
       stopWorkers();
-      const ranges = splitAssignmentRanges(problem.variables.length, workerCount);
+      const plan = createSearchPlan(problem, workerCount, strategy);
+      const ranges = plan.ranges;
       const startedAt = Date.now();
       const permutation = createSearchPermutation(
         problem.assignmentCount,
@@ -102,6 +121,9 @@ export function useSearchController(compiled: CompiledProblem | null) {
         speed: 0,
         bestLoss: null,
         bestMask: null,
+        bestCoordinates: null,
+        algorithmScore: null,
+        algorithmTotal: null,
         solutions: 0,
         done: false
       }));
@@ -110,14 +132,23 @@ export function useSearchController(compiled: CompiledProblem | null) {
         ...INITIAL_SNAPSHOT,
         status: "running",
         startedAt,
+        strategy,
+        workUnits: plan.workUnits,
+        workLabel: plan.workLabel,
         lanes,
         logs: [
           {
             id: ++logCounterRef.current,
-            text: `[sys] ${strategy === "random" ? "randomly permuted" : "ordered"} scan of ${problem.assignmentCount.toLocaleString()} candidate hyperplanes across ${ranges.length} threads`
+            text: `[sys] ${strategyDescription(strategy)}: ${plan.workUnits.toLocaleString()} ${plan.workLabel} across ${ranges.length} threads`
           }
         ]
       });
+
+      const miharaObservations = buildRegressionDataFrame(problem).map((row) => ({
+        coefficients: problem.variables.map((variable) => row.coefficients[variable.name] ?? 0),
+        target: row.target,
+        source: row.source
+      }));
 
       const nextWorkers = ranges.map((range) => {
         const worker = new Worker(
@@ -135,8 +166,11 @@ export function useSearchController(compiled: CompiledProblem | null) {
           evaluatorSource: problem.evaluatorSource,
           lossFloor: problem.scoring.theoreticalFloor,
           assignmentCount: problem.assignmentCount,
+          variableCount: problem.variables.length,
           strategy,
           permutation,
+          miharaObservations,
+          prime: problem.scoring.prime,
           start: range.start,
           endExclusive: range.endExclusive,
           updateEveryMs: 220
@@ -189,22 +223,34 @@ function applyProgress(
           speed: progress.speed,
           bestLoss: progress.bestLoss,
           bestMask: progress.bestMask,
+          bestCoordinates: progress.bestCoordinates,
+          algorithmScore: progress.algorithmScore,
+          algorithmTotal: progress.algorithmTotal,
           solutions: progress.solutions,
           done: progress.done
         }
       : lane
   );
 
-  const laneBest = lanes
-    .filter((lane) => lane.bestLoss != null)
-    .sort((a, b) => (a.bestLoss ?? Infinity) - (b.bestLoss ?? Infinity))[0];
+  const laneBest = previous.strategy === "mihara"
+    ? lanes
+      .filter((lane) => lane.algorithmScore != null)
+      .sort((a, b) => (b.algorithmScore ?? -Infinity) - (a.algorithmScore ?? -Infinity))[0]
+    : lanes
+      .filter((lane) => lane.bestLoss != null)
+      .sort((a, b) => (a.bestLoss ?? Infinity) - (b.bestLoss ?? Infinity))[0];
   const totalTested = lanes.reduce((sum, lane) => sum + lane.tested, 0);
   const totalSpeed = lanes.reduce((sum, lane) => sum + lane.speed, 0);
   const solutions = lanes.reduce((sum, lane) => sum + lane.solutions, 0);
   const bestLoss = laneBest?.bestLoss ?? previous.bestLoss;
   const bestMask = laneBest?.bestMask ?? previous.bestMask;
+  const bestCoordinates = laneBest?.bestCoordinates ?? previous.bestCoordinates;
+  const algorithmScore = laneBest?.algorithmScore ?? previous.algorithmScore;
+  const algorithmTotal = laneBest?.algorithmTotal ?? previous.algorithmTotal;
   const done = lanes.length > 0 && lanes.every((lane) => lane.done);
-  const changedBest = bestLoss != null && bestLoss !== previous.bestLoss;
+  const changedBest = previous.strategy === "mihara"
+    ? algorithmScore != null && algorithmScore !== previous.algorithmScore
+    : bestLoss != null && bestLoss !== previous.bestLoss;
   const lastHistoryPoint = previous.history[previous.history.length - 1];
   const appendCompletionPlateau =
     done && bestLoss != null && lastHistoryPoint?.tested !== totalTested;
@@ -218,6 +264,9 @@ function applyProgress(
     solutions,
     bestLoss,
     bestMask,
+    bestCoordinates,
+    algorithmScore,
+    algorithmTotal,
     history:
       bestLoss == null || (!changedBest && !appendCompletionPlateau)
         ? previous.history
@@ -227,11 +276,20 @@ function applyProgress(
           ...previous.logs,
           {
             id: previous.logs.length + 1,
-            text: `[t${progress.workerId}] new best p-adic loss ${bestLoss} at hyperplane ${
-              progress.bestMask == null ? "-" : `H${progress.bestMask}`
-            }`
+            text: previous.strategy === "mihara"
+              ? `[t${progress.workerId}] equality consensus ${algorithmScore}/${algorithmTotal}; ${bestMask == null ? "not Boolean" : `candidate H${bestMask}`}`
+              : `[t${progress.workerId}] new best p-adic loss ${bestLoss} at hyperplane ${
+                progress.bestMask == null ? "-" : `H${progress.bestMask}`
+              }`
           }
         ].slice(-12)
       : previous.logs
   };
+}
+
+function strategyDescription(strategy: SearchStrategy): string {
+  if (strategy === "random") return "randomly permuted exhaustive scan";
+  if (strategy === "zubarev") return "Zubarev single-bit walk";
+  if (strategy === "mihara") return "Mihara digitwise equality fit";
+  return "ordered exhaustive scan";
 }

@@ -72,4 +72,21 @@ describe("SudokuSolver", () => {
     expect(snap.solved).toBe(true);
     expect(snap.conflicts).toBe(0);
   });
+
+  it("runs the Mihara equality fit as a diagnostic rather than claiming Sudoku success", () => {
+    const solver = new SudokuSolver(parsePuzzle(EXAMPLE_PUZZLE), {
+      ...DEFAULT_SOLVER_OPTIONS,
+      method: "mihara",
+      maxSteps: 1,
+      restarts: 1
+    });
+
+    const snap = solver.advance();
+
+    expect(snap.done).toBe(true);
+    expect(snap.solved).toBe(false);
+    expect(snap.miharaTotal).toBeGreaterThan(1_000);
+    expect(snap.miharaCoefficients === null || snap.miharaInliers !== null).toBe(true);
+    expect((snap.miharaSuccessfulTrials ?? 0) + (snap.miharaSingularTrials ?? 0)).toBe(1);
+  });
 });
