@@ -165,11 +165,11 @@ The minimum-loss coefficient vectors are exactly the valid assignments of Figure
 \subsection{\texorpdfstring{\(p\)-adic}{p-adic} linear regression can express CNF statements as well}
 \label{sec:worked-cnf}
 
-Consider
+Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \[
 \Phi=(z_1)\wedge(\neg z_1\vee z_2),
 \]
-and encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
+What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
 
 \begin{table}[H]
 \centering
