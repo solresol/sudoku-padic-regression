@@ -215,18 +215,24 @@ This small example is the paper's claim in operational form: a CNF formula becom
 \subsection{Polynomial-valued false labels}
 \label{sec:polynomial-labels}
 
-The scalar clause loss records how many clauses are false, but not which ones. It is possible to retain the identities algebraically. Let \(V_C(x)\) be \(1\) when clause \(C\) is false and \(0\) when it is true, choose pairwise coprime nonconstant polynomials \(P_C(T)\), and form
+The preceding CNF gives a concrete polynomial-valued encoding. Let \(V_{C_i}(x)\) be \(1\) when clause \(C_i\) is false and \(0\) when it is true, and take
 \[
-R_x(T)=\prod_{C\in\Phi}\bigl(1-V_C(x)+V_C(x)P_C(T)\bigr)
-=\prod_{C\text{ false under }x}P_C(T).
+P_{C_1}(T)=T,
+\qquad
+P_{C_2}(T)=T+1.
 \]
-Factoring \(R_x\) recovers the false-clause labels, and \(\deg R_x\) is a weighted false-clause count. Equivalently, the Boolean failure indicator itself can be written as the multilinear product of the literal-failure indicators, giving one positive nonlinear residual per clause \cite{deloera2007nullstellensatz}.
-
-For the preceding formula
+Form
 \[
-\Phi=C_1\wedge C_2=(z_1)\wedge(\neg z_1\vee z_2),
+R_x(T)=\prod_{i=1}^{2}\bigl(1-V_{C_i}(x)+V_{C_i}(x)P_{C_i}(T)\bigr)
+=\prod_{C_i\text{ false under }x}P_{C_i}(T).
 \]
-take \(P_{C_1}(T)=T\) and \(P_{C_2}(T)=T+1\). Then
+Factoring \(R_x\) recovers the false-clause labels. Degree also defines a non-Archimedean absolute value on the rational-function field: for any fixed \(c>1\),
+\[
+\left|\frac{f}{g}\right|_{\infty}=c^{\deg f-\deg g},
+\qquad
+|0|_{\infty}=0.
+\]
+Thus minimising \(\deg R_x\) is equivalent to minimising this degree-based ultrametric loss. For the four assignments,
 \[
 \begin{array}{c|c|c}
 x & R_x(T) & \deg R_x\\
@@ -237,7 +243,7 @@ x & R_x(T) & \deg R_x\\
 (1,1) & T & 1
 \end{array}
 \]
-so minimising \(\deg R_x\) gives the same unique satisfying assignment as Table~\ref{tab:cnf-candidates}. With unit-degree labels the degree is exactly the number of false clauses, while factorisation retains their identities.
+so minimising \(\deg R_x\) gives the same unique satisfying assignment as Table~\ref{tab:cnf-candidates}. The degree is exactly the number of false clauses, while factorisation retains their identities. Equivalently, each Boolean failure indicator can be written as the multilinear product of the literal-failure indicators, giving one positive nonlinear residual per clause \cite{deloera2007nullstellensatz}.
 
 We do not use this representation in the algorithm or the browser. Constructing it still requires evaluating the clauses, its factors reproduce the violation list already available from that evaluation, and its degree discards the extra labels again. It may be useful in a setting where polynomial-valued certificates are transmitted or manipulated independently, but no such use is established here. We therefore record it only as a possible direction for future research.
 
