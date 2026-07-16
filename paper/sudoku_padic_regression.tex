@@ -758,9 +758,6 @@ These are \(p\)-adic machine-learning techniques in this setting because they tr
 
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
 
-\section{Interactive compiler and reproducibility}
-\label{sec:interactive-demo}
-
 \begin{quote}\small
 \url{https://padic-logic.symmachus.org}
 \end{quote}
@@ -1142,12 +1139,12 @@ Raw E2 data: \path{archive/results/e2_heuristic_comparison.csv}
 The submitted source package includes the experiment CSV files, puzzle seeds, trace puzzle and solution files, and figure source used for Tables~\ref{tab:results} and \ref{tab:powers-two-results} and Figure~\ref{fig:loss}. The raw-data revision above generated the archived CSV rows; the submitted driver corrects the summary formatter so that half-integer medians are not truncated. The main experiment outputs were produced with Python~3.11.6 and Matplotlib~3.9.0 on an Apple M1 system. Timing columns are retained as descriptive provenance only.
 
 \subsection*{Interactive demonstration}
-A browser-based demonstration of the construction is described in Section~\ref{sec:interactive-demo} and available at
+A browser-based demonstration of the construction is shown in Figure~\ref{fig:browser-sudoku-solution} and available at
 \begin{quote}\small
 \url{https://padic-logic.symmachus.org}\\
 \url{https://padic-logic.symmachus.org/\#sudoku}
 \end{quote}
-The Sudoku and Boolean-CSP compilers, residual dataframes, objective evaluations, and representative searches run client-side. Their source is in \path{padic-logic.symmachus.org/} in the same repository; the deployed values quoted in Section~\ref{sec:interactive-demo} were checked on 13 July 2026. The optional natural-language schema extractor requires a browser exposing the on-device Prompt API and is therefore not part of the browser-independent reproducibility claim. The complete batch results remain tied to the experiment-code revision and dataset archive above rather than to the mutable teaching site.
+The Sudoku and Boolean-CSP compilers, residual dataframes, objective evaluations, and representative searches run client-side. Their source is in \path{padic-logic.symmachus.org/} in the same repository; the deployed values shown in Figure~\ref{fig:browser-sudoku-solution} were checked on 13 July 2026. The optional natural-language schema extractor requires a browser exposing the on-device Prompt API and is therefore not part of the browser-independent reproducibility claim. The complete batch results remain tied to the experiment-code revision and dataset archive above rather than to the mutable teaching site.
 
 \begin{thebibliography}{99}
 
