@@ -49,12 +49,13 @@ Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent o
 \qquad
 |0|_p=0.
 \]
-This norm makes numbers close when their difference is divisible by a large power of \(p\). In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and an ordinary weighted objective sums terms of the form
+This norm makes numbers close when their difference is divisible by a large power of \(p\). Linear regression using sums of squared residuals needs little introduction: the familiar loss derives from the Euclidean distance formula, and weighted variants, including negatively weighted observations, are well known. Euclidean distance is not the only distance that can be used. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and a weighted objective sums terms of the form
 \[
 \gamma\,|u^\top x-b|_p,
 \qquad \gamma>0.
 \]
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. The construction below also permits negative weights, but only after sufficiently strong positive terms have confined every global minimiser to a prescribed finite domain. On that domain the residual norms used here are zero--one indicators, so the signed regression objective becomes an exact finite constraint objective.
+This is a weighted \(p\)-adic linear-regression objective.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a resulting trained model can be transformed mechanically into a solution of the CSP.
 
 \subsection{An example}
 \label{sec:worked-all-different}
@@ -82,8 +83,6 @@ to the objective. Positive rows of weight \(3\) pin each coefficient to its allo
 \label{fig:list-colouring-example}
 \end{figure}
 
-Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
-
 \begin{table}[H]
 \centering
 \small
@@ -104,6 +103,8 @@ $E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$ & reward $x_2\ne x_3$ \\
 \caption{Dataframe view of Figure~\ref{fig:list-colouring-regression}. The three coefficient columns form the feature vector, and each row contributes its signed weight times the \(5\)-adic norm of feature dot coefficient minus target.}
 \label{tab:list-colouring-dataframe}
 \end{table}
+
+Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 \begin{figure}[H]
 \centering
@@ -130,11 +131,7 @@ The zero-intercept model is the hyperplane
 \[
 b=u^\top x=u_1x_1+u_2x_2+u_3x_3.
 \]
-Choosing one domain-pinning row for each coefficient gives
-\[
-|D_1|\,|D_2|\,|D_3|=2\cdot2\cdot2=8
-\]
-candidate zero-intercept hyperplanes. The general theorem below guarantees that at least one global minimum occurs among these finitely many candidates.
+The general theorem below guarantees that at least one global minimum occurs among the finitely many domain-respecting candidates.
 
 On a domain-respecting vector the six positive rows contribute \(9\), while each unequal edge subtracts one. Thus
 \[
@@ -159,18 +156,20 @@ $(2,3,1)$ & $7$ & yes \\
 $(2,3,3)$ & $8$ & no \\
 \bottomrule
 \end{tabular}
-\caption{All eight hyperplanes determined by the domain-pinning rows. The minimum-loss coefficient vectors are exactly the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.}
+\caption{All eight hyperplanes determined by the domain-pinning rows.}
 \label{tab:list-colouring-candidates}
 \end{table}
+
+The minimum-loss coefficient vectors are exactly the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.
 
 \subsection{\texorpdfstring{\(p\)-adic}{p-adic} linear regression can express CNF statements as well}
 \label{sec:worked-cnf}
 
-Consider
+Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \[
 \Phi=(z_1)\wedge(\neg z_1\vee z_2),
 \]
-and encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
+What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
 
 \begin{table}[H]
 \centering
@@ -206,27 +205,33 @@ $(1,0)$ & $(\mathrm{false},\mathrm{true})$ & $1$ & $5$ \\
 $(1,1)$ & $(\mathrm{false},\mathrm{false})$ & $1$ & $5$ \\
 \bottomrule
 \end{tabular}
-\caption{Brute-force regression for \(\Phi\). The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying assignment \(z_1=z_2=\mathrm{true}\).}
+\caption{Brute-force regression for \(\Phi\).}
 \label{tab:cnf-candidates}
 \end{table}
 
-This small example is the paper's claim in operational form: a CNF formula becomes an ordinary coefficient-and-target dataframe, a finite set of candidate hyperplanes is evaluated, and the best regression coefficients decode to a logical assignment.
+The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying assignment \(z_1=z_2=\mathrm{true}\).
 
 \subsection{Polynomial-valued false labels}
 \label{sec:polynomial-labels}
 
-The scalar clause loss records how many clauses are false, but not which ones. It is possible to retain the identities algebraically. Let \(V_C(x)\) be \(1\) when clause \(C\) is false and \(0\) when it is true, choose pairwise coprime nonconstant polynomials \(P_C(T)\), and form
+The preceding CNF gives a concrete polynomial-valued encoding. Let \(V_{C_i}(x)\) be \(1\) when clause \(C_i\) is false and \(0\) when it is true, and take
 \[
-R_x(T)=\prod_{C\in\Phi}\bigl(1-V_C(x)+V_C(x)P_C(T)\bigr)
-=\prod_{C\text{ false under }x}P_C(T).
+P_{C_1}(T)=T,
+\qquad
+P_{C_2}(T)=T+1.
 \]
-Factoring \(R_x\) recovers the false-clause labels, and \(\deg R_x\) is a weighted false-clause count. Equivalently, the Boolean failure indicator itself can be written as the multilinear product of the literal-failure indicators, giving one positive nonlinear residual per clause \cite{deloera2007nullstellensatz}.
-
-For the preceding formula
+Form
 \[
-\Phi=C_1\wedge C_2=(z_1)\wedge(\neg z_1\vee z_2),
+R_x(T)=\prod_{i=1}^{2}\bigl(1-V_{C_i}(x)+V_{C_i}(x)P_{C_i}(T)\bigr)
+=\prod_{C_i\text{ false under }x}P_{C_i}(T).
 \]
-take \(P_{C_1}(T)=T\) and \(P_{C_2}(T)=T+1\). Then
+Factoring \(R_x\) recovers the false-clause labels. Degree also defines a non-Archimedean absolute value on the rational-function field: for any fixed \(c>1\),
+\[
+\left|\frac{f}{g}\right|_{\infty}=c^{\deg f-\deg g},
+\qquad
+|0|_{\infty}=0.
+\]
+Thus minimising \(\deg R_x\) is equivalent to minimising this degree-based ultrametric loss. For the four assignments,
 \[
 \begin{array}{c|c|c}
 x & R_x(T) & \deg R_x\\
@@ -237,17 +242,14 @@ x & R_x(T) & \deg R_x\\
 (1,1) & T & 1
 \end{array}
 \]
-so minimising \(\deg R_x\) gives the same unique satisfying assignment as Table~\ref{tab:cnf-candidates}. With unit-degree labels the degree is exactly the number of false clauses, while factorisation retains their identities.
+so minimising \(\deg R_x\) gives the same unique satisfying assignment as Table~\ref{tab:cnf-candidates}. The degree is exactly the number of false clauses, while factorisation retains their identities. Equivalently, each Boolean failure indicator can be written as the multilinear product of the literal-failure indicators, giving one positive nonlinear residual per clause \cite{deloera2007nullstellensatz}.
 
 We do not use this representation in the algorithm or the browser. Constructing it still requires evaluating the clauses, its factors reproduce the violation list already available from that evaluation, and its degree discards the extra labels again. It may be useful in a setting where polynomial-valued certificates are transmitted or manipulated independently, but no such use is established here. We therefore record it only as a possible direction for future research.
 
 \section{A general all-different residual-objective template}
 \label{construction}
 
-The worked examples can now be put on a general footing. Fix a prime $p$. The $p$-adic valuation $v_p(n)$ of an integer $n\neq 0$ is the exponent of $p$ in its factorisation, and
-\[
-|n|_p = p^{-v_p(n)}, \qquad |0|_p = 0.
-\]
+The worked examples can now be put on a general footing.
 We work first in the $p$-adic integers $\mathbb Z_p$, where every norm is at most $1$. If $p>q$, every nonzero difference between values in $\{1,\dots,q\}$ has norm $1$. For comparison, the discrete metric \(d_{\mathrm{disc}}(s,t):=\mathbf 1_{s\neq t}\) is also an ultrametric; a discrete version of the construction is stated after the main theorem.
 
 Many finite-domain all-different systems can be viewed as list-colouring problems. Each variable $x_i$ has a finite allowed set $D_i$, and an edge \(\{i,j\}\) requires \(x_i\neq x_j\). An all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique.
@@ -580,6 +582,15 @@ Globally minimising signed affine \(p\)-adic residual objectives is NP-hard alre
 Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha>\Delta\). Its minimum equals \(\alpha n-m\) if and only if all \(m\) clauses can be satisfied. A global optimiser would therefore decide \textsc{3-SAT}, so the optimisation problem is NP-hard.
 \end{proof}
 
+\begin{corollary}[NP-hardness for the polynomial degree metric]
+\label{cor:degree-metric-nphard}
+Given pairwise coprime linear false-clause labels, minimising the degree-based ultrametric loss \(\deg R_x\) over Boolean assignments is NP-hard.
+\end{corollary}
+
+\begin{proof}
+Apply the construction of Section~\ref{sec:polynomial-labels} to a \(3\)-CNF formula, assigning each clause a distinct linear polynomial. Then \(\deg R_x\) is exactly the number of false clauses. In particular, its minimum is \(0\) if and only if the formula is satisfiable, so a global optimiser would decide \textsc{3-SAT}.
+\end{proof}
+
 \paragraph{Signed versus positive complement encodings.}
 The signed construction is compact rather than uniquely expressive. The same clause can be encoded positively through its failure sum
 \[
@@ -589,7 +600,7 @@ and the allowed set \(S_C=\{0,\dots,s-1\}\). For \(S\subseteq\{0,\dots,s\}\), se
 \[
 W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
-When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship; it does not show that a positive encoding is impossible. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
+When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
 
 \section{Minimum conflicts and Potts energies}
 \label{sec:minimum-conflicts-potts}
@@ -597,11 +608,13 @@ When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals 
 \subsection{Unsatisfiable instances}
 The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
 
+If a best-effort solution should treat some constraints as more important than others, assign them correspondingly higher or lower losses. Replacing the unit reward on an edge \(e\) by a weight \(w_e>0\), and raising each pinning weight \(\lambda_i\) above the total weight incident on coordinate \(i\), gives the weighted minimum-conflict objective by the same domination argument.
+
 \subsection{Potts energies}
 On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
 \section{Sudoku as a special case}
-Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly.
+Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with \(p\)-adic machine-learning training methods and demonstrate that these techniques generally succeed at solving the Sudoku-devil instances.
 
 \subsection{Sudoku}
 A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
@@ -709,14 +722,22 @@ Assume \(\alpha>20\). Then every global minimiser of the minimal objective \eqre
 Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm{Sud}}\). Thus a proper list-colouring assigns pairwise distinct digits in each unit. Since the available values are exactly \(\{1,\dots,9\}\), pairwise distinctness in a unit is equivalent to containing every digit exactly once. The singleton domains enforce the clues. Apply Theorem~\ref{thm:all-different}.
 \end{proof}
 
-For Sudoku, the bound is explicit. In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; \(\alpha=21\) is enough. For the expanded objective \eqref{eq:objective}, the same claim requires \(\alpha_{\mathrm{clue}}>20\), because the all-digit wells are constant on clue cells. If one instead counts row, column, and box overlaps separately, each cell has \(8+8+8=24\) incident negative terms, and the safe unary bound becomes \(>24\). That threshold belongs to the duplicated unit-scope objective, not to the deduplicated peer objective \eqref{eq:objective-minimal}.
+In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; \(\alpha=21\) is enough. For the expanded objective \eqref{eq:objective}, the same claim requires \(\alpha_{\mathrm{clue}}>20\), because the all-digit wells are constant on clue cells. If one instead counts row, column, and box overlaps separately, each cell has \(8+8+8=24\) incident negative terms, and the safe unary bound becomes \(>24\).
 
-\paragraph{Why ultrametric residuals help with negative weights.}
-An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large differences, not just nonzero differences, and needs separate bounds. An ultrametric residual distinguishes equality from inequality. The discrete metric has this property by definition, and for \(p>9\) the \(p\)-adic norm has the same behaviour on digit-valued differences: \(|x_i-x_j|_p\in\{0,1\}\).
+\section{Representational parsimony}
 
-\section{Illustrative computations}
+A standard SAT or exact-cover lift introduces Boolean variables
+\[
+y_{r,c,d}\in\{0,1\},
+\]
+with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(9\times 9\times 9=729\) indicators before any clues are applied. The p-adic construction instead uses an \(81\)-cell digit space. This variable-level comparison is the main parsimony claim: one digit-valued parameter per semantic object rather than nine Boolean indicators per cell.
+
+The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables.
+
+Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
+
+\section{Computations using \texorpdfstring{\(p\)-adic}{p-adic} machine-learning techniques}
 \label{sec:illustrative-computations}
-These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
 
 To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
 \[
@@ -733,19 +754,9 @@ Because each row is kept as a permutation of \(\{1,\dots,9\}\), the correspondin
 
 We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
 
+These are \(p\)-adic machine-learning techniques in this setting because they train the coefficient vector by local moves that reduce a loss derived from the signed \(p\)-adic residual objective. In particular, row-swap search is a discrete graph walk on the state graph of clue-consistent row permutations, in the same spirit as earlier graph-walk experiments.
+
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
-
-\section{Representational parsimony}
-
-A standard SAT or exact-cover lift introduces Boolean variables
-\[
-y_{r,c,d}\in\{0,1\},
-\]
-with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(9\times 9\times 9=729\) indicators before any clues are applied. The p-adic construction instead uses an \(81\)-cell digit space. This variable-level comparison is the main parsimony claim: one digit-valued parameter per semantic object rather than nine Boolean indicators per cell.
-
-The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables. The heuristics in Appendix~\ref{app:heuristics} then evaluate the duplicated unit-scope surrogate \(H_{\mathrm{cb}}\) on the restricted row-permutation state space.
-
-Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
 \section{Interactive compiler and reproducibility}
 \label{sec:interactive-demo}
