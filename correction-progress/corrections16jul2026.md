@@ -40,7 +40,7 @@ The review found 31 coherent correction units on 13 pages. Each unit was impleme
 | C12 | 10 | Show that NP-hardness also holds for the polynomial degree metric. | `codex/corrections16jul2026-c12-polynomial-degree-hardness` | [#12](https://github.com/solresol/sudoku-padic-regression/pull/12) | CNF compiler theorem | build passed |
 | C13 | 10 | Remove the hedge about positive encodings being impossible. | `codex/corrections16jul2026-c13-remove-positive-encoding-hedge` | [#13](https://github.com/solresol/sudoku-padic-regression/pull/13) | complement encodings | build passed |
 | C14 | 11 | Add weighted best-effort constraints and the corresponding pinning-weight adjustment. | `codex/corrections16jul2026-c14-weighted-best-effort` | [#14](https://github.com/solresol/sudoku-padic-regression/pull/14) | unsatisfiable instances | build passed |
-| C15 | 11 | State the p-adic machine-learning experimental aim for Sudoku-devil instances. | `codex/corrections16jul2026-c15-sudoku-devil-experiments` | [#15](https://github.com/solresol/sudoku-padic-regression/pull/15) | Sudoku introduction | build passed |
+| C15 | 11 | Describe the p-adic machine-learning experiments in the Sudoku introduction. | `codex/corrections16jul2026-c15-sudoku-devil-experiments` | [#15](https://github.com/solresol/sudoku-padic-regression/pull/15) | Sudoku introduction | build passed; wording corrected in [#36](https://github.com/solresol/sudoku-padic-regression/pull/36) |
 | C16 | 13 | Remove the marked lead-in and duplicated-objective qualification from the bound paragraph. | `codex/corrections16jul2026-c16-tighten-sudoku-bound` | [#16](https://github.com/solresol/sudoku-padic-regression/pull/16) | Sudoku bound | build passed |
 | C17 | 13 | Remove the ultrametric-residual aside. | `codex/corrections16jul2026-c17-remove-ultrametric-aside` | [#17](https://github.com/solresol/sudoku-padic-regression/pull/17) | Sudoku special case | build passed |
 | C18 | 13 | Rename the computations section and remove the illustrative-only disclaimer. | `codex/corrections16jul2026-c18-rename-computations` | [#19](https://github.com/solresol/sudoku-padic-regression/pull/19) | computations section | build passed |
@@ -142,3 +142,9 @@ This ledger confirms that every change marked in `sudoku_padic_regression-correc
 | C29 | [#30](https://github.com/solresol/sudoku-padic-regression/pull/30) | [`7e40b00`](https://github.com/solresol/sudoku-padic-regression/commit/7e40b00f4462df8469514d137387b3e284b59789) |
 | C30 | [#31](https://github.com/solresol/sudoku-padic-regression/pull/31) | [`b1182c5`](https://github.com/solresol/sudoku-padic-regression/commit/b1182c5980873a91072decd4d0d930537213042c) |
 | C31 | [#32](https://github.com/solresol/sudoku-padic-regression/pull/32) | [`21c682a`](https://github.com/solresol/sudoku-padic-regression/commit/21c682aff946344badeaa26e8c2f1e02f4d51c70) |
+
+## Post-merge review follow-up
+
+- [#36](https://github.com/solresol/sudoku-padic-regression/pull/36), merged as [`05fc08f`](https://github.com/solresol/sudoku-padic-regression/commit/05fc08f623700510bcec3234a1d518cad11e0246), addressed the substantive Codex findings on C02, C15, and C20 after the correction batch was merged.
+- The C15 branch name above preserves the historical branch identifier, but its benchmark label was an early transcription error. The final manuscript accurately describes the reported experiment as a small sample of randomly carved Sudoku instances.
+- Codex approved #36, and the combined Claude manuscript/artifact review completed successfully with no inline comments.
