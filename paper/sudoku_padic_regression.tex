@@ -714,6 +714,24 @@ For Sudoku, the bound is explicit. In the deduplicated peer graph, every cell ha
 \paragraph{Why ultrametric residuals help with negative weights.}
 An ordinary term such as \(-(x_i-x_j)^2\) over \(\mathbb R\) rewards large differences, not just nonzero differences, and needs separate bounds. An ultrametric residual distinguishes equality from inequality. The discrete metric has this property by definition, and for \(p>9\) the \(p\)-adic norm has the same behaviour on digit-valued differences: \(|x_i-x_j|_p\in\{0,1\}\).
 
+\section{Representational parsimony}
+
+A standard SAT or exact-cover lift introduces Boolean variables
+\[
+y_{r,c,d}\in\{0,1\},
+\]
+with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(9\times 9\times 9=729\) indicators before any clues are applied. The p-adic construction instead uses an \(81\)-cell digit space. This variable-level comparison is the main parsimony claim: one digit-valued parameter per semantic object rather than nine Boolean indicators per cell.
+
+The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables.
+
+A positive-only affine residual construction is possible, but it makes the complement explicit by listing allowed differences. For a \(q\)-symbol alphabet, choose \(p>2(q-1)\) and, on each edge, add the \(2q-2\) wells
+\[
+\sum_{d\in\{-(q-1),\dots,-1,1,\dots,q-1\}} |x_i-x_j-d|_p.
+\]
+On the intended alphabet this sum is \(2q-3\) when \(x_i\neq x_j\) and \(2q-2\) when \(x_i=x_j\). It therefore has the same minimum-conflict states, but uses \(2q-2\) positive residual rows per edge rather than one signed row and requires a correspondingly larger pinning bound. The signed construction's parsimony is thus at both the variable level and the forbidden-interaction level; it is not a claim that positive residual objectives lack the same finite-domain expressivity.
+
+Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
+
 \section{Illustrative computations}
 \label{sec:illustrative-computations}
 These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
@@ -734,24 +752,6 @@ Because each row is kept as a permutation of \(\{1,\dots,9\}\), the correspondin
 We implemented two simple local-search procedures for \(H_{\mathrm{cb}}\): a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} records the algorithms, a locality lemma for row swaps, and traces on a standard puzzle.
 
 On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
-
-\section{Representational parsimony}
-
-A standard SAT or exact-cover lift introduces Boolean variables
-\[
-y_{r,c,d}\in\{0,1\},
-\]
-with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(9\times 9\times 9=729\) indicators before any clues are applied. The p-adic construction instead uses an \(81\)-cell digit space. This variable-level comparison is the main parsimony claim: one digit-valued parameter per semantic object rather than nine Boolean indicators per cell.
-
-The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables. The heuristics in Appendix~\ref{app:heuristics} then evaluate the duplicated unit-scope surrogate \(H_{\mathrm{cb}}\) on the restricted row-permutation state space.
-
-A positive-only affine residual construction is possible, but it makes the complement explicit by listing allowed differences. For a \(q\)-symbol alphabet, choose \(p>2(q-1)\) and, on each edge, add the \(2q-2\) wells
-\[
-\sum_{d\in\{-(q-1),\dots,-1,1,\dots,q-1\}} |x_i-x_j-d|_p.
-\]
-On the intended alphabet this sum is \(2q-3\) when \(x_i\neq x_j\) and \(2q-2\) when \(x_i=x_j\). It therefore has the same minimum-conflict states, but uses \(2q-2\) positive residual rows per edge rather than one signed row and requires a correspondingly larger pinning bound. The signed construction's parsimony is thus at both the variable level and the forbidden-interaction level; it is not a claim that positive residual objectives lack the same finite-domain expressivity.
-
-Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
 \section{Interactive compiler and reproducibility}
 \label{sec:interactive-demo}
