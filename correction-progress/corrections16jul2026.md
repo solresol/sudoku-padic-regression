@@ -100,3 +100,45 @@ The review found 31 coherent correction units on 13 pages. Each unit was impleme
 - Individual branch build verification: **31 / 31 passed** with `make -B paper`.
 
 This ledger confirms that every change marked in `sudoku_padic_regression-corrections16jul2026.pdf` appears in a dedicated pull request before merging begins.
+
+## Merge results
+
+- Correction PRs merged: **31 / 31**.
+- Correction PRs remaining open: **0**.
+- Final generated-PDF PR: [#34](https://github.com/solresol/sudoku-padic-regression/pull/34), merged as [`a975a1c`](https://github.com/solresol/sudoku-padic-regression/commit/a975a1cd6aa3643ba6455bf5c93d8b0b8a20605d).
+- Final manuscript: **25 A4 pages**, with `paper/sudoku_padic_regression.pdf` byte-identical to `site/sudoku_padic_regression.pdf` before publication.
+- Final verification: clean LaTeX rebuild with no undefined references or citations; all 25 rendered pages visually reviewed; Python tests **10 / 10 passed**; site tests **67 / 67 passed**; production site build passed.
+
+| ID | PR | Merge commit |
+|---|---:|---|
+| C01 | [#1](https://github.com/solresol/sudoku-padic-regression/pull/1) | [`15a29d2`](https://github.com/solresol/sudoku-padic-regression/commit/15a29d2aab9ea3652ee56c36e79b12764512e076) |
+| C02 | [#2](https://github.com/solresol/sudoku-padic-regression/pull/2) | [`98c3657`](https://github.com/solresol/sudoku-padic-regression/commit/98c3657f95eaf815d341b39cef7871423998bb03) |
+| C03 | [#3](https://github.com/solresol/sudoku-padic-regression/pull/3) | [`cce7fe2`](https://github.com/solresol/sudoku-padic-regression/commit/cce7fe23ab1e4b8e73f274a68f5354f3b10c25f0) |
+| C04 | [#4](https://github.com/solresol/sudoku-padic-regression/pull/4) | [`60c6bc4`](https://github.com/solresol/sudoku-padic-regression/commit/60c6bc4a047687ff761172f42276b4d6b06b293a) |
+| C05 | [#5](https://github.com/solresol/sudoku-padic-regression/pull/5) | [`e2b268d`](https://github.com/solresol/sudoku-padic-regression/commit/e2b268d27c19ae1325f0a9c6d00f6127ff7e2dea) |
+| C06 | [#6](https://github.com/solresol/sudoku-padic-regression/pull/6) | [`8f49646`](https://github.com/solresol/sudoku-padic-regression/commit/8f4964695b2ecef04c35c7ddc8937de0eca58d03) |
+| C07 | [#7](https://github.com/solresol/sudoku-padic-regression/pull/7) | [`dc86749`](https://github.com/solresol/sudoku-padic-regression/commit/dc86749d88d9281acb7be74877e24e2729c7bee6) |
+| C08 | [#8](https://github.com/solresol/sudoku-padic-regression/pull/8) | [`84d5199`](https://github.com/solresol/sudoku-padic-regression/commit/84d519996f97e91dea229671ee0b8fac9d0e04da) |
+| C09 | [#9](https://github.com/solresol/sudoku-padic-regression/pull/9) | [`fa9af66`](https://github.com/solresol/sudoku-padic-regression/commit/fa9af66b7966a9986a38d8be49ea1922a2007551) |
+| C10 | [#10](https://github.com/solresol/sudoku-padic-regression/pull/10) | [`92db1fa`](https://github.com/solresol/sudoku-padic-regression/commit/92db1fa5b3fa1e2a12c9259abf3e9604ca14140e) |
+| C11 | [#11](https://github.com/solresol/sudoku-padic-regression/pull/11) | [`c13e4e8`](https://github.com/solresol/sudoku-padic-regression/commit/c13e4e8b257f61bb4e6bfcf51421402def3c24a2) |
+| C12 | [#12](https://github.com/solresol/sudoku-padic-regression/pull/12) | [`879fa51`](https://github.com/solresol/sudoku-padic-regression/commit/879fa5177b847fc1cd2cf49d803d9dee2244bfea) |
+| C13 | [#13](https://github.com/solresol/sudoku-padic-regression/pull/13) | [`932a107`](https://github.com/solresol/sudoku-padic-regression/commit/932a107afa1b04cf8f88ab069bd6fade80bf478e) |
+| C14 | [#14](https://github.com/solresol/sudoku-padic-regression/pull/14) | [`f43b1c8`](https://github.com/solresol/sudoku-padic-regression/commit/f43b1c80bd5a2993cd97c364f90ec14f2a645935) |
+| C15 | [#15](https://github.com/solresol/sudoku-padic-regression/pull/15) | [`dba2568`](https://github.com/solresol/sudoku-padic-regression/commit/dba256874262984034b0ae13d00e3b07eb6a6219) |
+| C16 | [#16](https://github.com/solresol/sudoku-padic-regression/pull/16) | [`e3ab11e`](https://github.com/solresol/sudoku-padic-regression/commit/e3ab11e05746f0a18a991161eb95653d0d7376af) |
+| C17 | [#17](https://github.com/solresol/sudoku-padic-regression/pull/17) | [`6576595`](https://github.com/solresol/sudoku-padic-regression/commit/65765952cab950d1477629f4cb7ca9a31a9e916e) |
+| C18 | [#19](https://github.com/solresol/sudoku-padic-regression/pull/19) | [`2b36ece`](https://github.com/solresol/sudoku-padic-regression/commit/2b36ece623cfca45c399eb9872e14473a5800905) |
+| C19 | [#20](https://github.com/solresol/sudoku-padic-regression/pull/20) | [`25d64df`](https://github.com/solresol/sudoku-padic-regression/commit/25d64df2e5e23647478698d1617b65ff8672641b) |
+| C20 | [#21](https://github.com/solresol/sudoku-padic-regression/pull/21) | [`9374ac6`](https://github.com/solresol/sudoku-padic-regression/commit/9374ac6ee64b636d1c16027f0be90670786bf6e4) |
+| C21 | [#22](https://github.com/solresol/sudoku-padic-regression/pull/22) | [`6fa19d6`](https://github.com/solresol/sudoku-padic-regression/commit/6fa19d6ad84649610902ae3bd54f83a19eb2316a) |
+| C22 | [#23](https://github.com/solresol/sudoku-padic-regression/pull/23) | [`89781cb`](https://github.com/solresol/sudoku-padic-regression/commit/89781cb6736fdd7724e1494dfb12f934a6290d38) |
+| C23 | [#24](https://github.com/solresol/sudoku-padic-regression/pull/24) | [`bed4e23`](https://github.com/solresol/sudoku-padic-regression/commit/bed4e238d5cc3ff35ab4398ad304f40ae0528cfd) |
+| C24 | [#25](https://github.com/solresol/sudoku-padic-regression/pull/25) | [`cec4bd1`](https://github.com/solresol/sudoku-padic-regression/commit/cec4bd13d19a493832794ea6f1d6a989028036fa) |
+| C25 | [#26](https://github.com/solresol/sudoku-padic-regression/pull/26) | [`a1d7532`](https://github.com/solresol/sudoku-padic-regression/commit/a1d753266a56f20f9871fa2af9452bf767fac145) |
+| C26 | [#27](https://github.com/solresol/sudoku-padic-regression/pull/27) | [`da07bf9`](https://github.com/solresol/sudoku-padic-regression/commit/da07bf95cec47c14dabdc7b855d9d16b2ef4649a) |
+| C27 | [#28](https://github.com/solresol/sudoku-padic-regression/pull/28) | [`f64e354`](https://github.com/solresol/sudoku-padic-regression/commit/f64e35423be2ec0cd791ea438b93f41543a61e99) |
+| C28 | [#29](https://github.com/solresol/sudoku-padic-regression/pull/29) | [`809d5ef`](https://github.com/solresol/sudoku-padic-regression/commit/809d5ef2e8d8ce54384d420f3fc67ae1b1834bd1) |
+| C29 | [#30](https://github.com/solresol/sudoku-padic-regression/pull/30) | [`7e40b00`](https://github.com/solresol/sudoku-padic-regression/commit/7e40b00f4462df8469514d137387b3e284b59789) |
+| C30 | [#31](https://github.com/solresol/sudoku-padic-regression/pull/31) | [`b1182c5`](https://github.com/solresol/sudoku-padic-regression/commit/b1182c5980873a91072decd4d0d930537213042c) |
+| C31 | [#32](https://github.com/solresol/sudoku-padic-regression/pull/32) | [`21c682a`](https://github.com/solresol/sudoku-padic-regression/commit/21c682aff946344badeaa26e8c2f1e02f4d51c70) |
