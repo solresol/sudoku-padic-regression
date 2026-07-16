@@ -835,7 +835,7 @@ Sudoku is a finite-domain case study in which the variables, domains, and all-di
 
 The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:polynomial-labels} notes that different false clauses can be given different polynomial labels, but the resulting factorisation merely repackages the already-computed violation list. No optimisation or verification advantage is claimed for it.
 
-The companion site in Section~\ref{sec:interactive-demo} lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor.
+The companion site in Figure~\ref{fig:browser-sudoku-solution} lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor.
 
 \appendix
 
