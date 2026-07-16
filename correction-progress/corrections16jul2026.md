@@ -14,7 +14,7 @@
 - Render workspace: `/Users/gregb/Documents/devel/sudoku-padic-regression/scratch/corrections16jul2026/`
 - Source file: `paper/sudoku_padic_regression.tex`
 - Progress branch: `codex/corrections16jul2026-progress`
-- Progress PR: pending creation
+- Progress PR: [#33](https://github.com/solresol/sudoku-padic-regression/pull/33)
 
 ## Review method
 
@@ -100,4 +100,3 @@ The review found 31 coherent correction units on 13 pages. Each unit was impleme
 - Individual branch build verification: **31 / 31 passed** with `make -B paper`.
 
 This ledger confirms that every change marked in `sudoku_padic_regression-corrections16jul2026.pdf` appears in a dedicated pull request before merging begins.
-
