@@ -742,9 +742,8 @@ On the intended alphabet this sum is \(2q-3\) when \(x_i\neq x_j\) and \(2q-2\) 
 
 Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
-\section{Illustrative computations}
+\section{Computations using \texorpdfstring{\(p\)-adic}{p-adic} machine-learning techniques}
 \label{sec:illustrative-computations}
-These computations are illustrative only: the point is to see the signed construction searched by simple local rules, not to propose a competitive Sudoku solver.
 
 To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
 \[
