@@ -17,6 +17,7 @@ export interface SearchPlan {
   strategy: SearchStrategy;
   assignmentCount: number;
   workUnits: number;
+  unbounded: boolean;
   workLabel: "hyperplanes" | "walk steps" | "RANSAC trials";
   lossFloor: number;
   ranges: AssignmentRange[];
@@ -86,6 +87,7 @@ export function createSearchPlan(
     strategy,
     assignmentCount,
     workUnits,
+    unbounded: strategy === "mihara",
     workLabel: strategy === "mihara"
       ? "RANSAC trials"
       : strategy === "zubarev"

@@ -12,6 +12,9 @@
 // norms below are computed genuinely (via the p-adic valuation), not faked.
 
 export const P_DEFAULT = 11;
+// Mihara's positive complement distinguishes every attainable peer difference
+// -8,...,-1,1,...,8 in the first residue digit, so its prime must exceed 16.
+export const MIHARA_SUDOKU_PRIME = 19;
 // Deduped peer degree is 20, so the pinning weight alpha must exceed 20.
 export const ALPHA_DEFAULT = 21;
 export const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
@@ -291,6 +294,15 @@ export interface SudokuRegressionDataFrame {
   peerRewardRowCount: number;
 }
 
+export interface MiharaPositiveSudokuDataFrame {
+  variables: SudokuRegressionVariable[];
+  rows: SudokuRegressionRow[];
+  totalWeight: number;
+  satisfiableFloor: number;
+  pinningRowCount: number;
+  peerComplementRowCount: number;
+}
+
 export function buildPuzzleModel(
   puzzle: Grid,
   options: { p?: number; alpha?: number } = {}
@@ -371,6 +383,54 @@ export function buildSudokuRegressionDataFrame(
     rows: [...pinningRows, ...peerRows],
     pinningRowCount: pinningRows.length,
     peerRewardRowCount: peerRows.length
+  };
+}
+
+// Mihara's digitwise regression consumes a positive-weight equality dataset.
+// Replace each negative peer row -|x_i-x_j|_p with one positive equality row
+// for every nonzero difference attainable from the two cells' domains. On a
+// domain-respecting grid, exactly one such row is an inlier when the peer
+// constraint is satisfied and none is an inlier when the digits are equal.
+export function buildMiharaPositiveSudokuDataFrame(
+  model: PuzzleModel
+): MiharaPositiveSudokuDataFrame {
+  if (model.p <= 16) {
+    throw new Error("Mihara's Sudoku complement expansion requires p > 16.");
+  }
+
+  const dataframe = buildSudokuRegressionDataFrame(model);
+  const pinningRows = dataframe.rows
+    .filter((row) => row.kind === "pinning")
+    .map((row) => ({ ...row, id: `M-${row.id}` }));
+  const peerComplementRows = dataframe.rows
+    .filter((row) => row.kind === "peer-reward")
+    .flatMap((row) => {
+      const nonzeroDifferences = Array.from(new Set(
+        DIGITS.flatMap((left) => DIGITS.map((right) => left - right))
+      ))
+        .filter((target) => target !== row.target)
+        .sort((left, right) => left - right);
+      return nonzeroDifferences.map((target) => ({
+        ...row,
+        id: `M-${row.id}-${target < 0 ? `n${-target}` : `p${target}`}`,
+        label: `${row.label} @ ${target}`,
+        relation: "=" as const,
+        target,
+        sign: 1 as const,
+        source: `Positive complement of ${row.label}: reward x_i - x_j = ${target}; forbidden target is ${row.target}`
+      }));
+    });
+  const rows = [...pinningRows, ...peerComplementRows];
+  const totalWeight = rows.reduce((sum, row) => sum + row.weight, 0);
+  const maximumInlierWeight = model.alpha * model.variables + model.peerCount;
+
+  return {
+    variables: dataframe.variables,
+    rows,
+    totalWeight,
+    satisfiableFloor: totalWeight - maximumInlierWeight,
+    pinningRowCount: pinningRows.length,
+    peerComplementRowCount: peerComplementRows.length
   };
 }
 

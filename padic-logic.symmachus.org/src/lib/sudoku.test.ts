@@ -3,10 +3,12 @@ import objectiveFixture from "../../../fixtures/sudoku_objective_golden.json";
 import {
   ALPHA_DEFAULT,
   MAX_DEGREE,
+  MIHARA_SUDOKU_PRIME,
   PEER_COUNT,
   PEERS,
   UNITS,
   buildPuzzleModel,
+  buildMiharaPositiveSudokuDataFrame,
   buildSudokuRegressionDataFrame,
   conflictsAllUnits,
   conflictsColsBoxes,
@@ -153,6 +155,32 @@ describe("signed p-adic residual objective", () => {
       sign: -1,
       weight: 1
     });
+  });
+
+  it("expands negative peer rewards into a weighted positive equality family for Mihara", () => {
+    const model = buildPuzzleModel(parsePuzzle(EXAMPLE_PUZZLE), {
+      p: MIHARA_SUDOKU_PRIME
+    });
+    const dataframe = buildMiharaPositiveSudokuDataFrame(model);
+
+    expect(dataframe.pinningRowCount).toBe(489);
+    expect(dataframe.peerComplementRowCount).toBe(810 * 16);
+    expect(dataframe.rows).toHaveLength(489 + 810 * 16);
+    expect(dataframe.rows.every((row) => row.sign === 1 && row.relation === "=")).toBe(true);
+    expect(dataframe.rows[0].weight).toBe(ALPHA_DEFAULT);
+    expect(dataframe.rows.slice(489, 505).map((row) => row.target)).toEqual([
+      -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8
+    ]);
+    expect(dataframe.totalWeight).toBe(489 * ALPHA_DEFAULT + 810 * 16);
+    expect(dataframe.satisfiableFloor).toBe(
+      dataframe.totalWeight - ALPHA_DEFAULT * 81 - 810
+    );
+  });
+
+  it("rejects a prime that aliases distinct Sudoku peer differences", () => {
+    expect(() => buildMiharaPositiveSudokuDataFrame(
+      buildPuzzleModel(parsePuzzle(EXAMPLE_PUZZLE), { p: 11 })
+    )).toThrow(/p > 16/u);
   });
 
   it("hits the theoretical floor exactly on a valid completion", () => {

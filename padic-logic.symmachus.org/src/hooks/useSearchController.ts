@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { buildRegressionDataFrame, type CompiledProblem } from "../lib/csp";
+import {
+  buildMiharaPositiveRegressionDataFrame,
+  type CompiledProblem
+} from "../lib/csp";
 import {
   createSearchPlan,
   createSearchPermutation,
@@ -19,6 +22,9 @@ export interface WorkerLane {
   bestCoordinates: number[] | null;
   algorithmScore: number | null;
   algorithmTotal: number | null;
+  algorithmLoss: number | null;
+  algorithmSuccessfulTrials: number | null;
+  algorithmSingularTrials: number | null;
   solutions: number;
   done: boolean;
 }
@@ -33,13 +39,18 @@ export interface SearchSnapshot {
   startedAt: number | null;
   strategy: SearchStrategy;
   workUnits: number;
+  unbounded: boolean;
   workLabel: "hyperplanes" | "walk steps" | "RANSAC trials";
+  chartFloor: number;
   lanes: WorkerLane[];
   bestLoss: number | null;
   bestMask: number | null;
   bestCoordinates: number[] | null;
   algorithmScore: number | null;
   algorithmTotal: number | null;
+  algorithmLoss: number | null;
+  algorithmSuccessfulTrials: number;
+  algorithmSingularTrials: number;
   totalTested: number;
   totalSpeed: number;
   solutions: number;
@@ -52,13 +63,18 @@ const INITIAL_SNAPSHOT: SearchSnapshot = {
   startedAt: null,
   strategy: "ordered",
   workUnits: 0,
+  unbounded: false,
   workLabel: "hyperplanes",
+  chartFloor: 0,
   lanes: [],
   bestLoss: null,
   bestMask: null,
   bestCoordinates: null,
   algorithmScore: null,
   algorithmTotal: null,
+  algorithmLoss: null,
+  algorithmSuccessfulTrials: 0,
+  algorithmSingularTrials: 0,
   totalTested: 0,
   totalSpeed: 0,
   solutions: 0,
@@ -77,6 +93,9 @@ interface WorkerProgress {
   bestCoordinates: number[] | null;
   algorithmScore: number | null;
   algorithmTotal: number | null;
+  algorithmLoss: number | null;
+  algorithmSuccessfulTrials: number | null;
+  algorithmSingularTrials: number | null;
   solutions: number;
   done: boolean;
 }
@@ -114,6 +133,13 @@ export function useSearchController(compiled: CompiledProblem | null) {
         problem.assignmentCount,
         startedAt ^ logCounterRef.current
       );
+      const miharaFrame = buildMiharaPositiveRegressionDataFrame(problem);
+      const miharaObservations = miharaFrame.rows.map((row) => ({
+        coefficients: problem.variables.map((variable) => row.coefficients[variable.name] ?? 0),
+        target: row.target,
+        weight: row.weight,
+        source: row.source
+      }));
       const lanes = ranges.map((range) => ({
         ...range,
         tested: 0,
@@ -124,6 +150,9 @@ export function useSearchController(compiled: CompiledProblem | null) {
         bestCoordinates: null,
         algorithmScore: null,
         algorithmTotal: null,
+        algorithmLoss: null,
+        algorithmSuccessfulTrials: null,
+        algorithmSingularTrials: null,
         solutions: 0,
         done: false
       }));
@@ -134,21 +163,21 @@ export function useSearchController(compiled: CompiledProblem | null) {
         startedAt,
         strategy,
         workUnits: plan.workUnits,
+        unbounded: plan.unbounded,
         workLabel: plan.workLabel,
+        chartFloor: strategy === "mihara"
+          ? miharaFrame.satisfiableFloor
+          : problem.scoring.theoreticalFloor,
         lanes,
         logs: [
           {
             id: ++logCounterRef.current,
-            text: `[sys] ${strategyDescription(strategy)}: ${plan.workUnits.toLocaleString()} ${plan.workLabel} across ${ranges.length} threads`
+            text: plan.unbounded
+              ? `[sys] ${strategyDescription(strategy)}: fresh starts continue across ${ranges.length} threads until a decoded fit satisfies the CSP or the attempt is stopped`
+              : `[sys] ${strategyDescription(strategy)}: ${plan.workUnits.toLocaleString()} ${plan.workLabel} across ${ranges.length} threads`
           }
         ]
       });
-
-      const miharaObservations = buildRegressionDataFrame(problem).map((row) => ({
-        coefficients: problem.variables.map((variable) => row.coefficients[variable.name] ?? 0),
-        target: row.target,
-        source: row.source
-      }));
 
       const nextWorkers = ranges.map((range) => {
         const worker = new Worker(
@@ -158,6 +187,13 @@ export function useSearchController(compiled: CompiledProblem | null) {
 
         worker.onmessage = (event: MessageEvent<WorkerProgress>) => {
           setSnapshot((previous) => applyProgress(previous, event.data));
+          if (
+            strategy === "mihara" &&
+            event.data.done &&
+            event.data.solutions > 0
+          ) {
+            stopWorkers();
+          }
         };
 
         worker.postMessage({
@@ -173,6 +209,7 @@ export function useSearchController(compiled: CompiledProblem | null) {
           prime: problem.scoring.prime,
           start: range.start,
           endExclusive: range.endExclusive,
+          unbounded: plan.unbounded,
           updateEveryMs: 220
         });
 
@@ -214,6 +251,8 @@ function applyProgress(
   previous: SearchSnapshot,
   progress: WorkerProgress
 ): SearchSnapshot {
+  const recoveredMiharaSolution =
+    previous.strategy === "mihara" && progress.done && progress.solutions > 0;
   const lanes = previous.lanes.map((lane) =>
     lane.workerId === progress.workerId
       ? {
@@ -226,16 +265,19 @@ function applyProgress(
           bestCoordinates: progress.bestCoordinates,
           algorithmScore: progress.algorithmScore,
           algorithmTotal: progress.algorithmTotal,
+          algorithmLoss: progress.algorithmLoss,
+          algorithmSuccessfulTrials: progress.algorithmSuccessfulTrials,
+          algorithmSingularTrials: progress.algorithmSingularTrials,
           solutions: progress.solutions,
           done: progress.done
         }
       : lane
-  );
+  ).map((lane) => recoveredMiharaSolution ? { ...lane, done: true } : lane);
 
   const laneBest = previous.strategy === "mihara"
     ? lanes
-      .filter((lane) => lane.algorithmScore != null)
-      .sort((a, b) => (b.algorithmScore ?? -Infinity) - (a.algorithmScore ?? -Infinity))[0]
+      .filter((lane) => lane.algorithmLoss != null)
+      .sort((a, b) => (a.algorithmLoss ?? Infinity) - (b.algorithmLoss ?? Infinity))[0]
     : lanes
       .filter((lane) => lane.bestLoss != null)
       .sort((a, b) => (a.bestLoss ?? Infinity) - (b.bestLoss ?? Infinity))[0];
@@ -247,13 +289,51 @@ function applyProgress(
   const bestCoordinates = laneBest?.bestCoordinates ?? previous.bestCoordinates;
   const algorithmScore = laneBest?.algorithmScore ?? previous.algorithmScore;
   const algorithmTotal = laneBest?.algorithmTotal ?? previous.algorithmTotal;
+  const algorithmLoss = laneBest?.algorithmLoss ?? previous.algorithmLoss;
+  const algorithmSuccessfulTrials = lanes.reduce(
+    (sum, lane) => sum + (lane.algorithmSuccessfulTrials ?? 0),
+    0
+  );
+  const algorithmSingularTrials = lanes.reduce(
+    (sum, lane) => sum + (lane.algorithmSingularTrials ?? 0),
+    0
+  );
   const done = lanes.length > 0 && lanes.every((lane) => lane.done);
   const changedBest = previous.strategy === "mihara"
     ? algorithmScore != null && algorithmScore !== previous.algorithmScore
     : bestLoss != null && bestLoss !== previous.bestLoss;
+  const trackedLoss = previous.strategy === "mihara" ? algorithmLoss : bestLoss;
+  const previousTrackedLoss = previous.strategy === "mihara"
+    ? previous.algorithmLoss
+    : previous.bestLoss;
+  const changedTrackedLoss = trackedLoss != null && trackedLoss !== previousTrackedLoss;
   const lastHistoryPoint = previous.history[previous.history.length - 1];
   const appendCompletionPlateau =
-    done && bestLoss != null && lastHistoryPoint?.tested !== totalTested;
+    done && trackedLoss != null && lastHistoryPoint?.tested !== totalTested;
+  const completedWithoutMiharaFit =
+    done && previous.status !== "complete" && previous.strategy === "mihara" && bestCoordinates == null;
+
+  const nextLogs = changedBest
+    ? [
+        ...previous.logs,
+        {
+          id: previous.logs.length + 1,
+          text: previous.strategy === "mihara"
+            ? `[t${progress.workerId}] positive consensus ${algorithmScore}/${algorithmTotal}; loss ${algorithmLoss}; ${bestMask == null ? "not Boolean" : `candidate H${bestMask}`}`
+            : `[t${progress.workerId}] new best p-adic loss ${bestLoss} at hyperplane ${
+              progress.bestMask == null ? "-" : `H${progress.bestMask}`
+            }`
+        }
+      ]
+    : completedWithoutMiharaFit
+      ? [
+          ...previous.logs,
+          {
+            id: previous.logs.length + 1,
+            text: `[sys] attempt complete: no full-rank equality sample in ${algorithmSingularTrials} RANSAC trials`
+          }
+        ]
+      : previous.logs;
 
   return {
     ...previous,
@@ -267,29 +347,20 @@ function applyProgress(
     bestCoordinates,
     algorithmScore,
     algorithmTotal,
+    algorithmLoss,
+    algorithmSuccessfulTrials,
+    algorithmSingularTrials,
     history:
-      bestLoss == null || (!changedBest && !appendCompletionPlateau)
+      trackedLoss == null || (!changedTrackedLoss && !appendCompletionPlateau)
         ? previous.history
-        : [...previous.history, { tested: totalTested, loss: bestLoss }].slice(-160),
-    logs: changedBest
-      ? [
-          ...previous.logs,
-          {
-            id: previous.logs.length + 1,
-            text: previous.strategy === "mihara"
-              ? `[t${progress.workerId}] equality consensus ${algorithmScore}/${algorithmTotal}; ${bestMask == null ? "not Boolean" : `candidate H${bestMask}`}`
-              : `[t${progress.workerId}] new best p-adic loss ${bestLoss} at hyperplane ${
-                progress.bestMask == null ? "-" : `H${progress.bestMask}`
-              }`
-          }
-        ].slice(-12)
-      : previous.logs
+        : [...previous.history, { tested: totalTested, loss: trackedLoss }].slice(-160),
+    logs: nextLogs.slice(-12)
   };
 }
 
 function strategyDescription(strategy: SearchStrategy): string {
   if (strategy === "random") return "randomly permuted exhaustive scan";
   if (strategy === "zubarev") return "Zubarev single-bit walk";
-  if (strategy === "mihara") return "Mihara digitwise equality fit";
+  if (strategy === "mihara") return "Mihara positive-complement digitwise fit";
   return "ordered exhaustive scan";
 }

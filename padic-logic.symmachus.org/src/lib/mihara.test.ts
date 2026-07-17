@@ -30,4 +30,30 @@ describe("Mihara digitwise comparison helpers", () => {
     expect(booleanCoordinatesToMask([0, 1, 0])).toBe(5);
     expect(booleanCoordinatesToMask([0, 16, 1])).toBeNull();
   });
+
+  it("counts positive observation weights in the consensus score", () => {
+    const observations = [
+      { coefficients: [1], target: 0, weight: 5 },
+      { coefficients: [1], target: 1, weight: 2 }
+    ];
+
+    expect(countModPInliers(observations, [0], 17)).toBe(5);
+    expect(fitMiharaLastDigit(observations, 17, 3, 2).total).toBe(7);
+  });
+
+  it("samples a full-rank basis across equivalent-target groups", () => {
+    const observations = [
+      { coefficients: [1, 0], target: 0, samplingGroup: "x" },
+      { coefficients: [1, 0], target: 1, samplingGroup: "x" },
+      { coefficients: [0, 1], target: 0, samplingGroup: "y" },
+      { coefficients: [0, 1], target: 1, samplingGroup: "y" },
+      { coefficients: [1, 1], target: 1, samplingGroup: "sum" }
+    ];
+
+    const fit = fitMiharaLastDigit(observations, 17, 9, 1);
+
+    expect(fit.successfulTrials).toBe(1);
+    expect(fit.singularTrials).toBe(0);
+    expect(fit.coefficients).toHaveLength(2);
+  });
 });

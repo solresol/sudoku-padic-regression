@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildMiharaPositiveRegressionDataFrame,
   buildRegressionDataFrame,
   compileProblem,
   evaluateAssignment,
@@ -167,6 +168,7 @@ describe("CSP compiler", () => {
     expect(satisfiedFrame.rows[0]).toMatchObject({
       affineValue: -1,
       residual: -2,
+      pAdicValuation: 0,
       pAdicNorm: 1,
       signedWeight: -1,
       contribution: -1,
@@ -179,11 +181,25 @@ describe("CSP compiler", () => {
     const violatedFrame = evaluateRegressionDataFrame(compiled, violated);
     expect(violatedFrame.rows[0]).toMatchObject({
       residual: 0,
+      pAdicValuation: null,
       pAdicNorm: 0,
       contribution: 0,
       status: "violated"
     });
     expect(violatedFrame.totalLoss).toBe(compiled.scoring.theoreticalFloor + 1);
+  });
+
+  it("expands each negative clause row into its positive affine complement", () => {
+    const compiled = compileProblem("A or not B");
+    const frame = buildMiharaPositiveRegressionDataFrame(compiled);
+    const clauseRows = frame.rows.filter((row) => row.kind === "constraint");
+
+    expect(clauseRows.map((row) => row.target)).toEqual([-1, 0]);
+    expect(clauseRows.every((row) => row.sign === 1 && row.relation === "="))
+      .toBe(true);
+    expect(clauseRows.map((row) => row.weight)).toEqual([1, 1]);
+    expect(frame.totalWeight).toBe(10);
+    expect(frame.satisfiableFloor).toBe(5);
   });
 
   it("generates an executable bit-mask evaluator", () => {

@@ -341,6 +341,61 @@ describe("p-adic logic app", () => {
     }));
   });
 
+  it("keeps the Mihara attempt running past its initial trial batch", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    await user.selectOptions(screen.getByLabelText("Sample problem"), "assignment");
+    await user.selectOptions(screen.getByLabelText("Search algorithm"), "mihara");
+    await user.click(screen.getByRole("button", { name: /Solve p-adic linear regression/i }));
+
+    expect(MockWorker.instances).toHaveLength(2);
+    for (const [index, worker] of MockWorker.instances.entries()) {
+      expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        strategy: "mihara",
+        unbounded: true
+      }));
+      const startMessage = worker.postMessage.mock.calls[0][0] as {
+        miharaObservations: Array<{ weight?: number; source?: string }>;
+      };
+      expect(startMessage.miharaObservations.some((row) => row.weight === 61)).toBe(true);
+      expect(startMessage.miharaObservations.some((row) =>
+        row.source?.startsWith("Positive complement of C")
+      )).toBe(true);
+      act(() => worker.onmessage?.({
+        data: {
+          type: "progress",
+          workerId: index + 1,
+          tested: 52,
+          currentMask: 0,
+          speed: 52,
+          bestLoss: null,
+          bestMask: null,
+          bestCoordinates: index === 0 ? Array(16).fill(2) : null,
+          algorithmScore: index === 0 ? 21 : null,
+          algorithmTotal: 148,
+          algorithmLoss: index === 0 ? 127 : null,
+          algorithmSuccessfulTrials: index === 0 ? 1 : 0,
+          algorithmSingularTrials: index === 0 ? 51 : 52,
+          solutions: 0,
+          done: false
+        }
+      } as MessageEvent));
+    }
+
+    expect(screen.getByText("1 / 104")).toBeInTheDocument();
+    expect(screen.getByText(/not Boolean, so there is no CSP assignment to validate/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/Mihara receives a positive-only complement expansion/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/wrong statistical model on purpose/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "p-adic loss over time" }))
+      .toHaveAttribute("data-points", "1");
+    expect(screen.getByRole("status")).toHaveTextContent(/Retrying fresh starts/i);
+    expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
+    expect(MockWorker.instances.every((worker) => worker.terminate.mock.calls.length === 0)).toBe(true);
+    expect(screen.queryByText("Attempt complete")).not.toBeInTheDocument();
+  });
+
   it("shows generation progress without the debug transcript", async () => {
     const user = userEvent.setup();
     const prompt = vi.fn().mockResolvedValueOnce(
@@ -547,6 +602,7 @@ describe("p-adic logic app", () => {
     ).toBeTruthy();
     const contributionTable = screen.getByRole("table", { name: "Regression row contributions" });
     expect(contributionTable.querySelectorAll("tbody tr")).toHaveLength(3);
+    expect(contributionTable).toHaveTextContent("v17(r)");
     expect(screen.getByText("Total L = 1")).toBeInTheDocument();
     expect(
       Array.from(document.querySelectorAll(".loss-chart .y-axis-label")).map((node) => node.textContent)
@@ -586,17 +642,44 @@ describe("p-adic logic app", () => {
     expect(screen.getByRole("button", { name: /Mihara attempt/i })).toBeEnabled();
   });
 
-  it("labels the Mihara Sudoku option as an expected failed equality fit", async () => {
+  it("explains the positive-complement Mihara Sudoku fit", async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole("tab", { name: /^Sudoku/i }));
     await user.click(screen.getByRole("button", { name: /Mihara attempt/i }));
 
-    expect(screen.getByText(/Expected to fail: this fits equalities, not Sudoku/i))
+    expect(screen.getByText(/Mihara receives a positive-only complement expansion/i))
       .toBeInTheDocument();
-    expect(screen.getByText(/peer rows actually reward/i)).toBeInTheDocument();
-    expect(screen.getByText("Modulo-11 RANSAC trials")).toBeInTheDocument();
-    expect(screen.getByText("48")).toBeInTheDocument();
+    expect(screen.getByText(/weighted consensus now rewards unequal peers/i)).toBeInTheDocument();
+    expect(screen.getByText("Retry policy")).toBeInTheDocument();
+    expect(screen.getByText("Until Sudoku solution or stopped")).toBeInTheDocument();
+    expect(screen.getByText("Mihara prime").closest(".metric-row"))
+      .toHaveTextContent("p = 19 (> 16)");
+  });
+
+  it("charts Mihara's selected positive loss separately from the original signed audit", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: /^Sudoku/i }));
+    await user.click(screen.getByRole("button", { name: /Mihara attempt/i }));
+    await user.click(screen.getByRole("button", { name: /Start search/i }));
+
+    const positiveChart = screen.getByRole("img", {
+      name: "Mihara positive-complement p-adic loss over time"
+    });
+    const signedChart = screen.getByRole("img", {
+      name: "Original signed Sudoku p-adic loss over time"
+    });
+    await waitFor(() => {
+      expect(Number(positiveChart.getAttribute("data-points"))).toBeGreaterThan(0);
+      expect(Number(signedChart.getAttribute("data-points"))).toBeGreaterThan(0);
+    }, { timeout: 5_000 });
+
+    expect(screen.getByText("Positive-complement last-digit loss")).toBeInTheDocument();
+    expect(screen.getByText("Original signed objective L(x)")).toBeInTheDocument();
+    expect(screen.getByText(/this is the score Mihara selects/i)).toBeInTheDocument();
+    expect(screen.getByText(/this does not select Mihara fits/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Pause/i }));
   });
 
   it("edits Sudoku clues on the board and locks cells after search starts", async () => {

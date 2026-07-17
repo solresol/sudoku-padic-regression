@@ -72,6 +72,7 @@ export interface RegressionDataFrameRow {
 export interface RegressionDataFrameEvaluationRow extends RegressionDataFrameRow {
   affineValue: number;
   residual: number;
+  pAdicValuation: number | null;
   pAdicNorm: number;
   signedWeight: number;
   contribution: number;
@@ -81,6 +82,12 @@ export interface RegressionDataFrameEvaluationRow extends RegressionDataFrameRow
 export interface RegressionDataFrameEvaluation {
   rows: RegressionDataFrameEvaluationRow[];
   totalLoss: number;
+}
+
+export interface MiharaPositiveRegressionDataFrame {
+  rows: RegressionDataFrameRow[];
+  totalWeight: number;
+  satisfiableFloor: number;
 }
 
 type TokenKind =
@@ -241,6 +248,43 @@ export function buildRegressionDataFrame(
   return rows;
 }
 
+// Mihara's regression routine expects an ordinary positive-weight dataset. On
+// the Boolean domain, a negative clause row -|u.x-t|_p is equivalent, up to the
+// constant |S|-1, to one positive row |u.x-s|_p for every attainable affine
+// value s in S except the forbidden target t. Exactly one complementary row is
+// an inlier when the clause is satisfied, and none is an inlier when it fails.
+export function buildMiharaPositiveRegressionDataFrame(
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">
+): MiharaPositiveRegressionDataFrame {
+  const rows = buildRegressionDataFrame(compiled).flatMap((row) => {
+    if (row.sign > 0) {
+      return [{ ...row, id: `M-${row.id}` }];
+    }
+
+    return attainableAffineValues(row, compiled.variables)
+      .filter((target) => target !== row.target)
+      .map((target) => ({
+        ...row,
+        id: `M-${row.id}-${formatTargetId(target)}`,
+        label: `${row.label} @ ${target}`,
+        relation: "=" as const,
+        target,
+        sign: 1 as const,
+        source: `Positive complement of ${row.label}: reward u.x = ${target}; forbidden target is ${row.target}`
+      }));
+  });
+  const totalWeight = rows.reduce((sum, row) => sum + row.weight, 0);
+  const maximumInlierWeight =
+    compiled.scoring.unitWellWeight * compiled.variables.length +
+    compiled.ternaryClauses.length;
+
+  return {
+    rows,
+    totalWeight,
+    satisfiableFloor: totalWeight - maximumInlierWeight
+  };
+}
+
 export function evaluateRegressionDataFrame(
   compiled: CompiledProblem,
   assignment: Record<string, boolean>
@@ -258,7 +302,10 @@ export function evaluateRegressionDataFrame(
       0
     );
     const residual = affineValue - row.target;
-    const pAdicNorm = pAdicIntegerNorm(residual, compiled.scoring.prime);
+    const pAdicValuation = pAdicIntegerValuation(residual, compiled.scoring.prime);
+    const pAdicNorm = pAdicValuation == null
+      ? 0
+      : compiled.scoring.prime ** -pAdicValuation;
     const signedWeight = row.sign * row.weight;
     const contribution = pAdicNorm === 0 ? 0 : signedWeight * pAdicNorm;
 
@@ -266,6 +313,7 @@ export function evaluateRegressionDataFrame(
       ...row,
       affineValue,
       residual,
+      pAdicValuation,
       pAdicNorm,
       signedWeight,
       contribution,
@@ -400,9 +448,28 @@ function zeroCoefficientRow(variables: Variable[]): Record<string, number> {
   return Object.fromEntries(variables.map((variable) => [variable.name, 0]));
 }
 
-function pAdicIntegerNorm(value: number, prime: number): number {
+function attainableAffineValues(
+  row: RegressionDataFrameRow,
+  variables: Variable[]
+): number[] {
+  let values = new Set([0]);
+  for (const variable of variables) {
+    const coefficient = row.coefficients[variable.name] ?? 0;
+    if (coefficient === 0) continue;
+    const next = new Set(values);
+    for (const value of values) next.add(value + coefficient);
+    values = next;
+  }
+  return Array.from(values).sort((left, right) => left - right);
+}
+
+function formatTargetId(target: number): string {
+  return target < 0 ? `neg${Math.abs(target)}` : `${target}`;
+}
+
+function pAdicIntegerValuation(value: number, prime: number): number | null {
   if (value === 0) {
-    return 0;
+    return null;
   }
 
   let magnitude = Math.abs(value);
@@ -411,7 +478,7 @@ function pAdicIntegerNorm(value: number, prime: number): number {
     magnitude /= prime;
     valuation += 1;
   }
-  return prime ** -valuation;
+  return valuation;
 }
 
 export function buildEvaluatorSource(

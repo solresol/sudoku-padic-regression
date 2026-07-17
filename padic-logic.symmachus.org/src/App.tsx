@@ -1118,8 +1118,22 @@ function SearchPlanPanel({
             label="Thread split"
             value={searchStrategy === "ordered" || searchStrategy === "random"
               ? "Disjoint hyperplane batches"
-              : `Independent ${plan.workLabel}`}
+              : searchStrategy === "mihara"
+                ? "Independent fresh-start streams"
+                : `Independent ${plan.workLabel}`}
           />
+          {searchStrategy === "mihara" && (
+            <>
+              <MetricRow
+                label="Mihara input"
+                value="positive equality family complementary to each forbidden clause target"
+              />
+              <MetricRow
+                label="Retry policy"
+                value="continue until a decoded fit satisfies the CSP or stopped"
+              />
+            </>
+          )}
           <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17)" />
           <MetricRow
             label="Unit-well weight"
@@ -1133,7 +1147,7 @@ function SearchPlanPanel({
           <MetricRow
             label="Success criterion"
             value={searchStrategy === "mihara"
-              ? "diagnostic only: recovered digits must decode and satisfy CNF"
+              ? "first full-rank equality fit whose decoded digits satisfy CNF"
               : "loss reaches the satisfiable floor"}
           />
         </>
@@ -1147,7 +1161,7 @@ function SearchPlanPanel({
 function searchStrategyLabel(strategy: SearchStrategy): string {
   if (strategy === "random") return "Random-permutation exhaustive search";
   if (strategy === "zubarev") return "Zubarev Boltzmann walk on Boolean bit flips";
-  if (strategy === "mihara") return "Mihara digitwise equality recovery (diagnostic)";
+  if (strategy === "mihara") return "Mihara positive-complement digitwise recovery";
   return "Ordered exhaustive search";
 }
 
@@ -1215,9 +1229,9 @@ function ReadyBand({
         </button>
       </div>
       <div className="runtime-card">
-        <span>{plan ? plan.workLabel : "Work"}</span>
-        <strong>{plan ? plan.workUnits.toLocaleString() : "-"}</strong>
-        <small>split across {workerCount} threads</small>
+        <span>{plan?.unbounded ? "Retry policy" : plan ? plan.workLabel : "Work"}</span>
+        <strong>{plan?.unbounded ? "Until solution or stopped" : plan ? plan.workUnits.toLocaleString() : "-"}</strong>
+        <small>{plan?.unbounded ? "fresh starts" : "work"} across {workerCount} threads</small>
       </div>
       <button
         className="run-button"
@@ -1266,28 +1280,50 @@ function RunDashboard({
     <section className="run-grid" aria-label="Search results" ref={resultsRef}>
       <section className="panel worker-dashboard">
         <div className="run-stats">
-          <Stat label={snapshot.workLabel} value={`${snapshot.totalTested.toLocaleString()} / ${snapshot.workUnits.toLocaleString()}`} />
-          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} ${snapshot.workLabel}/s`} />
-          <Stat label="Best loss" value={`${snapshot.bestLoss ?? "-"}`} />
           <Stat
-            label={searchStrategy === "mihara" ? "Equality inliers" : "Floor hits"}
+            label={snapshot.workLabel}
+            value={snapshot.unbounded
+              ? snapshot.totalTested.toLocaleString()
+              : `${snapshot.totalTested.toLocaleString()} / ${snapshot.workUnits.toLocaleString()}`}
+          />
+          <Stat label="Total speed" value={`${formatRate(snapshot.totalSpeed)} ${snapshot.workLabel}/s`} />
+          <Stat
+            label={searchStrategy === "mihara" ? "Full-rank samples" : "Best loss"}
             value={searchStrategy === "mihara"
-              ? `${snapshot.algorithmScore ?? "-"} / ${snapshot.algorithmTotal ?? "-"}`
+              ? `${snapshot.algorithmSuccessfulTrials} / ${snapshot.totalTested}`
+              : `${snapshot.bestLoss ?? "-"}`}
+          />
+          <Stat
+            label={searchStrategy === "mihara" ? "Positive p-adic loss" : "Floor hits"}
+            value={searchStrategy === "mihara"
+              ? `${snapshot.algorithmLoss ?? "-"}`
               : `${snapshot.solutions}`}
           />
         </div>
-        <div className="global-progress">
-          <span style={{ width: `${progress * 100}%` }} />
-        </div>
+        {snapshot.unbounded ? (
+          <div className="algorithm-diagnostic mihara-diagnostic" role="status">
+            <strong>Retrying fresh starts.</strong>
+            <p>Full-rank fits that do not decode to a valid CSP solution are rejected; the attempt continues until one does, or you pause or stop it.</p>
+          </div>
+        ) : (
+          <div className="global-progress">
+            <span style={{ width: `${progress * 100}%` }} />
+          </div>
+        )}
         <WorkerTable
           compiled={compiled}
           lanes={snapshot.lanes}
           strategy={searchStrategy}
           workLabel={snapshot.workLabel}
         />
-        {searchStrategy !== "mihara" && (
-          <LossChart floor={regressionFloor} history={snapshot.history} />
-        )}
+        <LossChart
+          floor={snapshot.chartFloor}
+          history={snapshot.history}
+          workLabel={snapshot.workLabel}
+          floorLabel={searchStrategy === "mihara"
+            ? "positive satisfiable floor"
+            : "satisfiable floor"}
+        />
         <section className="solution-section" aria-label="Best p-adic regression solution">
           <PanelHeader
             icon={<ShieldCheck size={20} />}
@@ -1337,6 +1373,14 @@ function RunDashboard({
             </>
           ) : searchStrategy === "mihara" && snapshot.bestCoordinates ? (
             <EmptyState text="The recovered modulo-17 coefficients are not Boolean, so there is no CSP assignment to validate." />
+          ) : searchStrategy === "mihara" && isComplete ? (
+            <EmptyState
+              text={snapshot.algorithmSingularTrials === snapshot.totalTested
+                ? `No coefficient vector was recovered. All ${snapshot.algorithmSingularTrials.toLocaleString()} RANSAC samples were singular on this sparse equality dataframe.`
+                : "No coefficient vector was recovered from the completed Mihara attempt."}
+            />
+          ) : searchStrategy === "mihara" ? (
+            <EmptyState text="No valid Mihara solution yet; fresh RANSAC starts are still being tried." />
           ) : (
             <EmptyState text="Best coefficient vector will appear after the first thread update." />
           )}
@@ -1400,7 +1444,7 @@ function RunDashboard({
           ? "Each candidate hyperplane is a coefficient vector. Threads scan disjoint hyperplane batches."
           : searchStrategy === "zubarev"
             ? "Each thread runs an independent Boltzmann-weighted walk over single-bit moves."
-            : "Each thread samples full-rank equality rows and estimates one modulo-17 coefficient digit."}</p>
+            : "Each thread samples the positive complement expansion. Full-rank fits are scored by positive p-adic loss, decoded, and checked; invalid candidates do not stop the stream."}</p>
         <div className="basis-diagram">
           {compiled.variables.slice(0, 8).map((variable) => (
             <span key={variable.name}>
@@ -1413,8 +1457,17 @@ function RunDashboard({
           {snapshot.lanes.map((lane) => (
             <div key={lane.workerId}>
               <strong>T{lane.workerId}</strong>
-              <span>{snapshot.workLabel} {lane.start.toLocaleString()}</span>
-              <span>{(lane.endExclusive - 1).toLocaleString()}</span>
+              {searchStrategy === "mihara" ? (
+                <>
+                  <span>{lane.tested.toLocaleString()} fresh starts</span>
+                  <span>{lane.done ? "solution recovered" : "retrying"}</span>
+                </>
+              ) : (
+                <>
+                  <span>{snapshot.workLabel} {lane.start.toLocaleString()}</span>
+                  <span>{(lane.endExclusive - 1).toLocaleString()}</span>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -1434,25 +1487,26 @@ function MiharaCspDiagnostic({
   const invalid = coordinates.filter((coordinate) => coordinate !== 0 && coordinate !== 1).length;
   return (
     <div className="algorithm-diagnostic mihara-diagnostic" role="note">
-      <strong>This attempt fits the wrong statistical model on purpose.</strong>
+      <strong>Mihara receives a positive-only complement expansion.</strong>
       <p>
-        Mihara recovers a coefficient digit from samples expected to lie mostly on one affine
-        equality. Here each CNF row names a forbidden equality, so an equality inlier is a failed
-        clause, not evidence for a satisfying assignment.
+        Each negative clause row is replaced by positive equality rows for every attainable affine
+        value except its forbidden target. A consensus inlier now rewards a satisfying clause
+        value. The signed-row audit below still reports the original residual valuation.
       </p>
       <div className="constraint-check">
         <MetricRow
-          label="Equality consensus"
-          value={`${snapshot.algorithmScore ?? 0} / ${snapshot.algorithmTotal ?? 0} rows`}
+          label="Positive equality consensus"
+          value={`${snapshot.algorithmScore ?? 0} / ${snapshot.algorithmTotal ?? 0} weighted rows`}
         />
+        <MetricRow label="Positive p-adic loss" value={`${snapshot.algorithmLoss ?? "-"}`} />
         <MetricRow label="Non-Boolean coefficients" value={`${invalid} / ${compiled.variables.length}`} />
         <MetricRow
           label="CNF verdict"
           value={snapshot.bestMask == null
             ? "cannot decode"
             : snapshot.bestLoss === compiled.scoring.theoreticalFloor
-              ? "satisfying by coincidence"
-              : "failed"}
+              ? "satisfying"
+              : "not yet satisfying"}
           accent
         />
       </div>
@@ -1482,10 +1536,10 @@ function WorkerTable({
     <div className="worker-table" role="table" aria-label="Thread work batches">
       <div className="worker-row worker-head" role="row">
         <span>Thread</span>
-        <span>{workLabel} batch</span>
-        <span>{exhaustive ? "Current hyperplane" : "Current candidate"}</span>
+        <span>{strategy === "mihara" ? "Restart stream" : `${workLabel} batch`}</span>
+        <span>{strategy === "mihara" ? "Full-rank fits" : exhaustive ? "Current hyperplane" : "Current candidate"}</span>
         <span>Units/sec</span>
-        <span>Progress</span>
+        <span>{strategy === "mihara" ? "Starts tried" : "Progress"}</span>
         <span>{strategy === "mihara" ? "Best inliers" : "Best loss"}</span>
       </div>
       {lanes.map((lane) => {
@@ -1494,13 +1548,21 @@ function WorkerTable({
           <div className="worker-row" key={lane.workerId} role="row">
             <span className="worker-id">T{lane.workerId}</span>
             <span>
-              {lane.start.toLocaleString()} - {(lane.endExclusive - 1).toLocaleString()}
+              {strategy === "mihara"
+                ? "fresh samples"
+                : `${lane.start.toLocaleString()} - ${(lane.endExclusive - 1).toLocaleString()}`}
             </span>
-            <span>{lane.bestMask == null ? "-" : `H${lane.currentMask.toLocaleString()}`}</span>
+            <span>{strategy === "mihara"
+              ? `${lane.algorithmSuccessfulTrials ?? 0}`
+              : lane.bestMask == null ? "-" : `H${lane.currentMask.toLocaleString()}`}</span>
             <span>{formatRate(lane.speed)}</span>
-            <span className="lane-progress">
-              <i style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }} />
-            </span>
+            {strategy === "mihara" ? (
+              <span>{lane.tested.toLocaleString()}</span>
+            ) : (
+              <span className="lane-progress">
+                <i style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }} />
+              </span>
+            )}
             <span>{strategy === "mihara"
               ? `${lane.algorithmScore ?? "-"} / ${lane.algorithmTotal ?? "-"}`
               : lane.bestLoss ?? "-"}</span>
@@ -1546,6 +1608,7 @@ function RegressionEvaluationTable({
               <th>u·x</th>
               <th>target</th>
               <th>residual</th>
+              <th>v<sub>{prime}</sub>(r)</th>
               <th>|r|<sub>{prime}</sub></th>
               <th>signed weight</th>
               <th>contribution to L</th>
@@ -1560,6 +1623,7 @@ function RegressionEvaluationTable({
                 <td>{row.affineValue}</td>
                 <td>{row.relation} {row.target}</td>
                 <td>{formatSignedNumber(row.residual)}</td>
+                <td>{row.pAdicValuation == null ? "∞" : row.pAdicValuation}</td>
                 <td>{row.pAdicNorm}</td>
                 <td className={row.signedWeight < 0 ? "negative-evaluation" : undefined}>
                   {formatSignedNumber(row.signedWeight)}
@@ -1573,7 +1637,7 @@ function RegressionEvaluationTable({
           </tbody>
           <tfoot>
             <tr>
-              <th colSpan={7}>Sum of signed row contributions</th>
+              <th colSpan={8}>Sum of signed row contributions</th>
               <td>{evaluation.totalLoss}</td>
               <td>total loss</td>
             </tr>
@@ -1586,10 +1650,14 @@ function RegressionEvaluationTable({
 
 function LossChart({
   floor,
-  history
+  history,
+  workLabel,
+  floorLabel
 }: {
   floor: number;
   history: Array<{ tested: number; loss: number }>;
+  workLabel: string;
+  floorLabel: string;
 }) {
   const floorIndex = history.findIndex((point) => point.loss <= floor);
   const visibleHistory = floorIndex >= 0 ? history.slice(0, floorIndex + 1) : history;
@@ -1669,10 +1737,10 @@ function LossChart({
         />
         <path d={path} className="loss-line" />
         <text className="floor-label" x={plot.left + 10} y={height - plot.bottom - 9}>
-          satisfiable floor = {floor}
+          {floorLabel} = {floor}
         </text>
         <text className="axis-label x-axis-label" x={plot.left} y={height - 10} textAnchor="start">
-          0 hyperplanes
+          0 {workLabel}
         </text>
         <text className="axis-label x-axis-label" x={width - plot.right} y={height - 10} textAnchor="end">
           {points[points.length - 1].tested.toLocaleString()} tested

@@ -23,6 +23,7 @@ interface StartMessage {
   prime: number;
   start: number;
   endExclusive: number;
+  unbounded: boolean;
   updateEveryMs: number;
 }
 
@@ -83,6 +84,9 @@ function runExhaustiveSearch(message: StartMessage): void {
       bestCoordinates: null,
       algorithmScore: null,
       algorithmTotal: null,
+      algorithmLoss: null,
+      algorithmSuccessfulTrials: null,
+      algorithmSingularTrials: null,
       solutions,
       speed: tested / Math.max((now - startedAt) / 1000, 0.001),
       done
@@ -139,6 +143,9 @@ function runZubarevWalk(message: StartMessage): void {
       bestCoordinates: null,
       algorithmScore: null,
       algorithmTotal: null,
+      algorithmLoss: null,
+      algorithmSuccessfulTrials: null,
+      algorithmSingularTrials: null,
       solutions,
       speed: tested / Math.max((now - startedAt) / 1000, 0.001),
       done
@@ -190,9 +197,16 @@ function runMiharaAttempt(message: StartMessage): void {
   let bestInliers = -1;
   let bestMask: number | null = null;
   let bestLoss: number | null = null;
+  let successfulTrials = 0;
+  let singularTrials = 0;
+  const positiveTotalWeight = message.miharaObservations.reduce(
+    (sum, observation) => sum + (observation.weight ?? 1),
+    0
+  );
   const startedAt = performance.now();
   let lastUpdate = startedAt;
   const chunkSize = 4;
+  const endExclusive = message.unbounded ? Number.MAX_SAFE_INTEGER : message.endExclusive;
 
   const emitProgress = (type: "progress" | "done", done: boolean, now: number) => {
     ctx.postMessage({
@@ -204,7 +218,10 @@ function runMiharaAttempt(message: StartMessage): void {
       bestMask,
       bestCoordinates,
       algorithmScore: bestInliers < 0 ? null : bestInliers,
-      algorithmTotal: message.miharaObservations.length,
+      algorithmTotal: positiveTotalWeight,
+      algorithmLoss: bestInliers < 0 ? null : positiveTotalWeight - bestInliers,
+      algorithmSuccessfulTrials: successfulTrials,
+      algorithmSingularTrials: singularTrials,
       solutions: bestLoss === message.lossFloor ? 1 : 0,
       speed: tested / Math.max((now - startedAt) / 1000, 0.001),
       done
@@ -212,7 +229,7 @@ function runMiharaAttempt(message: StartMessage): void {
   };
 
   const step = () => {
-    const trials = Math.min(chunkSize, message.endExclusive - cursor);
+    const trials = Math.min(chunkSize, endExclusive - cursor);
     if (trials > 0) {
       const fit = fitMiharaLastDigit(
         message.miharaObservations,
@@ -222,6 +239,20 @@ function runMiharaAttempt(message: StartMessage): void {
       );
       tested += trials;
       cursor += trials;
+      successfulTrials += fit.successfulTrials;
+      singularTrials += fit.singularTrials;
+      if (fit.coefficients) {
+        const candidateMask = booleanCoordinatesToMask(fit.coefficients);
+        const candidateLoss = candidateMask == null ? null : evaluateMask(candidateMask);
+        if (candidateLoss === message.lossFloor) {
+          bestCoordinates = fit.coefficients;
+          bestInliers = fit.inliers;
+          bestMask = candidateMask;
+          bestLoss = candidateLoss;
+          emitProgress("done", true, performance.now());
+          return;
+        }
+      }
       if (fit.coefficients && fit.inliers > bestInliers) {
         bestCoordinates = fit.coefficients;
         bestInliers = fit.inliers;
@@ -232,7 +263,7 @@ function runMiharaAttempt(message: StartMessage): void {
         lastUpdate = now;
       }
     }
-    finishOrContinue(step, emitProgress, cursor, message.endExclusive, message.updateEveryMs, lastUpdate);
+    finishOrContinue(step, emitProgress, cursor, endExclusive, message.updateEveryMs, lastUpdate);
   };
 
   step();

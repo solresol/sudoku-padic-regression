@@ -16,6 +16,7 @@ import {
   type PuzzleModel,
   type SudokuRegressionRow,
   ALPHA_DEFAULT,
+  MIHARA_SUDOKU_PRIME,
   P_DEFAULT,
   PEERS,
   buildPuzzleModel,
@@ -68,6 +69,7 @@ function SudokuMode() {
 
   const [snap, setSnap] = useState<SolverSnapshot | null>(null);
   const [history, setHistory] = useState<LossHistoryPoint[]>([]);
+  const [miharaHistory, setMiharaHistory] = useState<LossHistoryPoint[]>([]);
   const [phase, setPhase] = useState<Phase>("setup");
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -122,11 +124,21 @@ function SudokuMode() {
       }
     }
     setSnap(latest);
-    const latestLoss = evaluateObjective(latest.grid, model).loss;
-    setHistory((previous) => appendLossHistory(previous, {
-      step: latest.totalSteps,
-      loss: latestLoss
-    }));
+    const latestLoss = method === "mihara"
+      ? latest.miharaSignedLoss
+      : evaluateObjective(latest.grid, model).loss;
+    if (latestLoss != null) {
+      setHistory((previous) => appendLossHistory(previous, {
+        step: latest.totalSteps,
+        loss: latestLoss
+      }));
+    }
+    if (method === "mihara" && latest.miharaLoss != null) {
+      setMiharaHistory((previous) => appendLossHistory(previous, {
+        step: latest.totalSteps,
+        loss: latest.miharaLoss as number
+      }));
+    }
 
     if (latest.solved) {
       setPhase("solved");
@@ -148,14 +160,17 @@ function SudokuMode() {
     solverRef.current = new SudokuSolver(puzzle, {
       method,
       seed: 0,
-      maxSteps: method === "mihara" ? 48 : maxSteps,
+      maxSteps: method === "mihara" ? Number.MAX_SAFE_INTEGER : maxSteps,
       restarts: method === "mihara" ? 1 : restarts,
       beta0: 0.5,
       beta1: 6.0
     });
     const initial = solverRef.current.snapshot();
     setSnap(initial);
-    setHistory([{ step: 0, loss: evaluateObjective(initial.grid, model).loss }]);
+    setHistory(method === "mihara"
+      ? []
+      : [{ step: 0, loss: evaluateObjective(initial.grid, model).loss }]);
+    setMiharaHistory([]);
     if (initial.solved) {
       setPhase("solved");
       return;
@@ -184,6 +199,7 @@ function SudokuMode() {
     solverRef.current = null;
     setSnap(null);
     setHistory([]);
+    setMiharaHistory([]);
     setPhase("setup");
   }, [stopRaf]);
 
@@ -226,7 +242,9 @@ function SudokuMode() {
 
   const isRunning = phase === "running";
   const canEdit = phase === "setup";
-  const hasLossHistory = history.length > 0;
+  const hasLossHistory = history.length > 0 || miharaHistory.length > 0 || (
+    method === "mihara" && phase !== "setup"
+  );
 
   return (
     <div className={hasLossHistory ? "sudoku-mode has-loss-history" : "sudoku-mode"}>
@@ -312,9 +330,14 @@ function SudokuMode() {
             {objective && (
               <div className="constraint-check">
                 <MetricRow label="Theoretical floor" value={model.theoreticalFloor.toLocaleString()} />
-                <MetricRow label="Current loss L(x)" value={objective.loss.toLocaleString()} />
                 <MetricRow
-                  label="Peer conflicts (loss − floor)"
+                  label={method === "mihara" ? "Rendered-grid signed loss" : "Current loss L(x)"}
+                  value={objective.loss.toLocaleString()}
+                />
+                <MetricRow
+                  label={objective.domainRespecting
+                    ? "Peer conflicts (loss − floor)"
+                    : "Loss − floor (off domain)"}
                   value={`${objective.dedupedConflicts}`}
                   accent={objective.dedupedConflicts > 0}
                 />
@@ -376,27 +399,49 @@ function SudokuMode() {
           </div>
         </div>}
         <MetricRow
-          label={method === "mihara" ? "Modulo-11 RANSAC trials" : "Max steps / restart"}
-          value={method === "mihara" ? "48" : maxSteps.toLocaleString()}
+          label={method === "mihara" ? "Retry policy" : "Max steps / restart"}
+          value={method === "mihara" ? "Until Sudoku solution or stopped" : maxSteps.toLocaleString()}
         />
         {method !== "mihara" && <MetricRow label="Restarts" value={`${restarts}`} />}
 
         {method === "mihara" && (
           <div className="algorithm-diagnostic mihara-diagnostic" role="note">
-            <strong>Expected to fail: this fits equalities, not Sudoku.</strong>
+            <strong>Mihara receives a positive-only complement expansion.</strong>
             <p>
-              The attempt deliberately presents every signed dataframe row as a sample from one
-              hidden affine equality. Peer rows actually reward xᵢ ≠ xⱼ, so the equality fit is
-              pulled toward repeated digits.
+              Each negative peer row is replaced by positive equality rows for every allowed nonzero
+              digit difference. Weighted consensus now rewards unequal peers. The best diagnostic fit
+              is displayed even when it is off-domain, while fresh starts continue until a valid Sudoku
+              is recovered or you pause or reset. Off-domain residues are blanked in the grid; the
+              original signed audit below evaluates the recovered modulo-{MIHARA_SUDOKU_PRIME} vector.
             </p>
           </div>
         )}
 
+        {method === "mihara" && (
+          <>
+            <MetricRow label="Mihara prime" value={`p = ${MIHARA_SUDOKU_PRIME}  (> 16)`} />
+            <MetricRow
+              label="Mihara input"
+              value={`${snap?.miharaObservationCount?.toLocaleString() ?? "–"} positive rows · weighted total ${snap?.miharaTotal?.toLocaleString() ?? "–"}`}
+            />
+            <MetricRow
+              label="Positive last-digit loss"
+              value={`${snap?.miharaLoss ?? "–"}`}
+              accent={snap?.miharaLoss != null && snap.miharaLoss > (snap.miharaFloor ?? 0)}
+            />
+            <MetricRow label="Positive satisfiable floor" value={`${snap?.miharaFloor ?? "–"}`} />
+            <MetricRow label="Original signed loss (audit)" value={`${snap?.miharaSignedLoss ?? "–"}`} />
+          </>
+        )}
+
         <div className="run-stats sudoku-stats">
-          <Stat label="Conflicts H_cb" value={`${snap?.conflicts ?? objective?.hcbConflicts ?? 0}`} />
-          <Stat label="Peer conflicts" value={`${dedupConf}`} />
           <Stat
-            label={method === "mihara" ? "Equality inliers" : "Best"}
+            label={method === "mihara" ? "Rendered conflicts H_cb" : "Conflicts H_cb"}
+            value={`${snap?.conflicts ?? objective?.hcbConflicts ?? 0}`}
+          />
+          <Stat label={method === "mihara" ? "Rendered peer conflicts" : "Peer conflicts"} value={`${dedupConf}`} />
+          <Stat
+            label={method === "mihara" ? "Weighted positive inliers" : "Best"}
             value={method === "mihara"
               ? `${snap?.miharaInliers ?? "–"} / ${snap?.miharaTotal ?? "–"}`
               : `${snap?.bestConflicts ?? "–"}`}
@@ -425,8 +470,17 @@ function SudokuMode() {
               value={`${snap.miharaClueViolations ?? 0}`}
               accent={(snap.miharaClueViolations ?? 0) > 0}
             />
+            <MetricRow
+              label={`v₁₉(r) = 0 peer rows`}
+              value={`${snap.miharaNegativeUnitValuations ?? 0} / 810`}
+            />
+            <MetricRow
+              label={`v₁₉(r) = ∞ peer rows`}
+              value={`${snap.miharaNegativeInfiniteValuations ?? 0} / 810`}
+              accent={(snap.miharaNegativeInfiniteValuations ?? 0) > 0}
+            />
             <div className="solution-equation">
-              <span>Recovered cell coefficients modulo 11</span>
+              <span>Recovered cell coefficients modulo {MIHARA_SUDOKU_PRIME}</span>
               <code>{snap.miharaCoefficients.join(", ")}</code>
             </div>
           </div>
@@ -459,7 +513,7 @@ function SudokuMode() {
                 </>
               ) : (
                 method === "mihara" ? (
-                  <>Attempt finished: no Sudoku solution recovered</>
+                  <>Retry limit reached: no Sudoku solution</>
                 ) : (
                   <>Settled at {snap?.bestConflicts} conflicts (minimum-conflict)</>
                 )
@@ -478,7 +532,26 @@ function SudokuMode() {
             <Square size={18} />
             <h2>p-adic loss over time</h2>
           </div>
-          <SudokuLossChart floor={model?.theoreticalFloor ?? 0} history={history} />
+          {method === "mihara" ? (
+            <>
+              <SudokuLossChart
+                ariaLabel="Mihara positive-complement p-adic loss over time"
+                floor={snap?.miharaFloor ?? 0}
+                history={miharaHistory}
+                subtitle="lower is better; this is the score Mihara selects"
+                title="Positive-complement last-digit loss"
+              />
+              <SudokuLossChart
+                ariaLabel="Original signed Sudoku p-adic loss over time"
+                floor={model?.theoreticalFloor ?? 0}
+                history={history}
+                subtitle="audit only; this does not select Mihara fits"
+                title="Original signed objective L(x)"
+              />
+            </>
+          ) : (
+            <SudokuLossChart floor={model?.theoreticalFloor ?? 0} history={history} />
+          )}
         </section>
       )}
 
@@ -760,11 +833,17 @@ function StatusBanner({ phase, snap }: { phase: Phase; snap: SolverSnapshot | nu
 }
 
 function SudokuLossChart({
+  ariaLabel = "Sudoku p-adic loss over time",
   floor,
-  history
+  history,
+  subtitle = "lower is better",
+  title = "Signed objective L(x)"
 }: {
+  ariaLabel?: string;
   floor: number;
   history: LossHistoryPoint[];
+  subtitle?: string;
+  title?: string;
 }) {
   const floorIndex = history.findIndex((point) => point.loss <= floor);
   const points = floorIndex >= 0 ? history.slice(0, floorIndex + 1) : history;
@@ -799,13 +878,13 @@ function SudokuLossChart({
   return (
     <div className="loss-chart">
       <div className="chart-title">
-        <strong>Signed objective L(x)</strong>
-        <span>lower is better</span>
+        <strong>{title}</strong>
+        <span>{subtitle}</span>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Sudoku p-adic loss over time"
+        aria-label={ariaLabel}
         data-points={points.length}
         data-last-step={points[points.length - 1]?.step ?? 0}
         data-hit-floor={floorIndex >= 0 ? "true" : "false"}

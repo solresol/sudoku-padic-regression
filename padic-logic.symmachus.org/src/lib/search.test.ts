@@ -54,16 +54,18 @@ describe("bit-mask search", () => {
     expect(result.tested).toBe(8);
   });
 
-  it("builds bounded heuristic plans for Zubarev and Mihara", () => {
+  it("marks Mihara as an unbounded retry plan while keeping Zubarev bounded", () => {
     const compiled = compileProblem("A or B\nB xor not C");
     const zubarev = createSearchPlan(compiled, 2, "zubarev");
     const mihara = createSearchPlan(compiled, 2, "mihara");
 
     expect(zubarev.workLabel).toBe("walk steps");
     expect(zubarev.workUnits).toBe(512);
+    expect(zubarev.unbounded).toBe(false);
     expect(zubarev.ranges).toHaveLength(2);
     expect(mihara.workLabel).toBe("RANSAC trials");
     expect(mihara.workUnits).toBe(96);
+    expect(mihara.unbounded).toBe(true);
     expect(mihara.ranges[0]).toMatchObject({ start: 0, endExclusive: 48 });
   });
 });

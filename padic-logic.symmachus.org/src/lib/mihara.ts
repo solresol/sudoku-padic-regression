@@ -1,6 +1,8 @@
 export interface ModPObservation {
   coefficients: number[];
   target: number;
+  weight?: number;
+  samplingGroup?: string;
   source?: string;
 }
 
@@ -76,16 +78,77 @@ export function makeDeterministicRng(seed: number): () => number {
 }
 
 function sampleWithoutReplacement(
-  length: number,
+  observations: ModPObservation[],
   count: number,
-  rng: () => number
+  rng: () => number,
+  p: number
 ): number[] {
-  const indices = Array.from({ length }, (_, index) => index);
-  for (let index = 0; index < count; index += 1) {
-    const selected = index + Math.floor(rng() * (length - index));
-    [indices[index], indices[selected]] = [indices[selected], indices[index]];
+  const groupsByKey = new Map<string, { indices: number[]; weight: number }>();
+  observations.forEach((observation, index) => {
+    const key = observation.samplingGroup ?? `row-${index}`;
+    const group = groupsByKey.get(key) ?? { indices: [], weight: 0 };
+    group.indices.push(index);
+    group.weight += observation.weight ?? 1;
+    groupsByKey.set(key, group);
+  });
+  const groups = Array.from(groupsByKey.values());
+  if (groups.length < count) {
+    throw new Error(`Need at least ${count} independent sampling groups.`);
   }
-  return indices.slice(0, count);
+
+  // Weighted sampling without replacement (Efraimidis-Spirakis keys). A row's
+  // positive objective weight therefore affects both consensus scoring and the
+  // probability that it anchors a minimal sample. Equivalent coefficient rows
+  // can share a sampling group, preventing an automatically singular sample
+  // while still choosing one of their alternative targets at random.
+  const orderedGroups = groups
+    .map((group, index) => ({
+      index,
+      key: Math.log(Math.max(rng(), Number.MIN_VALUE)) / group.weight
+    }))
+    .sort((left, right) => right.key - left.key);
+  const selectedGroups: Array<{ indices: number[]; weight: number }> = [];
+
+  if (observations.some((observation) => observation.samplingGroup != null)) {
+    const basis: Array<number[] | undefined> = new Array(
+      observations[0].coefficients.length
+    );
+    for (const { index } of orderedGroups) {
+      const group = groups[index];
+      const vector = observations[group.indices[0]].coefficients.map((value) => mod(value, p));
+      for (let column = 0; column < vector.length; column += 1) {
+        if (vector[column] === 0) continue;
+        const pivotRow = basis[column];
+        if (pivotRow) {
+          const factor = vector[column];
+          for (let offset = column; offset < vector.length; offset += 1) {
+            vector[offset] = mod(vector[offset] - factor * pivotRow[offset], p);
+          }
+          continue;
+        }
+        const inverse = inverseMod(vector[column], p);
+        for (let offset = column; offset < vector.length; offset += 1) {
+          vector[offset] = mod(vector[offset] * inverse, p);
+        }
+        basis[column] = vector;
+        selectedGroups.push(group);
+        break;
+      }
+      if (selectedGroups.length === count) break;
+    }
+  } else {
+    selectedGroups.push(...orderedGroups.slice(0, count).map(({ index }) => groups[index]));
+  }
+
+  if (selectedGroups.length < count) return [];
+  return selectedGroups.map((group) => {
+      let ticket = rng() * group.weight;
+      for (const observationIndex of group.indices) {
+        ticket -= observations[observationIndex].weight ?? 1;
+        if (ticket <= 0) return observationIndex;
+      }
+      return group.indices[group.indices.length - 1];
+    });
 }
 
 export function countModPInliers(
@@ -98,7 +161,11 @@ export function countModPInliers(
       (sum, coefficient, index) => sum + coefficient * coefficients[index],
       0
     );
-    return count + (mod(affineValue - observation.target, p) === 0 ? 1 : 0);
+    return count + (
+      mod(affineValue - observation.target, p) === 0
+        ? observation.weight ?? 1
+        : 0
+    );
   }, 0);
 }
 
@@ -130,8 +197,12 @@ export function fitMiharaLastDigit(
   let singularTrials = 0;
 
   for (let trial = 0; trial < trials; trial += 1) {
-    const sample = sampleWithoutReplacement(observations.length, dimension, rng)
+    const sample = sampleWithoutReplacement(observations, dimension, rng, p)
       .map((index) => observations[index]);
+    if (sample.length < dimension) {
+      singularTrials += 1;
+      continue;
+    }
     const candidate = solveSquareSystemModP(
       sample.map((row) => row.coefficients),
       sample.map((row) => row.target),
@@ -155,7 +226,7 @@ export function fitMiharaLastDigit(
   return {
     coefficients: best,
     inliers: Math.max(bestInliers, 0),
-    total: observations.length,
+    total: observations.reduce((sum, observation) => sum + (observation.weight ?? 1), 0),
     successfulTrials,
     singularTrials
   };

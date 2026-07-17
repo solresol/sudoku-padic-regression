@@ -13,11 +13,15 @@ import {
   type Grid,
   BOXES,
   COLS,
+  MIHARA_SUDOKU_PRIME,
+  PEER_COUNT,
   ROWS,
+  buildMiharaPositiveSudokuDataFrame,
   buildPuzzleModel,
-  buildSudokuRegressionDataFrame,
   boxIndex,
   conflictsAllUnits,
+  dedupedPeerConflicts,
+  evaluateObjective,
   indexToRc,
   isValidComplete,
   respectsClues,
@@ -67,12 +71,19 @@ export interface SolverSnapshot {
   bestConflicts: number;
   bestGrid: Grid;
   solved: boolean;
-  done: boolean; // exhausted all restarts without solving
+  done: boolean; // search exhausted, or a valid solution was recovered
   lastMove: SolverMove | null;
   beta: number | null; // active inverse temperature (Zubarev only)
   miharaCoefficients: number[] | null;
   miharaInliers: number | null;
   miharaTotal: number | null;
+  miharaObservationCount: number | null;
+  miharaLoss: number | null;
+  miharaFloor: number | null;
+  miharaSignedLoss: number | null;
+  miharaPrime: number | null;
+  miharaNegativeUnitValuations: number | null;
+  miharaNegativeInfiniteValuations: number | null;
   miharaDomainViolations: number | null;
   miharaClueViolations: number | null;
   miharaSuccessfulTrials: number | null;
@@ -216,8 +227,13 @@ export class SudokuSolver {
   private lastMove: SolverMove | null = null;
   private beta: number | null = null;
   private miharaObservations: ModPObservation[] = [];
+  private miharaTotalWeight = 0;
+  private miharaFloor = 0;
   private miharaCoefficients: number[] | null = null;
   private miharaInliers: number | null = null;
+  private miharaSignedLoss: number | null = null;
+  private miharaNegativeUnitValuations: number | null = null;
+  private miharaNegativeInfiniteValuations: number | null = null;
   private miharaDomainViolations: number | null = null;
   private miharaClueViolations: number | null = null;
   private miharaSuccessfulTrials = 0;
@@ -228,14 +244,22 @@ export class SudokuSolver {
     this.options = options;
     this.rng = makeRng(options.seed >>> 0);
     if (options.method === "mihara") {
-      const dataframe = buildSudokuRegressionDataFrame(buildPuzzleModel(puzzle));
+      const dataframe = buildMiharaPositiveSudokuDataFrame(buildPuzzleModel(puzzle, {
+        p: MIHARA_SUDOKU_PRIME
+      }));
       this.miharaObservations = dataframe.rows.map((row) => ({
         coefficients: dataframe.variables.map((variable) =>
           row.coefficients[variable.name] ?? 0
         ),
         target: row.target,
+        weight: row.weight,
+        samplingGroup: row.kind === "pinning"
+          ? `pin-${Object.keys(row.coefficients)[0]}`
+          : row.id.replace(/-(?:n|p)\d+$/u, ""),
         source: row.source
       }));
+      this.miharaTotalWeight = dataframe.totalWeight;
+      this.miharaFloor = dataframe.satisfiableFloor;
     }
     this.initRestart();
   }
@@ -252,6 +276,9 @@ export class SudokuSolver {
       this.lastMove = null;
       this.miharaCoefficients = null;
       this.miharaInliers = null;
+      this.miharaSignedLoss = null;
+      this.miharaNegativeUnitValuations = null;
+      this.miharaNegativeInfiniteValuations = null;
       this.miharaDomainViolations = null;
       this.miharaClueViolations = null;
       this.miharaSuccessfulTrials = 0;
@@ -390,7 +417,7 @@ export class SudokuSolver {
   }
 
   private advanceMiharaAttempt(): SolverSnapshot {
-    const trialLimit = Math.min(this.options.maxSteps, 48);
+    const trialLimit = this.options.maxSteps;
     if (this.step >= trialLimit) {
       this.done = true;
       return this.snapshot();
@@ -398,7 +425,7 @@ export class SudokuSolver {
 
     const fit = fitMiharaLastDigit(
       this.miharaObservations,
-      11,
+      MIHARA_SUDOKU_PRIME,
       this.options.seed ^ Math.imul(this.step + 1, 0x9e37_79b9),
       1
     );
@@ -406,9 +433,28 @@ export class SudokuSolver {
     this.totalSteps += 1;
     this.miharaSuccessfulTrials += fit.successfulTrials;
     this.miharaSingularTrials += fit.singularTrials;
-    if (fit.coefficients && (this.miharaInliers == null || fit.inliers > this.miharaInliers)) {
+    if (fit.coefficients) {
+      const candidateGrid = fit.coefficients.map((coefficient) =>
+        coefficient >= 1 && coefficient <= 9 ? coefficient : 0
+      );
+      const candidateConflicts = conflictsAllUnits(candidateGrid);
+      const candidateSolved = candidateConflicts === 0 &&
+        isValidComplete(candidateGrid) && respectsClues(candidateGrid, this.puzzle);
+      const improvesDiagnostic = this.miharaInliers == null || fit.inliers > this.miharaInliers;
+      if (!candidateSolved && !improvesDiagnostic) {
+        if (this.step >= trialLimit) this.done = true;
+        return this.snapshot();
+      }
+
       this.miharaCoefficients = fit.coefficients;
       this.miharaInliers = fit.inliers;
+      const originalPeerConflicts = dedupedPeerConflicts(fit.coefficients);
+      this.miharaSignedLoss = evaluateObjective(
+        fit.coefficients,
+        buildPuzzleModel(this.puzzle, { p: MIHARA_SUDOKU_PRIME })
+      ).loss;
+      this.miharaNegativeUnitValuations = PEER_COUNT - originalPeerConflicts;
+      this.miharaNegativeInfiniteValuations = originalPeerConflicts;
       this.miharaDomainViolations = fit.coefficients.filter(
         (coefficient) => coefficient < 1 || coefficient > 9
       ).length;
@@ -418,13 +464,11 @@ export class SudokuSolver {
         ),
         0
       );
-      this.grid = fit.coefficients.map((coefficient) =>
-        coefficient >= 1 && coefficient <= 9 ? coefficient : 0
-      );
-      this.conf = conflictsAllUnits(this.grid);
+      this.grid = candidateGrid;
+      this.conf = candidateConflicts;
       this.bestConf = this.conf;
       this.bestGrid = this.grid.slice();
-      this.solved = this.isSolvedState();
+      this.solved = candidateSolved;
     }
     if (this.step >= trialLimit && !this.solved) this.done = true;
     return this.snapshot();
@@ -465,7 +509,18 @@ export class SudokuSolver {
       beta: this.beta,
       miharaCoefficients: this.miharaCoefficients?.slice() ?? null,
       miharaInliers: this.miharaInliers,
-      miharaTotal: this.options.method === "mihara" ? this.miharaObservations.length : null,
+      miharaTotal: this.options.method === "mihara" ? this.miharaTotalWeight : null,
+      miharaObservationCount: this.options.method === "mihara"
+        ? this.miharaObservations.length
+        : null,
+      miharaLoss: this.miharaInliers == null
+        ? null
+        : this.miharaTotalWeight - this.miharaInliers,
+      miharaFloor: this.options.method === "mihara" ? this.miharaFloor : null,
+      miharaSignedLoss: this.miharaSignedLoss,
+      miharaPrime: this.options.method === "mihara" ? MIHARA_SUDOKU_PRIME : null,
+      miharaNegativeUnitValuations: this.miharaNegativeUnitValuations,
+      miharaNegativeInfiniteValuations: this.miharaNegativeInfiniteValuations,
       miharaDomainViolations: this.miharaDomainViolations,
       miharaClueViolations: this.miharaClueViolations,
       miharaSuccessfulTrials: this.options.method === "mihara"

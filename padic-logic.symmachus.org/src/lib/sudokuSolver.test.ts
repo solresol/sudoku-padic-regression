@@ -73,7 +73,7 @@ describe("SudokuSolver", () => {
     expect(snap.conflicts).toBe(0);
   });
 
-  it("runs the Mihara equality fit as a diagnostic rather than claiming Sudoku success", () => {
+  it("runs Mihara on the weighted positive-complement Sudoku dataframe", () => {
     const solver = new SudokuSolver(parsePuzzle(EXAMPLE_PUZZLE), {
       ...DEFAULT_SOLVER_OPTIONS,
       method: "mihara",
@@ -85,8 +85,44 @@ describe("SudokuSolver", () => {
 
     expect(snap.done).toBe(true);
     expect(snap.solved).toBe(false);
-    expect(snap.miharaTotal).toBeGreaterThan(1_000);
-    expect(snap.miharaCoefficients === null || snap.miharaInliers !== null).toBe(true);
-    expect((snap.miharaSuccessfulTrials ?? 0) + (snap.miharaSingularTrials ?? 0)).toBe(1);
+    expect(snap.miharaPrime).toBe(19);
+    expect(snap.miharaObservationCount).toBe(13_449);
+    expect(snap.miharaTotal).toBe(23_229);
+    expect(snap.miharaFloor).toBe(20_718);
+    expect(snap.miharaCoefficients).toHaveLength(81);
+    expect(snap.miharaInliers).not.toBeNull();
+    expect(snap.miharaLoss).toBe((snap.miharaTotal ?? 0) - (snap.miharaInliers ?? 0));
+    expect(snap.miharaLoss).toBeGreaterThanOrEqual(snap.miharaFloor ?? 0);
+    expect(snap.miharaSignedLoss).not.toBeNull();
+    expect(
+      (snap.miharaNegativeUnitValuations ?? 0) +
+      (snap.miharaNegativeInfiniteValuations ?? 0)
+    ).toBe(810);
+    expect(snap.miharaSuccessfulTrials).toBe(1);
+    expect(snap.miharaSingularTrials).toBe(0);
+  });
+
+  it("retries Mihara with alternate full-rank starts and retains only a non-increasing loss", () => {
+    const solver = new SudokuSolver(parsePuzzle(EXAMPLE_PUZZLE), {
+      ...DEFAULT_SOLVER_OPTIONS,
+      method: "mihara",
+      seed: 0,
+      maxSteps: 8,
+      restarts: 1
+    });
+
+    const losses: number[] = [];
+    for (let index = 0; index < 8; index += 1) {
+      const snapshot = solver.advance();
+      if (snapshot.miharaLoss != null) losses.push(snapshot.miharaLoss);
+    }
+    const final = solver.snapshot();
+
+    expect(final.totalSteps).toBe(8);
+    expect(final.miharaSuccessfulTrials).toBe(8);
+    expect(final.miharaSingularTrials).toBe(0);
+    expect(final.done).toBe(true);
+    expect(losses).toHaveLength(8);
+    expect(losses.every((loss, index) => index === 0 || loss <= losses[index - 1])).toBe(true);
   });
 });
