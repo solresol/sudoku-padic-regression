@@ -40,6 +40,26 @@ We construct a mechanical compiler from finite-domain all-different systems and 
 
 \noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
 
+\section{Introduction}
+\label{sec:introduction}
+
+In affine \(p\)-adic linear regression, an observation pairs a feature vector \(u\in\mathbb Z^n\) with a target \(b\in\mathbb Z\), and a coefficient vector \(x\) is scored by a weighted sum of residual norms \(|u^\top x-b|_p\). Earlier work establishes the geometry and complexity of this problem when every weight is positive \cite{baker2025padic,baker2026nphard,mihara2026forcing}. This paper studies the signed variant, in which an observation may carry a negative weight. In ordinary least squares, negative weights can destroy convexity and boundedness. Over \(\mathbb Z_p\), by contrast, every affine residual has norm at most one, so a finite signed objective remains bounded and a negative row acts as a bounded reward.
+
+The contribution is one of expressivity. Finite-domain all-different systems and CNF formulae compile mechanically into signed objectives: sufficiently weighted positive unary rows pin each coefficient to a finite allowed set, and a coordinatewise domination theorem (Theorem~\ref{thm:compiler-template}) shows that every global minimiser lies in that finite domain. There each remaining residual norm is a zero-or-one indicator, so a negative row rewards an unequal pair \(x_i\neq x_j\) or a satisfied clause, and the loss is, up to an additive constant, the conflict count of the all-different system or the negative number of satisfied clauses. The global minimisers are exactly the domain-respecting minimum-conflict assignments, and exactly the satisfying assignments when the instance is satisfiable (Theorem~\ref{thm:all-different}, Corollary~\ref{cor:all-different-csp}).
+
+Two caveats frame that claim. First, once the minimisers have snapped to the finite domain, the \(p\)-adic norms have collapsed to indicators, and a discrete-metric variant of the construction behaves identically (Section~\ref{construction}). The claim is therefore not that \(p\)-adic analysis solves constraint problems better than existing methods; it is that the signed affine \(p\)-adic regression class \emph{contains} these problems on their native variables, without a one-hot lift. One consequence for the class itself is that its threshold decision problem is NP-hard already at the fixed prime \(p=5\) (Corollary~\ref{cor:signed-nphard}). Because a positive objective is the special case in which every sign is \(+1\), this hardness also follows from Mihara's forcing theorem \cite{mihara2026forcing}; the derivation here is elementary and self-contained, using only the clause compiler. Second, the Sudoku computations are smoke tests of finite-state search on the induced loss, not a solver benchmark, and their search components are standard: the permutation state space and within-unit swap neighbourhood follow Lewis's metaheuristic Sudoku formulation \cite{lewis2007metaheuristics}, with rows in place of boxes as the permutation unit.
+
+The paper makes the following contributions.
+\begin{itemize}
+\item A compiler template from finite-domain all-different systems and CNF formulae to signed weighted affine \(p\)-adic residual objectives, with a coordinatewise domination theorem locating every global minimiser in the finite domain, on \(\mathbb Z_p^n\) and on \(\mathbb Q_p^n\) (Theorem~\ref{thm:compiler-template}, Corollary~\ref{cor:qp-extension}).
+\item An exact characterisation of the global minimisers for all-different systems in list-colouring form as the domain-respecting minimum-conflict assignments, covering the unsatisfiable Max-CSP regime and the antiferromagnetic Potts reading (Theorem~\ref{thm:all-different}, Section~\ref{sec:minimum-conflicts-potts}).
+\item NP-hardness of the signed threshold problem at the fixed prime \(p=5\), by an elementary reduction through the clause compiler (Corollary~\ref{cor:signed-nphard}).
+\item A polynomial-size positive-only complement expansion of each negative CNF row, supporting a diagnostic comparison with Mihara's digitwise equality regression while the signed row is retained for valuation and loss reporting (Section~\ref{sec:mihara-digitwise}).
+\item A Sudoku case study on the native \(81\)-cell digit space: two finite-state solvers, a greedy row-swap search and a discrete Zubarev walk, both of which completed all \(18\) randomly carved smoke-test puzzles; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
+\end{itemize}
+
+Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a polynomial-valued labelling of false clauses as a direction for future work. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances and the Potts interpretation. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku, and Section~\ref{sec:illustrative-computations} reports the computations. Section~\ref{sec:related-work} locates the construction among valued CSPs, Potts energies, and Mihara's digitwise regression. The appendices record the heuristics, their traces, the experiments, and the failed powers-of-two encoding.
+
 \section{\texorpdfstring{\(p\)-adic}{p-adic} linear regression}
 \label{sec:padic-regression-background}
 
@@ -619,6 +639,7 @@ If a best-effort solution should treat some constraints as more important than o
 On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
 \section{Sudoku as a special case}
+\label{sec:sudoku}
 Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with \(p\)-adic machine-learning training methods on a small sample of randomly carved Sudoku instances.
 
 \subsection{Sudoku}
@@ -730,6 +751,7 @@ Each row, column, and box of Sudoku forms a clique of size \(9\) in \(G_{\mathrm
 In the deduplicated peer graph, every cell has degree \(20\), so Theorem~\ref{thm:all-different} requires \(\alpha>20\) for the minimal objective \eqref{eq:objective-minimal}; \(\alpha=21\) is enough. For the expanded objective \eqref{eq:objective}, the same claim requires \(\alpha_{\mathrm{clue}}>20\), because the all-digit wells are constant on clue cells. If one instead counts row, column, and box overlaps separately, each cell has \(8+8+8=24\) incident negative terms, and the safe unary bound becomes \(>24\).
 
 \section{Representational parsimony}
+\label{sec:parsimony}
 
 A standard SAT or exact-cover lift introduces Boolean variables
 \[
@@ -762,10 +784,11 @@ On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solv
 \end{figure}
 
 \section{Related work and scope}
+\label{sec:related-work}
 
 \subsection{Earlier regression and constraint models}
 
-From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts}. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
+From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts} and to Lewis's metaheuristic Sudoku study \cite{lewis2007metaheuristics}, whose simulated annealing keeps each \(3\times3\) box as a permutation of \(1,\dots,9\) and swaps two non-clue cells within a box; the heuristics in Appendix~\ref{app:heuristics} make the analogous choice with rows as the permutation unit. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
 
 \subsection{Mihara's digitwise regression and positive complement expansion}
 \label{sec:mihara-digitwise}
@@ -858,7 +881,7 @@ where \(C_c\) and \(B_b\) are the cells in column \(c\) and box \(b\), and
 \]
 Because each row is kept as a permutation of \(\{1,\dots,9\}\), the corresponding row contribution is identically zero and is omitted. This duplicated unit-scope loss is close to, but not identical with, the deduplicated peer-conflict objective coming from \(\mathcal P\): a conflicting pair that lies simultaneously in a column and a box is counted twice. For the seed-\(0\) initialisation shown later in Figure~\ref{fig:seed-zero-init}, the deduplicated peer-conflict count is \(47\) whereas \(H_{\mathrm{cb}}=56\), because nine conflicting pairs lie in both a column and a box.
 
-The heuristics work directly on the digit-valued, clue-consistent row-permutation state space and minimise \(H_{\mathrm{cb}}\). Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space.
+The heuristics work directly on the digit-valued, clue-consistent row-permutation state space and minimise \(H_{\mathrm{cb}}\). Concretely, we initialise each row as a random permutation of $1,\dots,9$ consistent with its clues, and then apply row-wise swaps that reduce \(H_{\mathrm{cb}}\). This is a block-local search on the integer state space. The state space and neighbourhood follow the standard metaheuristic Sudoku design of Lewis \cite{lewis2007metaheuristics}, with rows rather than boxes as the permutation unit; the search procedure itself is not a contribution of this paper.
 
 \begin{lemma}[Locality of row swaps]
 \label{lem:row-swap-locality}
@@ -1210,6 +1233,12 @@ S. Minton, M. D. Johnston, A. B. Philips, and P. Laird.
 \newblock Solving large-scale constraint-satisfaction and scheduling problems using a heuristic repair method.
 \newblock In \emph{Proceedings of AAAI-90}, 17--24 (1990).
 \newblock \url{https://cdn.aaai.org/AAAI/1990/AAAI90-003.pdf}
+
+\bibitem{lewis2007metaheuristics}
+R. Lewis.
+\newblock Metaheuristics can solve sudoku puzzles.
+\newblock \emph{Journal of Heuristics} 13(4), 387--401 (2007).
+\newblock \url{https://doi.org/10.1007/s10732-007-9012-8}
 
 \bibitem{knuth2000dancing}
 Donald E. Knuth.
