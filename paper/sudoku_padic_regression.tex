@@ -35,7 +35,7 @@
 \maketitle
 
 \begin{abstract}
-We give a mechanical translation from finite-domain all-different graphs and CNF formulae to signed, weighted \(p\)-adic regression data. Positive observations with sufficiently large weights restrict the model coefficients to allowed finite values; negative observations with smaller weights reward unequal endpoints or satisfied clauses. For a suitable prime, each residual norm on the intended finite domain is either zero or one, so minimising the regression objective is exactly minimising graph conflicts or maximising satisfied clauses. A three-variable worked example displays the complete dataframe and recovers its list-colourings by enumerating the finitely many zero-intercept hyperplanes determined by domain-pinning rows. A two-variable CNF example gives the same calculation for clauses. Standard Sudoku then supplies an \(81\)-variable case study. We prove a general compiler theorem and provide a client-side implementation that exposes the generated dataframe and loss arithmetic. Different false clauses can also be assigned different polynomial labels, but this retains information already available from the clause list and gives no evident optimisation shortcut; we leave stronger uses of that encoding to future work.
+We construct a mechanical compiler from finite-domain all-different systems and CNF formulae to signed, weighted affine \(p\)-adic residual objectives. For primes that separate the finite alphabet, every relevant residual norm is zero or one on the intended domain. Sufficiently weighted positive unary rows pin each coefficient to an allowed value, while negative rows reward unequal endpoints or clause satisfaction. A coordinatewise domination theorem proves that every global minimiser lies in the finite domain; there the loss is, up to an additive constant, the conflict count for all-different systems or the negative number of satisfied clauses for CNF. Each negative CNF row also has a polynomial-size positive-only complement expansion over its attainable affine values; this supports a Mihara-style weighted-consensus comparison while retaining the original signed row for valuation and loss reporting. The resulting optimisation is NP-hard already at the fixed prime \(p=5\). Standard Sudoku gives an \(81\)-coefficient case study without a one-hot lift. We implement two finite-state solvers: a greedy row-swap method that evaluates an integer conflict-count representative of the induced loss, and a discrete Zubarev walk whose Boltzmann rule uses changes in that loss. Both solved all \(18\) randomly carved smoke-test puzzles, which were not uniqueness-checked and do not constitute a benchmark. A direct Mihara digitwise equality-regression comparison remains intrinsically \(p\)-adic but does not solve ordinary Sudoku because the unexpanded rows encode many inequalities rather than samples from one hidden affine law. A client-side implementation exposes the generated dataframes, loss arithmetic, and representative searches.
 \end{abstract}
 
 \noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
@@ -49,13 +49,13 @@ Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent o
 \qquad
 |0|_p=0.
 \]
-This norm makes numbers close when their difference is divisible by a large power of \(p\). Linear regression using sums of squared residuals needs little introduction: the familiar loss derives from the Euclidean distance formula, and weighted variants, including negatively weighted observations, are well known. Euclidean distance is not the only distance that can be used. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and a weighted objective sums terms of the form
+This norm makes numbers close when their difference is divisible by a large power of \(p\). Ordinary weighted least squares normally uses nonnegative weights. Inserting negative coefficients into its quadratic objective can destroy convexity and boundedness, so it is not a useful precedent for the signed objective studied here. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and the usual positive-weight objective sums terms of the form
 \[
 \gamma\,|u^\top x-b|_p,
 \qquad \gamma>0.
 \]
 This is a weighted \(p\)-adic linear-regression objective.
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}. We find no evidence that \(p\)-adic linear regression with negative weights has previously been studied. We demonstrate that it gives a useful representation of constraint-satisfaction problems such as Sudoku: source forms can be transformed mechanically into datasets for \(p\)-adic linear-regression training, and a global minimiser of the resulting objective can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective used below. On \(\mathbb Z_p\), every affine residual in this paper has norm at most one, so each finite signed objective is bounded despite its negative terms. We demonstrate that such objectives give useful representations of constraint-satisfaction problems: source forms can be transformed mechanically into datasets, and a global minimiser can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment.
 
 \subsection{An example}
 \label{sec:worked-all-different}
@@ -167,7 +167,7 @@ The minimum-loss coefficient vectors are exactly the valid assignments of Figure
 
 Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \[
-\Phi=(z_1)\wedge(\neg z_1\vee z_2),
+\Phi=(z_1)\wedge(\neg z_1\vee z_2).
 \]
 What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
 
@@ -214,7 +214,7 @@ The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying 
 \subsection{Polynomial-valued false labels}
 \label{sec:polynomial-labels}
 
-The preceding CNF gives a concrete polynomial-valued encoding. Let \(V_{C_i}(x)\) be \(1\) when clause \(C_i\) is false and \(0\) when it is true, and take
+The preceding CNF gives a concrete polynomial-valued encoding over \(\mathbb Q[T]\). Let \(V_{C_i}(x)\) be \(1\) when clause \(C_i\) is false and \(0\) when it is true, and take
 \[
 P_{C_1}(T)=T,
 \qquad
@@ -225,17 +225,22 @@ Form
 R_x(T)=\prod_{i=1}^{2}\bigl(1-V_{C_i}(x)+V_{C_i}(x)P_{C_i}(T)\bigr)
 =\prod_{C_i\text{ false under }x}P_{C_i}(T).
 \]
-Factoring \(R_x\) recovers the false-clause labels. Degree also defines a non-Archimedean absolute value on the rational-function field: for any fixed \(c>1\),
+Factoring \(R_x\) recovers the false-clause labels. Degree defines a non-Archimedean absolute value on the rational-function field \(\mathbb Q(T)\): for any fixed \(c>1\) and nonzero \(f,g\in\mathbb Q[T]\),
 \[
 \left|\frac{f}{g}\right|_{\infty}=c^{\deg f-\deg g},
 \qquad
 |0|_{\infty}=0.
 \]
-Thus minimising \(\deg R_x\) is equivalent to minimising this degree-based ultrametric loss. For the four assignments,
+Multiplicativity follows from additivity of degree under products. The inequality
 \[
-\begin{array}{c|c|c}
+\deg(f+g)\leq\max\{\deg f,\deg g\}
+\]
+gives the strong triangle inequality. Hence
+\(d_\infty(F,G):=|F-G|_\infty\) is an ultrametric. For a nonzero polynomial \(R\),
+\(\log_c|R|_\infty=\deg R\). Thus degree is the logarithmic objective associated with this degree-at-infinity ultrametric, rather than itself being the metric, and minimising either quantity is equivalent. For the four assignments,
+\[
+\begin{array}{ccc}
 x & R_x(T) & \deg R_x\\
-\hline
 (0,0) & 1 & 0\\
 (0,1) & T+1 & 1\\
 (1,0) & T & 1\\
@@ -260,7 +265,7 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 \[
 \sigma\gamma\,|u^\top x-b|_p
 \]
-to the loss; formally, this is the $p$-adic analogue of a weighted Euclidean residual term.
+to the loss; this is the basic term in the signed weighted $p$-adic objective.
 \end{definition}
 
 Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards.
@@ -575,16 +580,16 @@ So the global minimisers are exactly the assignments that maximise the number of
 
 \begin{corollary}[NP-hardness at a fixed prime]
 \label{cor:signed-nphard}
-Globally minimising signed affine \(p\)-adic residual objectives is NP-hard already for the fixed prime \(p=5\).
+The threshold decision problem for signed affine \(p\)-adic residual objectives is NP-hard already for the fixed prime \(p=5\); consequently, so is global minimisation.
 \end{corollary}
 
 \begin{proof}
-Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha>\Delta\). Its minimum equals \(\alpha n-m\) if and only if all \(m\) clauses can be satisfied. A global optimiser would therefore decide \textsc{3-SAT}, so the optimisation problem is NP-hard.
+Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha=\Delta+1\). Its minimum is at most the threshold \(\alpha n-m\) if and only if all \(m\) clauses can be satisfied. This is a polynomial-time reduction from \textsc{3-SAT} to the threshold problem.
 \end{proof}
 
-\begin{corollary}[NP-hardness for the polynomial degree metric]
+\begin{corollary}[NP-hardness for the degree-at-infinity objective]
 \label{cor:degree-metric-nphard}
-Given pairwise coprime linear false-clause labels, minimising the degree-based ultrametric loss \(\deg R_x\) over Boolean assignments is NP-hard.
+Given pairwise coprime linear false-clause labels, minimising \(|R_x|_\infty\), equivalently \(\deg R_x\), over Boolean assignments is NP-hard.
 \end{corollary}
 
 \begin{proof}
@@ -600,7 +605,7 @@ and the allowed set \(S_C=\{0,\dots,s-1\}\). For \(S\subseteq\{0,\dots,s\}\), se
 \[
 W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
-When \(p>k\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
+When \(p>s\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
 
 \section{Minimum conflicts and Potts energies}
 \label{sec:minimum-conflicts-potts}
@@ -701,7 +706,7 @@ Once \(x\) is digit-valued, the pairwise part is simply
 \[
 -\sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p
 =
--|\mathcal P|+\sum_{(i,j)\in\mathcal{P}}\mathbf 1_{x_i=x_j},
+-|\mathcal P|+\sum_{(i,j)\in\mathcal{P}}\mathbf 1_{x_i=x_j}.
 \]
 For the minimal objective on domain-respecting states, and for the expanded objective on digit-valued, clue-consistent states, the remaining terms are constant. In those regimes the loss differs from the \emph{deduplicated} peer-conflict count only by an additive constant. The heuristics below do not optimise that deduplicated peer objective directly: on the row-permutation state space they use a duplicated unit-scope column/box surrogate that counts conflicts separately inside each column and each box. That surrogate is described in Section~\ref{sec:illustrative-computations} and Appendix~\ref{app:heuristics}.
 
@@ -736,14 +741,14 @@ The minimal objective \eqref{eq:objective-minimal} is already a single scalar lo
 
 Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
 
-\section{Computations using \texorpdfstring{\(p\)-adic}{p-adic} machine-learning techniques}
+\section{Computations with the induced \texorpdfstring{\(p\)-adic}{p-adic} loss}
 \label{sec:illustrative-computations}
 
-We implemented two simple local-search procedures: a greedy row-swap search and a discrete Zubarev walk. Appendix~\ref{app:heuristics} defines their loss, records the algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
+We implemented two finite-state local-search solvers: a greedy row-swap search and a discrete Zubarev walk. We also implemented Mihara's digitwise equality regression as a diagnostic comparison, not as a successful Sudoku solver. Appendix~\ref{app:heuristics} defines the solver loss, records the two algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
 
-These are \(p\)-adic machine-learning techniques in this setting because they train the coefficient vector by local moves whose selection is biased toward reducing a loss derived from the signed \(p\)-adic residual objective. In particular, row-swap search is a discrete graph walk on the state graph of clue-consistent row permutations, in the same spirit as earlier graph-walk experiments.
+The greedy solver simply counts integer conflicts: it does not evaluate a \(p\)-adic valuation numerically. On the digit-restricted state space this count is an exact integer representative of the induced zero-or-one residual loss, with column--box overlaps counted twice. The Zubarev solver uses the same induced loss through the Boltzmann transition rule \(\exp(-\beta\,\Delta L)\); its finite implementation can likewise compute \(\Delta L\) from integer conflicts because all relevant norms have already collapsed to indicators. Mihara's comparison instead performs modulo-\(p\), digitwise equality fitting directly. It is therefore intrinsically \(p\)-adic, but it targets the wrong statistical model for an all-different CSP and does not solve ordinary Sudoku; at most degenerate or already-complete cases are trivial.
 
-On a small sample of \(18\) randomly carved puzzles, both heuristics solved every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These results show that general \(p\)-adic linear-regression heuristics can solve most of the sampled Sudoku instances in practice, but the sample is not a solver benchmark.
+On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These smoke tests show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. Mihara's diagnostic is not included among the \(36\) solver runs.
 
 \begin{quote}\small
 \url{https://padic-logic.symmachus.org}
@@ -760,9 +765,9 @@ On a small sample of \(18\) randomly carved puzzles, both heuristics solved ever
 
 \subsection{Earlier regression and constraint models}
 
-From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts}. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}.
+From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts}. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
 
-\subsection{Why we could not use Mihara regression}
+\subsection{Mihara's digitwise regression and positive complement expansion}
 \label{sec:mihara-digitwise}
 
 Mihara's forcing theorem \cite{mihara2026forcing} considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
@@ -803,20 +808,30 @@ the method estimates \(c\bmod p^E\) recursively: first solve a modulo-\(p\) line
 \]
 and the condition that the noise-free samples have the right affine hull modulo \(p\) at each digit step.
 
-Those assumptions do not match the Sudoku construction. In this paper the unknowns \(x_i\) are the cell values themselves, not coefficients of an observed response law. The residual rows are exact synthetic constraints chosen by the modeller: unary wells pin cells to allowed digits, while negative residuals \(-|x_i-x_j|_p\) reward inequality across peer edges. After digit snapping, the problem is a finite-domain conflict-minimisation problem. There is no response vector \(Y\), no hidden coefficient vector \(c\) to recover from random samples, and no large noise-free affine locus whose graph could be estimated digit by digit.
+The finite-field linear algebra in an individual trial is polynomial-time. The published algorithm is not, however, a worst-case polynomial-time method: its modulo-\(p\) routine uses an unbounded restart loop, and Mihara explicitly notes that the process need not terminate. The probability analysis can give useful expected behaviour when the random-sampling, affine-hull, and noise assumptions hold; it does not provide a polynomial termination guarantee for arbitrary input data.
 
-Mihara's method also does not apply to the CNF construction. A clause becomes one \emph{forbidden} affine equality
+Those assumptions do not directly match the signed Sudoku construction. In this paper the unknowns \(x_i\) are the cell values themselves, not coefficients of an observed response law. The residual rows are exact synthetic constraints chosen by the modeller: unary wells pin cells to allowed digits, while negative residuals \(-|x_i-x_j|_p\) reward inequality across peer edges. After digit snapping, the problem is a finite-domain conflict-minimisation problem. There is no naturally sampled response vector \(Y\), no hidden coefficient vector \(c\), and no large noise-free affine locus whose graph is assumed to have generated the observations.
+
+For a finite-domain negative row, however, there is an exact positive-only reformulation. Let
 \[
-u_C^\top x=t_C,
+S=\{u^\top x:x\in C\}
 \]
-and a satisfying assignment is rewarded because the residual is nonzero. Mihara's modulo-\(p\) stage is designed to recover an affine equality satisfied by most noise-free samples. The Boolean CSP task asks for one point avoiding many clause-specific forbidden hyperplanes, or, in the Max-CSP case, avoiding as many as possible. Failed clauses are not random digitwise outliers from a single affine law; they are exact, structured constraints sharing variables.
+be the attainable affine values on the forced finite domain \(C\), and let \(t\in S\) be the forbidden target. When distinct elements of \(S\) remain distinct modulo \(p\),
+\[
+\sum_{s\in S\setminus\{t\}} |u^\top x-s|_p
+= (|S|-1)-|u^\top x-t|_p,
+\qquad x\in C.
+\]
+Indeed, at \(u^\top x=t\) all \(|S|-1\) positive rows contribute one, whereas at an allowed value exactly one complementary row vanishes. Thus the positive family has exactly the same minimisers as the original negative row, differing only by the constant \(|S|-1\).
 
-This is not surprising: if Mihara's method could quickly solve these instances, it would provide a polynomial-time solver for NP-hard problems.
+For a CNF clause, \(S_C=\{u_C^\top x:x\in\{0,1\}^n\}\) contains at most one more value than the clause width. Replacing the forbidden row \(u_C^\top x=t_C\) by the positive rows \(u_C^\top x=s\) for \(s\in S_C\setminus\{t_C\}\) is therefore a polynomial-size expansion. Together with the positive weighted Boolean wells, it gives Mihara's modulo-\(p\) stage a positive-only weighted-consensus dataset: a satisfying clause contributes one unit of inlier weight, while a failed clause contributes none. The original signed row is retained for reporting \(v_p(u_C^\top x-t_C)\), its norm, and its signed contribution to the displayed loss.
+
+The companion browser uses this positive complement expansion for its Boolean-CSP Mihara mode and plots the resulting positive \(p\)-adic loss. It still treats the procedure as an unbounded-restart heuristic rather than a polynomial-time solver. The separate ordinary-Sudoku Mihara comparison continues to apply the direct equality fit to the unexpanded signed dataframe and generally returns coefficients that fail the digit, clue, and peer constraints. A method guaranteed to solve every compiled instance in polynomial time would decide the NP-hard threshold problem of Corollary~\ref{cor:signed-nphard}; Mihara's algorithm makes no such guarantee.
 
 
 \section{Conclusion}
 
-Negative weights in Euclidean squared-loss regression are usually treated as anti-shrinkage terms in selected directions. Here signed residuals have a different role. Positive synthetic terms pin variables to a finite set; after that, negative \(p\)-adic terms are bounded rewards for inequality on domain-respecting states.
+Signed \(p\)-adic residuals have a direct finite-domain role. Positive synthetic terms pin variables to a finite set; after that, negative terms are bounded rewards for inequality or clause satisfaction. This bounded construction should not be conflated with inserting negative weights into ordinary Euclidean least squares.
 
 Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
@@ -830,7 +845,7 @@ The companion site in Figure~\ref{fig:browser-sudoku-solution} lets readers trac
 \label{app:heuristics}
 
 \subsection{Row-swap local search}
-To keep local updates cheap, the implementation does not minimise \eqref{eq:objective} directly. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
+To keep local updates cheap, the greedy implementation does not evaluate \eqref{eq:objective} or any \(p\)-adic valuation numerically. Instead, on the digit-valued, clue-consistent row-permutation state space it minimises the duplicated unit-scope column/box conflict count
 \[
 H_{\mathrm{cb}}(x):=
 \sum_{c=1}^{9} \operatorname{conf}(C_c;x)
@@ -1022,7 +1037,7 @@ Step & Row & Swap (columns) & Conflicts (before) & (after) \\
 
 \section{Illustrative experiments}
 \label{app:heuristics-results}
-We implemented both heuristics above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime only the induced indicator behaviour matters: the search evaluates the integer conflict count \(H_{\mathrm{cb}}\) directly and never computes a \(p\)-adic valuation numerically, so the \(p\)-adic norm routines in the code are illustrative of the construction rather than part of the solve path.
+We implemented both solvers above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime the relevant residual norms are exactly zero-or-one indicators. The greedy solver evaluates the resulting integer conflict count \(H_{\mathrm{cb}}\) directly. The Zubarev solver uses changes in the same induced loss in its Boltzmann probabilities; those changes can also be computed from \(H_{\mathrm{cb}}\) without numerically calling a valuation routine. Thus the \(p\)-adic construction determines the finite-state loss, while the implementation uses its exact integer representation.
 
 \subsection{Experimental setup}
 To obtain a quick, reproducible testbed, we generated random puzzles by:
@@ -1162,9 +1177,9 @@ G. Baker.
 
 \bibitem{deloera2007nullstellensatz}
 J. A. De Loera, J. Lee, S. Margulies, and S. Onn.
-\newblock Expressing combinatorial optimization problems by systems of polynomial equations and the Nullstellensatz.
-\newblock arXiv:0706.0578 (2007).
-\newblock \url{https://arxiv.org/abs/0706.0578}
+\newblock Expressing combinatorial problems by systems of polynomial equations and Hilbert's Nullstellensatz.
+\newblock \emph{Combinatorics, Probability and Computing} 18(4), 551--582 (2009).
+\newblock \url{https://doi.org/10.1017/S0963548309009894}
 
 \bibitem{schiex1995vcsp}
 T. Schiex, H. Fargier, and G. Verfaillie.
@@ -1181,8 +1196,8 @@ J.-C. R\'egin.
 \bibitem{ellismonaghan2014potts}
 J. A. Ellis-Monaghan and I. Moffatt.
 \newblock A note on recognizing an old friend in a new place: list coloring and the zero-temperature Potts model.
-\newblock arXiv:1406.5532 (2014).
-\newblock \url{https://arxiv.org/abs/1406.5532}
+\newblock \emph{Annales de l'Institut Henri Poincar\'e D} 1(4), 429--442 (2014).
+\newblock \url{https://doi.org/10.4171/AIHPD/12}
 
 \bibitem{lucas2014ising}
 A. Lucas.
@@ -1225,6 +1240,12 @@ A. P. Zubarev.
 \newblock \(p\)-Adic polynomial regression as alternative to neural network for approximating \(p\)-adic functions of many variables.
 \newblock \emph{p-Adic Numbers, Ultrametric Analysis and Applications} 17(4), 413--420 (2025).
 \newblock \url{https://doi.org/10.1134/S2070046625040065}
+
+\bibitem{martins2025learning}
+A. F. T. Martins.
+\newblock Learning with the \(p\)-adics.
+\newblock arXiv:2512.22692 (2025).
+\newblock \url{https://arxiv.org/abs/2512.22692}
 
 \bibitem{mihara2026digitwise}
 T. Mihara.
