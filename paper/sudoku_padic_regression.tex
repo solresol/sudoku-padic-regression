@@ -58,7 +58,7 @@ The paper makes the following contributions.
 \item A Sudoku case study on the native \(81\)-cell digit space using a variety of \(p\)-adic linear-regression techniques; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
 \end{itemize}
 
-Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a polynomial-valued labelling of false values as a direction for future work. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances and the Potts interpretation. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations and compares Mihara's digitwise regression, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices record the heuristics, their traces, the experiments, and the failed powers-of-two encoding.
+Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances and the Potts interpretation. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations and compares Mihara's digitwise regression, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices record the heuristics, their traces, the experiments, and the failed powers-of-two encoding.
 
 \section{\texorpdfstring{\(p\)-adic}{p-adic} linear regression}
 \label{sec:padic-regression-background}
@@ -233,54 +233,12 @@ $(1,1)$ & $(\mathrm{false},\mathrm{false})$ & $1$ & $5$ \\
 
 The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying assignment \(z_1=z_2=\mathrm{true}\).
 
-\subsection{Polynomial-valued false labels}
-\label{sec:polynomial-labels}
+\subsection{General false labels}
+\label{sec:general-labels}
 
-The preceding CNF uses \(0\) for true and \(1\) for false for both variables. The false values need not coincide. They could be other \(p\)-adic integers, or they could be polynomials if the loss is defined using an ultrametric on a rational-function field.
+The preceding CNF uses \(0\) for true and \(1\) for false for both variables. The false values need not coincide. They could be other \(p\)-adic integers, and they need not be distinct.
 
-Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\): give a positive literal the coefficient \(+1\), a negated literal the coefficient \(-1\), and take as the forbidden target the sum of the false labels of the positive literals. On Boolean-labelled assignments the residual equals minus the sum of the false labels of the satisfied literals, and a nonempty subset of \(k\) such labels sums to \(k\) modulo \(p\), a unit whenever \(k<p\). Every satisfied clause is therefore rewarded by exactly one; the labels need not be distinct, and the uniform label \(b_i=1\) used above is the degenerate member of the family. Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information rather than correctness: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The width bound \(k<p\) is sharp for any labelling with uniform unit rewards, because the Davenport constant of \(\mathbb Z/p\mathbb Z\) is \(p\): among any \(p\) residues there is a nonempty subset summing to zero modulo \(p\).
-
-For the polynomial option, work over \(\mathbb Q(T)\), encode \(z_1=\mathrm{false}\) by \(x_1=T\), and encode \(z_2=\mathrm{false}\) by \(x_2=T+1\), while retaining \(0\) as the true value for each variable. Table~\ref{tab:cnf-polynomial-targets} reproduces Table~\ref{tab:cnf-dataframe} with these polynomial targets.
-
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}crrrcl@{}}
-\toprule
-Row & $x_1$ & $x_2$ & Target & Signed weight & Role \\
-\midrule
-$C_1$ & $1$ & $0$ & $T$ & $-1$ & reward $(z_1)$ \\
-$C_2$ & $-1$ & $1$ & $T+1$ & $-1$ & reward $(\neg z_1\vee z_2)$ \\
-$U_{1,0}$ & $1$ & $0$ & $0$ & $+3$ & true well \\
-$U_{1,T}$ & $1$ & $0$ & $T$ & $+3$ & false well \\
-$U_{2,0}$ & $0$ & $1$ & $0$ & $+3$ & true well \\
-$U_{2,T+1}$ & $0$ & $1$ & $T+1$ & $+3$ & false well \\
-\bottomrule
-\end{tabular}
-\caption{Polynomial-target version of the two-clause dataframe. On the displayed two-point domains, each negative row vanishes exactly on the assignment that falsifies its clause.}
-\label{tab:cnf-polynomial-targets}
-\end{table}
-
-For \(C_1\), the negative residual vanishes exactly when \(x_1=T\). For \(C_2\), the four values of \(-x_1+x_2\) are \(0\), \(T+1\), \(-T\), and \(1\), so the target \(T+1\) isolates the falsifying assignment \((x_1,x_2)=(0,T+1)\). Thus the two clause rows retain their zero-versus-nonzero interpretation on the displayed finite domain.
-
-Degree defines a non-Archimedean absolute value on the rational-function field \(\mathbb Q(T)\): for any fixed \(c>1\) and nonzero \(f,g\in\mathbb Q[T]\),
-\[
-\left|\frac{f}{g}\right|_{\infty}=c^{\deg f-\deg g},
-\qquad
-|0|_{\infty}=0.
-\]
-Multiplicativity follows from additivity of degree under products. The inequality
-\[
-\deg(f+g)\leq\max\{\deg f,\deg g\}
-\]
-gives the strong triangle inequality. Hence
-\(d_\infty(F,G):=|F-G|_\infty\) is an ultrametric.
-
-For more than two variables, the choice of clause row matters. Simply continuing the labels \(T,T+1,T+2,T+3\) does not support a direct unsigned encoding. For example, the raw-value sum for the falsifying assignment of \(\neg A\vee B\vee C\vee\neg D\) is \((T+1)+(T+2)=2T+3\), but the complementary assignment has the same sum \(T+(T+3)=2T+3\); the label sets \(\{T,T+3\}\) and \(\{T+1,T+2\}\) collide because \(0+3=1+2\), as in any four-term arithmetic progression of constants. A direct unsigned-sum row therefore cannot distinguish these two assignments.
-
-The clause-signed rows do not have this defect, and no per-assignment checking is needed. As with the integer labels above, the residual on Boolean-labelled assignments equals minus the sum of the false labels of the satisfied literals, so the row vanishes exactly at the falsifying assignment if and only if no nonempty subset of the clause's false labels sums to zero. Affine labels \(f_i=T+m_i\) with distinct constants \(m_i\) satisfy this condition for every clause, since a nonempty subset of size \(k\) sums to \(kT\) plus a constant: over \(\mathbb Q(T)\) unconditionally, and in characteristic \(p\) for clauses of width below \(p\), the same width bound as the integer labels and sharp for the same Davenport-constant reason. In particular the labels \(T,T+1,T+2,T+3\) support every clause once the rows are signed: for the displayed clause the signed functional \(-x_A+x_B+x_C-x_D\) attains its target \(2T+3\) only at the falsifying assignment.
-
-The degree-at-infinity norm does not automatically preserve the original clause-count loss, because different nonzero residuals can have different degrees and hence different magnitudes. The affine signed scheme, however, does preserve it: every residual at a satisfying assignment is \(-(kT+\text{const})\) with \(k\) between \(1\) and the clause width, so each satisfied clause is rewarded by the same magnitude \(c^{1}\), and on Boolean-labelled assignments the loss again decreases by one unit of reward per satisfied clause. Uniform magnitude and injective residual values can even be combined: with \(m_i=2^i\) the residual determines exactly which literals of the clause are satisfied, the cardinality from the leading coefficient and the subset from the constant term. We have not developed an application of these labelled residuals, such as reading violation provenance from the loss value, and record the construction as a direction for future research.
+Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\): give a positive literal the coefficient \(+1\), a negated literal the coefficient \(-1\), and take as the forbidden target the sum of the false labels of the positive literals. On Boolean-labelled assignments the residual equals minus the sum of the false labels of the satisfied literals, and a nonempty subset of \(k\) such labels sums to \(k\) modulo \(p\), a unit whenever \(k<p\). Every satisfied clause is therefore rewarded by exactly one; the labels need not be distinct, and the uniform label \(b_i=1\) used above is the degenerate member of the family. Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information rather than correctness: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The width bound \(k<p\) is sharp for any labelling with uniform unit rewards, because the Davenport constant of \(\mathbb Z/p\mathbb Z\) is \(p\): among any \(p\) residues there is a nonempty subset summing to zero modulo \(p\). Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant of these labels as a direction for future research.
 
 \section{A general all-different residual-objective template}
 \label{construction}
@@ -609,6 +567,9 @@ L_\Phi(x)=\alpha n-\operatorname{sat}_\Phi(x).
 \]
 So the global minimisers are exactly the assignments that maximise the number of satisfied clauses. Unlike the earlier ordinary summed \(2\)-adic \textsc{Max-Cut} reduction \cite{baker2026nphard}, this construction uses a signed objective; its \(3\)-CNF specialisation assumes \(p>3\).
 
+\paragraph{General false labels.}
+Nothing above requires the false value to be \(1\) for every variable. Encode \(z_i=\mathrm{false}\) by any \(b_i\equiv 1\pmod p\), not necessarily distinct, keep the \(\pm 1\) literal coefficients, take as the forbidden target the sum of the positive literals' labels, and replace the Boolean wells by \(|x_i|_p+|x_i-b_i|_p\). On Boolean-labelled assignments the clause residual equals minus the sum of the false labels of the satisfied literals: zero when the clause is falsified, and otherwise a sum of at most \(k<p\) labels congruent to \(1\), hence a unit. The snapping and domination arguments are unchanged because every integer norm is at most \(1\). The uniform label \(b_i=1\) is the degenerate member of this family, and the experiments in this paper use it; Section~\ref{sec:general-labels} describes the member \(b_i=1+p\,2^{i}\), which leaves the loss landscape identical while making each residual value identify the satisfied literals of its clause.
+
 \begin{corollary}[NP-hardness at a fixed prime]
 \label{cor:signed-nphard}
 The threshold decision problem for signed affine \(p\)-adic residual objectives is NP-hard already for the fixed prime \(p=5\); consequently, so is global minimisation.
@@ -619,7 +580,7 @@ Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha=\
 \end{proof}
 
 \paragraph{Signed versus positive complement encodings.}
-The signed construction is compact rather than uniquely expressive. The same clause can be encoded positively through its failure sum
+The signed construction is compact rather than uniquely expressive. For the uniform label \(b_i=1\), the same clause can be encoded positively through its failure sum
 \[
 s_C(x):=\sum_{j=1}^{s}\delta(\lambda_j;x)
 \]
@@ -857,14 +818,13 @@ The companion browser uses the positive complement expansion in both its Boolean
 
 From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts} and to Lewis's metaheuristic Sudoku study \cite{lewis2007metaheuristics}, whose simulated annealing keeps each \(3\times3\) box as a permutation of \(1,\dots,9\) and swaps two non-clue cells within a box; the heuristics in Appendix~\ref{app:heuristics} make the analogous choice with rows as the permutation unit. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
 
-
 \section{Conclusion}
 
 Signed \(p\)-adic residuals have a direct finite-domain role. Positive synthetic terms pin variables to a finite set; after that, negative terms are bounded rewards for inequality or clause satisfaction. This bounded construction should not be conflated with inserting negative weights into ordinary Euclidean least squares.
 
 Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
-The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:polynomial-labels} shows how variables can instead receive distinct polynomial false labels, but this labelled zero-set construction does not automatically preserve the original clause-count loss. No optimisation or verification advantage is claimed for it.
+The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:general-labels} shows how variables can instead receive distinct false labels whose residual values identify the satisfied literals without changing the loss landscape, and Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant. No optimisation or verification advantage is claimed for these labellings.
 
 The companion site in Figure~\ref{fig:browser-sudoku-solution} lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor. Its Mihara views expose the corresponding positive complement data, weighted-consensus loss, original signed-loss audit, and continued fresh-start policy rather than presenting consensus improvement as a Sudoku solution.
 
@@ -1156,6 +1116,52 @@ E2 SA & Simulated annealing on the same \(750\) runs & \(0/750\) & Mean lift \(0
 \caption{Archived local-search results for the powers-of-two encoding. The E1 prime sweep used primes \(2,3,5,7,11,13,17,23,47,73,97,127,257,521,2311\).}
 \label{tab:powers-two-results}
 \end{table}
+
+This failure and the labelled residuals of Section~\ref{sec:general-labels} use the same combinatorial fact---a superincreasing set has distinct subset sums---in opposite roles. Here the fact aggregates constraints: it replaces the pairwise penalties of each unit by a single sum residual, which discards most of the objective's structure, and the runs above strand local search in local minima. There the fact annotates residuals: with false labels \(1+p\,2^{i}\) the powers of two occupy \(p\)-adic digits that never affect which residuals vanish or what norm they take, so the loss landscape is identical to the uniform labelling and the structure only makes residual values self-describing. These experiments are therefore evidence that subset-sum structure is better used to label residuals than to replace constraints.
+
+\section{Polynomial-valued false labels}
+\label{app:polynomial-labels}
+The integer false labels of Section~\ref{sec:general-labels} can also be replaced by polynomials, with the loss defined by an ultrametric on a rational-function field. Work over \(\mathbb Q(T)\), encode \(z_1=\mathrm{false}\) by \(x_1=T\), and encode \(z_2=\mathrm{false}\) by \(x_2=T+1\), while retaining \(0\) as the true value for each variable. Table~\ref{tab:cnf-polynomial-targets} reproduces Table~\ref{tab:cnf-dataframe} with these polynomial targets.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}crrrcl@{}}
+\toprule
+Row & $x_1$ & $x_2$ & Target & Signed weight & Role \\
+\midrule
+$C_1$ & $1$ & $0$ & $T$ & $-1$ & reward $(z_1)$ \\
+$C_2$ & $-1$ & $1$ & $T+1$ & $-1$ & reward $(\neg z_1\vee z_2)$ \\
+$U_{1,0}$ & $1$ & $0$ & $0$ & $+3$ & true well \\
+$U_{1,T}$ & $1$ & $0$ & $T$ & $+3$ & false well \\
+$U_{2,0}$ & $0$ & $1$ & $0$ & $+3$ & true well \\
+$U_{2,T+1}$ & $0$ & $1$ & $T+1$ & $+3$ & false well \\
+\bottomrule
+\end{tabular}
+\caption{Polynomial-target version of the two-clause dataframe. On the displayed two-point domains, each negative row vanishes exactly on the assignment that falsifies its clause.}
+\label{tab:cnf-polynomial-targets}
+\end{table}
+
+For \(C_1\), the negative residual vanishes exactly when \(x_1=T\). For \(C_2\), the four values of \(-x_1+x_2\) are \(0\), \(T+1\), \(-T\), and \(1\), so the target \(T+1\) isolates the falsifying assignment \((x_1,x_2)=(0,T+1)\). Thus the two clause rows retain their zero-versus-nonzero interpretation on the displayed finite domain.
+
+Degree defines a non-Archimedean absolute value on the rational-function field \(\mathbb Q(T)\): for any fixed \(c>1\) and nonzero \(f,g\in\mathbb Q[T]\),
+\[
+\left|\frac{f}{g}\right|_{\infty}=c^{\deg f-\deg g},
+\qquad
+|0|_{\infty}=0.
+\]
+Multiplicativity follows from additivity of degree under products. The inequality
+\[
+\deg(f+g)\leq\max\{\deg f,\deg g\}
+\]
+gives the strong triangle inequality. Hence
+\(d_\infty(F,G):=|F-G|_\infty\) is an ultrametric.
+
+For more than two variables, the choice of clause row matters. Simply continuing the labels \(T,T+1,T+2,T+3\) does not support a direct unsigned encoding. For example, the raw-value sum for the falsifying assignment of \(\neg A\vee B\vee C\vee\neg D\) is \((T+1)+(T+2)=2T+3\), but the complementary assignment has the same sum \(T+(T+3)=2T+3\); the label sets \(\{T,T+3\}\) and \(\{T+1,T+2\}\) collide because \(0+3=1+2\), as in any four-term arithmetic progression of constants. A direct unsigned-sum row therefore cannot distinguish these two assignments.
+
+The clause-signed rows do not have this defect, and no per-assignment checking is needed. As with the integer labels of Section~\ref{sec:general-labels}, the residual on Boolean-labelled assignments equals minus the sum of the false labels of the satisfied literals, so the row vanishes exactly at the falsifying assignment if and only if no nonempty subset of the clause's false labels sums to zero. Affine labels \(f_i=T+m_i\) with distinct constants \(m_i\) satisfy this condition for every clause, since a nonempty subset of size \(k\) sums to \(kT\) plus a constant: over \(\mathbb Q(T)\) unconditionally, and in characteristic \(p\) for clauses of width below \(p\), the same width bound as the integer labels and sharp for the same Davenport-constant reason. In particular the labels \(T,T+1,T+2,T+3\) support every clause once the rows are signed: for the displayed clause the signed functional \(-x_A+x_B+x_C-x_D\) attains its target \(2T+3\) only at the falsifying assignment.
+
+The degree-at-infinity norm does not automatically preserve the original clause-count loss, because different nonzero residuals can have different degrees and hence different magnitudes. The affine signed scheme, however, does preserve it: every residual at a satisfying assignment is \(-(kT+\text{const})\) with \(k\) between \(1\) and the clause width, so each satisfied clause is rewarded by the same magnitude \(c^{1}\), and on Boolean-labelled assignments the loss again decreases by one unit of reward per satisfied clause. Uniform magnitude and injective residual values can even be combined: with \(m_i=2^i\) the residual determines exactly which literals of the clause are satisfied, the cardinality from the leading coefficient and the subset from the constant term. We have not developed an application of these labelled residuals, such as reading violation provenance from the loss value, and record the construction as a direction for future research.
 
 \section*{Funding}
 This research was supported by an Australian Government Research Training Program Scholarship.
