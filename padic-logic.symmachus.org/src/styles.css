@@ -893,6 +893,26 @@ button {
   border-color: #f3a4a4 !important;
 }
 
+.label-scheme-select {
+  margin: 0 0 10px;
+  justify-self: start;
+}
+
+.label-scheme-select select {
+  width: fit-content;
+}
+
+.dataframe-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.evaluation-table .decode-cell {
+  white-space: nowrap;
+}
+
 .metric-row {
   display: grid;
   grid-template-columns: 1fr auto;
