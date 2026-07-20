@@ -3,8 +3,12 @@ import {
   buildMiharaPositiveRegressionDataFrame,
   buildRegressionDataFrame,
   compileProblem,
+  decodeClauseResidual,
   evaluateAssignment,
+  evaluateExpression,
   evaluateRegressionDataFrame,
+  falseLabels,
+  INFORMATIVE_VARIABLE_LIMIT,
   parseProblem,
   renderClause
 } from "./csp";
@@ -213,5 +217,136 @@ describe("CSP compiler", () => {
     expect(evaluateMask(0b1011)).toBe(22);
     expect(compiled.evaluatorSource).not.toMatch(/xor/i);
     expect(evaluateMask(0)).toBeGreaterThan(22);
+  });
+});
+
+describe("informative false labels", () => {
+  const everyAssignment = (names: string[]): Array<Record<string, boolean>> =>
+    Array.from({ length: 2 ** names.length }, (_, mask) =>
+      Object.fromEntries(names.map((name, index) => [name, ((mask >> index) & 1) === 1]))
+    );
+
+  it("labels false as 1 + p·2^i in wells and clause targets", () => {
+    const compiled = compileProblem("A or not B");
+    const rows = buildRegressionDataFrame(compiled, "informative");
+
+    // b_A = 1 + 17·1 = 18, b_B = 1 + 17·2 = 35; target = sum over positive literals.
+    expect(rows[0]).toMatchObject({
+      kind: "constraint",
+      coefficients: { A: 1, B: -1 },
+      relation: "≠",
+      target: 18
+    });
+    expect(rows.slice(1).map((row) => row.target)).toEqual([0, 18, 0, 35]);
+  });
+
+  it("produces the identical loss to the uniform labelling at every assignment", () => {
+    const compiled = compileProblem(sample);
+    const names = compiled.variables.map((variable) => variable.name);
+
+    for (const assignment of everyAssignment(names)) {
+      const uniform = evaluateRegressionDataFrame(compiled, assignment, "uniform");
+      const informative = evaluateRegressionDataFrame(compiled, assignment, "informative");
+      expect(informative.totalLoss).toBe(uniform.totalLoss);
+      expect(informative.rows.map((row) => row.pAdicNorm))
+        .toEqual(uniform.rows.map((row) => row.pAdicNorm));
+    }
+  });
+
+  it("decodes every clause residual to the exact satisfied literals", () => {
+    const compiled = compileProblem(sample);
+    const names = compiled.variables.map((variable) => variable.name);
+    const prime = compiled.scoring.prime;
+
+    for (const assignment of everyAssignment(names)) {
+      const frame = evaluateRegressionDataFrame(compiled, assignment, "informative");
+      const clauseRows = frame.rows.filter((row) => row.kind === "constraint");
+      expect(clauseRows).toHaveLength(compiled.ternaryClauses.length);
+
+      clauseRows.forEach((row, clauseIndex) => {
+        const clause = compiled.ternaryClauses[clauseIndex];
+        const expected = clause.terms
+          .filter((term) => evaluateExpression(term, (name) => assignment[name] ?? false))
+          .map((term) =>
+            term.type === "literal"
+              ? term.name
+              : term.type === "not" && term.expr.type === "literal"
+                ? term.expr.name
+                : ""
+          )
+          .sort();
+
+        const decoded = decodeClauseResidual(row.residual, prime);
+        expect(decoded).not.toBeNull();
+        const decodedNames = decoded!.satisfiedVariableIndices
+          .map((index) => compiled.variables[index].name)
+          .sort();
+        expect(decodedNames).toEqual(expected);
+        expect(decoded!.satisfiedCount).toBe(expected.length);
+      });
+    }
+  });
+
+  it("keeps the count decodable but not the identity under uniform labels", () => {
+    const compiled = compileProblem("A or not B");
+    const frame = evaluateRegressionDataFrame(
+      compiled,
+      { A: true, B: false },
+      "uniform"
+    );
+    const decoded = decodeClauseResidual(frame.rows[0].residual, compiled.scoring.prime);
+    expect(decoded).toEqual({ satisfiedCount: 2, satisfiedVariableIndices: [] });
+  });
+
+  it("deduplicates repeated literals so targets match coefficients", () => {
+    // (A v A) previously kept coefficient {A: 1} but target 2·b_A, so the
+    // falsifying assignment missed the forbidden hyperplane entirely.
+    const compiled = compileProblem("A or A");
+    expect(compiled.ternaryClauses).toHaveLength(1);
+    expect(compiled.ternaryClauses[0].terms).toHaveLength(1);
+    expect(buildRegressionDataFrame(compiled)[0]).toMatchObject({
+      coefficients: { A: 1 },
+      target: 1
+    });
+
+    const falsified = evaluateRegressionDataFrame(compiled, { A: false });
+    expect(falsified.rows[0].status).toBe("violated");
+    expect(falsified.totalLoss).toBe(evaluateAssignment(compiled, { A: false }).loss);
+
+    const informative = evaluateRegressionDataFrame(compiled, { A: true }, "informative");
+    expect(decodeClauseResidual(informative.rows[0].residual, compiled.scoring.prime))
+      .toEqual({ satisfiedCount: 1, satisfiedVariableIndices: [0] });
+  });
+
+  it("drops tautological clauses", () => {
+    const compiled = compileProblem("A or not A");
+    expect(compiled.ternaryClauses).toHaveLength(0);
+  });
+
+  it("keeps informative labels exactly representable up to the variable limit", () => {
+    const atLimit = Array.from({ length: INFORMATIVE_VARIABLE_LIMIT }, (_, index) => ({
+      name: `v${index}`,
+      index
+    }));
+    const labels = falseLabels(atLimit, "informative", 17);
+    expect(Object.values(labels).every((label) => Number.isSafeInteger(label))).toBe(true);
+
+    // The reviewer's counterexample: at index 49 the label rounds and its
+    // residue mod 17 collapses to 0.
+    expect(Number.isSafeInteger(1 + 17 * 2 ** 49)).toBe(false);
+
+    const overLimit = [...atLimit, { name: "v45", index: INFORMATIVE_VARIABLE_LIMIT }];
+    expect(() => falseLabels(overLimit, "informative", 17)).toThrow(/45/);
+    expect(() => falseLabels(overLimit, "uniform", 17)).not.toThrow();
+  });
+
+  it("expands informative Mihara complements over the labelled affine values", () => {
+    const compiled = compileProblem("A or not B");
+    const frame = buildMiharaPositiveRegressionDataFrame(compiled, "informative");
+    const clauseRows = frame.rows.filter((row) => row.kind === "constraint");
+
+    // attainable values of A - B with A in {0,18}, B in {0,35}: -35, -17, 0, 18;
+    // the forbidden target 18 is dropped.
+    expect(clauseRows.map((row) => row.target)).toEqual([-35, -17, 0]);
   });
 });

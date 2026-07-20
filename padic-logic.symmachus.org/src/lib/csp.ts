@@ -84,6 +84,72 @@ export interface RegressionDataFrameEvaluation {
   totalLoss: number;
 }
 
+// False labels for the Boolean encoding x_i = 0 (true) / b_i (false). Any labels
+// b_i ≡ 1 (mod p) leave the loss landscape identical to the uniform b_i = 1,
+// because on Boolean-labelled assignments every clause residual is minus the sum
+// of the false labels of its satisfied literals: a sum of k < p labels each ≡ 1,
+// hence a p-adic unit exactly when the clause is satisfied. The informative
+// member b_i = 1 + p·2^i additionally makes that residual decodable: the count
+// of satisfied literals is its residue mod p and their identity is the binary
+// expansion of the quotient.
+export type FalseLabelScheme = "uniform" | "informative";
+
+// Beyond this variable count the informative labels 1 + p·2^i (and the clause
+// targets and residuals that sum up to 16 of them) can exceed 2^53 and stop
+// being exactly representable as doubles; 1 + 17·2^49 silently rounds to
+// 17·2^49, whose residue mod 17 is 0, corrupting both the loss identity and
+// residual decoding. At 45 variables the largest such sum stays below 2^53.
+export const INFORMATIVE_VARIABLE_LIMIT = 45;
+
+export function falseLabels(
+  variables: Variable[],
+  scheme: FalseLabelScheme,
+  prime: number
+): Record<string, number> {
+  if (scheme === "informative" && variables.length > INFORMATIVE_VARIABLE_LIMIT) {
+    throw new Error(
+      `Informative labels support at most ${INFORMATIVE_VARIABLE_LIMIT} variables; ` +
+        `beyond that 1 + ${prime}·2^i is not exactly representable in double precision.`
+    );
+  }
+  return Object.fromEntries(
+    variables.map((variable) => [
+      variable.name,
+      scheme === "uniform" ? 1 : 1 + prime * 2 ** variable.index
+    ])
+  );
+}
+
+export interface DecodedClauseResidual {
+  satisfiedCount: number;
+  satisfiedVariableIndices: number[];
+}
+
+// Decode a clause row's residual u·x − t back into the satisfied literals.
+// Valid on Boolean-labelled assignments; the index list is complete only under
+// the informative labelling (uniform labels carry the count alone).
+export function decodeClauseResidual(
+  residual: number,
+  prime: number
+): DecodedClauseResidual | null {
+  const labelSum = -residual;
+  if (!Number.isInteger(labelSum) || labelSum < 0) {
+    return null;
+  }
+  if (labelSum === 0) {
+    return { satisfiedCount: 0, satisfiedVariableIndices: [] };
+  }
+  const satisfiedCount = labelSum % prime;
+  const quotient = (labelSum - satisfiedCount) / prime;
+  const satisfiedVariableIndices: number[] = [];
+  for (let rest = quotient, bit = 0; rest > 0; rest = Math.floor(rest / 2), bit += 1) {
+    if (rest % 2 === 1) {
+      satisfiedVariableIndices.push(bit);
+    }
+  }
+  return { satisfiedCount, satisfiedVariableIndices };
+}
+
 export interface MiharaPositiveRegressionDataFrame {
   rows: RegressionDataFrameRow[];
   totalWeight: number;
@@ -204,13 +270,19 @@ export function evaluateAssignment(
 }
 
 export function buildRegressionDataFrame(
-  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">,
+  labelScheme: FalseLabelScheme = "uniform"
 ): RegressionDataFrameRow[] {
+  const labels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const rows: RegressionDataFrameRow[] = compiled.ternaryClauses.map((clause) => {
     const residual = clauseAffineResidual(clause);
     const coefficients = zeroCoefficientRow(compiled.variables);
+    let target = 0;
     for (const coefficient of residual.coeffs) {
       coefficients[coefficient.name] = coefficient.sign;
+      if (coefficient.sign > 0) {
+        target += labels[coefficient.name];
+      }
     }
 
     return {
@@ -219,7 +291,7 @@ export function buildRegressionDataFrame(
       label: `C${clause.id}`,
       coefficients,
       relation: "≠",
-      target: residual.t,
+      target,
       sign: -1,
       weight: 1,
       source: clause.source
@@ -227,7 +299,7 @@ export function buildRegressionDataFrame(
   });
 
   for (const variable of compiled.variables) {
-    for (const target of [0, 1]) {
+    for (const target of [0, labels[variable.name]]) {
       rows.push({
         id: `U${variable.index + 1}-${target}`,
         kind: "unit-well",
@@ -254,14 +326,16 @@ export function buildRegressionDataFrame(
 // value s in S except the forbidden target t. Exactly one complementary row is
 // an inlier when the clause is satisfied, and none is an inlier when it fails.
 export function buildMiharaPositiveRegressionDataFrame(
-  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">
+  compiled: Pick<CompiledProblem, "variables" | "ternaryClauses" | "scoring">,
+  labelScheme: FalseLabelScheme = "uniform"
 ): MiharaPositiveRegressionDataFrame {
-  const rows = buildRegressionDataFrame(compiled).flatMap((row) => {
+  const labels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
+  const rows = buildRegressionDataFrame(compiled, labelScheme).flatMap((row) => {
     if (row.sign > 0) {
       return [{ ...row, id: `M-${row.id}` }];
     }
 
-    return attainableAffineValues(row, compiled.variables)
+    return attainableAffineValues(row, compiled.variables, labels)
       .filter((target) => target !== row.target)
       .map((target) => ({
         ...row,
@@ -287,15 +361,17 @@ export function buildMiharaPositiveRegressionDataFrame(
 
 export function evaluateRegressionDataFrame(
   compiled: CompiledProblem,
-  assignment: Record<string, boolean>
+  assignment: Record<string, boolean>,
+  labelScheme: FalseLabelScheme = "uniform"
 ): RegressionDataFrameEvaluation {
+  const labels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const coordinates = Object.fromEntries(
     compiled.variables.map((variable) => [
       variable.name,
-      assignment[variable.name] ? 0 : 1
+      assignment[variable.name] ? 0 : labels[variable.name]
     ])
   );
-  const rows = buildRegressionDataFrame(compiled).map((row) => {
+  const rows = buildRegressionDataFrame(compiled, labelScheme).map((row) => {
     const affineValue = compiled.variables.reduce(
       (sum, variable) =>
         sum + (row.coefficients[variable.name] ?? 0) * coordinates[variable.name],
@@ -450,14 +526,16 @@ function zeroCoefficientRow(variables: Variable[]): Record<string, number> {
 
 function attainableAffineValues(
   row: RegressionDataFrameRow,
-  variables: Variable[]
+  variables: Variable[],
+  labels: Record<string, number>
 ): number[] {
   let values = new Set([0]);
   for (const variable of variables) {
     const coefficient = row.coefficients[variable.name] ?? 0;
     if (coefficient === 0) continue;
+    const step = coefficient * labels[variable.name];
     const next = new Set(values);
-    for (const value of values) next.add(value + coefficient);
+    for (const value of values) next.add(value + step);
     values = next;
   }
   return Array.from(values).sort((left, right) => left - right);
@@ -715,10 +793,40 @@ function expressionToCnfTerms(expr: Expression): Expression[][] {
 
   const orTerms = flattenSameOp(expr, "or");
   if (orTerms && orTerms.every(isLiteralExpression)) {
-    return [orTerms];
+    const normalized = normalizeClauseLiterals(orTerms);
+    return normalized ? [normalized] : [];
   }
 
   return truthTableCnf(expr);
+}
+
+// Deduplicate repeated literals and drop tautological clauses. A repeated
+// literal like (A v A) would otherwise overwrite its coefficient while
+// double-counting the clause target, so the falsifying assignment would miss
+// the forbidden hyperplane and residual decoding would misattribute the label
+// sum. Returns null when the clause contains a literal and its negation.
+function normalizeClauseLiterals(terms: Expression[]): Expression[] | null {
+  const seen = new Set<string>();
+  const normalized: Expression[] = [];
+  for (const term of terms) {
+    const positive = term.type === "literal";
+    const name = term.type === "literal"
+      ? term.name
+      : term.type === "not" && term.expr.type === "literal"
+        ? term.expr.name
+        : null;
+    if (name == null) {
+      return terms;
+    }
+    if (seen.has(`${name}|${!positive}`)) {
+      return null;
+    }
+    if (!seen.has(`${name}|${positive}`)) {
+      seen.add(`${name}|${positive}`);
+      normalized.push(term);
+    }
+  }
+  return normalized;
 }
 
 function flattenSameOp(expr: Expression, op: "or" | "xor"): Expression[] | null {
