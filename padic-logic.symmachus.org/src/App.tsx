@@ -33,6 +33,7 @@ import {
   evaluateAssignment,
   evaluateRegressionDataFrame,
   type FalseLabelScheme,
+  falseLabels,
   parseProblem,
   renderClause,
   renderClauseAffine
@@ -1314,8 +1315,9 @@ function RunDashboard({
   const isComplete = snapshot.status === "complete";
   const isPaused = snapshot.status === "paused";
   const solutionEquation = bestAssignment
-    ? formatRegressionEquation(compiled, bestAssignment)
+    ? formatRegressionEquation(compiled, bestAssignment, labelScheme)
     : null;
+  const solutionLabels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const regressionFloor = compiled.scoring.theoreticalFloor;
 
   return (
@@ -1380,7 +1382,7 @@ function RunDashboard({
             <>
               {solutionEquation && (
                 <div className="solution-equation">
-                  <span>Boolean assignment (1 = selected)</span>
+                  <span>Recovered coefficient vector (0 = true, bᵢ = false)</span>
                   <code>{solutionEquation}</code>
                 </div>
               )}
@@ -1388,7 +1390,9 @@ function RunDashboard({
                 {compiled.variables.map((variable) => (
                   <div className="solution-row" key={variable.name}>
                     <strong>{variable.name}</strong>
-                    <span>{bestAssignment[variable.name] ? 1 : 0}</span>
+                    <span title={bestAssignment[variable.name] ? "true" : "false"}>
+                      {bestAssignment[variable.name] ? 0 : solutionLabels[variable.name]}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -2018,13 +2022,15 @@ function isAbortError(error: unknown): boolean {
 
 function formatRegressionEquation(
   compiled: CompiledProblem,
-  coefficients: Record<string, boolean>
+  assignment: Record<string, boolean>,
+  labelScheme: FalseLabelScheme
 ): string {
+  const labels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const terms = compiled.variables.map((variable) => {
-    const coefficient = coefficients[variable.name] ? 1 : 0;
-    return `${coefficient} * ${variable.name}`;
+    const coordinate = assignment[variable.name] ? 0 : labels[variable.name];
+    return `${coordinate}·${variable.name}`;
   });
-  return `y = ${terms.join(" + ")}`;
+  return `x = ${terms.join(" + ")}`;
 }
 
 function formatRate(value: number): string {
