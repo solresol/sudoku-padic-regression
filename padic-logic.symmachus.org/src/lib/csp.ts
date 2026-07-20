@@ -94,11 +94,24 @@ export interface RegressionDataFrameEvaluation {
 // expansion of the quotient.
 export type FalseLabelScheme = "uniform" | "informative";
 
+// Beyond this variable count the informative labels 1 + p·2^i (and the clause
+// targets and residuals that sum up to 16 of them) can exceed 2^53 and stop
+// being exactly representable as doubles; 1 + 17·2^49 silently rounds to
+// 17·2^49, whose residue mod 17 is 0, corrupting both the loss identity and
+// residual decoding. At 45 variables the largest such sum stays below 2^53.
+export const INFORMATIVE_VARIABLE_LIMIT = 45;
+
 export function falseLabels(
   variables: Variable[],
   scheme: FalseLabelScheme,
   prime: number
 ): Record<string, number> {
+  if (scheme === "informative" && variables.length > INFORMATIVE_VARIABLE_LIMIT) {
+    throw new Error(
+      `Informative labels support at most ${INFORMATIVE_VARIABLE_LIMIT} variables; ` +
+        `beyond that 1 + ${prime}·2^i is not exactly representable in double precision.`
+    );
+  }
   return Object.fromEntries(
     variables.map((variable) => [
       variable.name,
@@ -780,10 +793,40 @@ function expressionToCnfTerms(expr: Expression): Expression[][] {
 
   const orTerms = flattenSameOp(expr, "or");
   if (orTerms && orTerms.every(isLiteralExpression)) {
-    return [orTerms];
+    const normalized = normalizeClauseLiterals(orTerms);
+    return normalized ? [normalized] : [];
   }
 
   return truthTableCnf(expr);
+}
+
+// Deduplicate repeated literals and drop tautological clauses. A repeated
+// literal like (A v A) would otherwise overwrite its coefficient while
+// double-counting the clause target, so the falsifying assignment would miss
+// the forbidden hyperplane and residual decoding would misattribute the label
+// sum. Returns null when the clause contains a literal and its negation.
+function normalizeClauseLiterals(terms: Expression[]): Expression[] | null {
+  const seen = new Set<string>();
+  const normalized: Expression[] = [];
+  for (const term of terms) {
+    const positive = term.type === "literal";
+    const name = term.type === "literal"
+      ? term.name
+      : term.type === "not" && term.expr.type === "literal"
+        ? term.expr.name
+        : null;
+    if (name == null) {
+      return terms;
+    }
+    if (seen.has(`${name}|${!positive}`)) {
+      return null;
+    }
+    if (!seen.has(`${name}|${positive}`)) {
+      seen.add(`${name}|${positive}`);
+      normalized.push(term);
+    }
+  }
+  return normalized;
 }
 
 function flattenSameOp(expr: Expression, op: "or" | "xor"): Expression[] | null {

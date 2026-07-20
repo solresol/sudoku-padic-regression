@@ -34,6 +34,7 @@ import {
   evaluateRegressionDataFrame,
   type FalseLabelScheme,
   falseLabels,
+  INFORMATIVE_VARIABLE_LIMIT,
   parseProblem,
   renderClause,
   renderClauseAffine
@@ -108,6 +109,11 @@ function App() {
   const [workerCount, setWorkerCount] = useState(2);
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("ordered");
   const [labelScheme, setLabelScheme] = useState<FalseLabelScheme>("uniform");
+  const informativeUnavailable =
+    (compiled?.variables.length ?? 0) > INFORMATIVE_VARIABLE_LIMIT;
+  const effectiveLabelScheme: FalseLabelScheme = informativeUnavailable
+    ? "uniform"
+    : labelScheme;
   const [modelStatus, setModelStatus] =
     useState<LanguageModelAvailability>("unavailable");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -543,12 +549,13 @@ function App() {
             <div className="regression-column">
               <RegressionDataFramePanel
                 compiled={compiled}
-                labelScheme={labelScheme}
+                informativeUnavailable={informativeUnavailable}
+                labelScheme={effectiveLabelScheme}
                 onLabelSchemeChange={setLabelScheme}
               />
               <SearchPlanPanel
                 compiled={compiled}
-                labelScheme={labelScheme}
+                labelScheme={effectiveLabelScheme}
                 searchStrategy={searchStrategy}
                 workerCount={workerCount}
               />
@@ -558,7 +565,7 @@ function App() {
           {isRunning && compiled && (
             <RunDashboard
               compiled={compiled}
-              labelScheme={labelScheme}
+              labelScheme={effectiveLabelScheme}
               resultsRef={resultsRef}
               searchStrategy={searchStrategy}
               workerCount={workerCount}
@@ -1033,10 +1040,12 @@ function TernaryPanel({
 
 function RegressionDataFramePanel({
   compiled,
+  informativeUnavailable,
   labelScheme,
   onLabelSchemeChange
 }: {
   compiled: CompiledProblem | null;
+  informativeUnavailable: boolean;
   labelScheme: FalseLabelScheme;
   onLabelSchemeChange: (scheme: FalseLabelScheme) => void;
 }) {
@@ -1056,9 +1065,18 @@ function RegressionDataFramePanel({
           onChange={(event) => onLabelSchemeChange(event.target.value as FalseLabelScheme)}
         >
           <option value="uniform">Uniform · bᵢ = 1</option>
-          <option value="informative">Informative · bᵢ = 1 + 17·2ⁱ</option>
+          <option value="informative" disabled={informativeUnavailable}>
+            Informative · bᵢ = 1 + 17·2ⁱ
+          </option>
         </select>
       </label>
+      {informativeUnavailable && (
+        <p className="dataframe-note">
+          Informative labels are available for up to {INFORMATIVE_VARIABLE_LIMIT} variables;
+          beyond that 1 + 17·2ⁱ is no longer exactly representable in double precision, so the
+          uniform labelling is shown.
+        </p>
+      )}
       {compiled ? (
         <>
           <div className="dataframe-scroll">

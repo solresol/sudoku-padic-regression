@@ -7,6 +7,8 @@ import {
   evaluateAssignment,
   evaluateExpression,
   evaluateRegressionDataFrame,
+  falseLabels,
+  INFORMATIVE_VARIABLE_LIMIT,
   parseProblem,
   renderClause
 } from "./csp";
@@ -294,6 +296,48 @@ describe("informative false labels", () => {
     );
     const decoded = decodeClauseResidual(frame.rows[0].residual, compiled.scoring.prime);
     expect(decoded).toEqual({ satisfiedCount: 2, satisfiedVariableIndices: [] });
+  });
+
+  it("deduplicates repeated literals so targets match coefficients", () => {
+    // (A v A) previously kept coefficient {A: 1} but target 2·b_A, so the
+    // falsifying assignment missed the forbidden hyperplane entirely.
+    const compiled = compileProblem("A or A");
+    expect(compiled.ternaryClauses).toHaveLength(1);
+    expect(compiled.ternaryClauses[0].terms).toHaveLength(1);
+    expect(buildRegressionDataFrame(compiled)[0]).toMatchObject({
+      coefficients: { A: 1 },
+      target: 1
+    });
+
+    const falsified = evaluateRegressionDataFrame(compiled, { A: false });
+    expect(falsified.rows[0].status).toBe("violated");
+    expect(falsified.totalLoss).toBe(evaluateAssignment(compiled, { A: false }).loss);
+
+    const informative = evaluateRegressionDataFrame(compiled, { A: true }, "informative");
+    expect(decodeClauseResidual(informative.rows[0].residual, compiled.scoring.prime))
+      .toEqual({ satisfiedCount: 1, satisfiedVariableIndices: [0] });
+  });
+
+  it("drops tautological clauses", () => {
+    const compiled = compileProblem("A or not A");
+    expect(compiled.ternaryClauses).toHaveLength(0);
+  });
+
+  it("keeps informative labels exactly representable up to the variable limit", () => {
+    const atLimit = Array.from({ length: INFORMATIVE_VARIABLE_LIMIT }, (_, index) => ({
+      name: `v${index}`,
+      index
+    }));
+    const labels = falseLabels(atLimit, "informative", 17);
+    expect(Object.values(labels).every((label) => Number.isSafeInteger(label))).toBe(true);
+
+    // The reviewer's counterexample: at index 49 the label rounds and its
+    // residue mod 17 collapses to 0.
+    expect(Number.isSafeInteger(1 + 17 * 2 ** 49)).toBe(false);
+
+    const overLimit = [...atLimit, { name: "v45", index: INFORMATIVE_VARIABLE_LIMIT }];
+    expect(() => falseLabels(overLimit, "informative", 17)).toThrow(/45/);
+    expect(() => falseLabels(overLimit, "uniform", 17)).not.toThrow();
   });
 
   it("expands informative Mihara complements over the labelled affine values", () => {
