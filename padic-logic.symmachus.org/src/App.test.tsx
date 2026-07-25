@@ -589,7 +589,7 @@ describe("p-adic logic app", () => {
     expect(screen.queryByRole("button", { name: /^Stop$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Clear results/i })).toBeInTheDocument();
     expect(screen.getByText(/Best p-adic regression solution/i)).toBeInTheDocument();
-    expect(screen.getByText(/y = /i)).toBeInTheDocument();
+    expect(document.querySelector(".solution-equation code")?.textContent).toMatch(/^x = /);
     expect(screen.queryByText(/Regression problem/i)).not.toBeInTheDocument();
     expect(document.querySelector(".compiled-summary")).not.toBeInTheDocument();
     expect(document.querySelector(".assignment-panel")).not.toBeInTheDocument();

@@ -29,8 +29,12 @@ import {
   buildRegressionDataFrame,
   type CompiledProblem,
   compileProblem,
+  decodeClauseResidual,
   evaluateAssignment,
   evaluateRegressionDataFrame,
+  type FalseLabelScheme,
+  falseLabels,
+  INFORMATIVE_VARIABLE_LIMIT,
   parseProblem,
   renderClause,
   renderClauseAffine
@@ -104,6 +108,12 @@ function App() {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [workerCount, setWorkerCount] = useState(2);
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("ordered");
+  const [labelScheme, setLabelScheme] = useState<FalseLabelScheme>("uniform");
+  const informativeUnavailable =
+    (compiled?.variables.length ?? 0) > INFORMATIVE_VARIABLE_LIMIT;
+  const effectiveLabelScheme: FalseLabelScheme = informativeUnavailable
+    ? "uniform"
+    : labelScheme;
   const [modelStatus, setModelStatus] =
     useState<LanguageModelAvailability>("unavailable");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -537,9 +547,15 @@ function App() {
               onPointerDown={(event) => handleColumnPointerDown("cnf-regression", event)}
             />
             <div className="regression-column">
-              <RegressionDataFramePanel compiled={compiled} />
+              <RegressionDataFramePanel
+                compiled={compiled}
+                informativeUnavailable={informativeUnavailable}
+                labelScheme={effectiveLabelScheme}
+                onLabelSchemeChange={setLabelScheme}
+              />
               <SearchPlanPanel
                 compiled={compiled}
+                labelScheme={effectiveLabelScheme}
                 searchStrategy={searchStrategy}
                 workerCount={workerCount}
               />
@@ -549,6 +565,7 @@ function App() {
           {isRunning && compiled && (
             <RunDashboard
               compiled={compiled}
+              labelScheme={effectiveLabelScheme}
               resultsRef={resultsRef}
               searchStrategy={searchStrategy}
               workerCount={workerCount}
@@ -1022,18 +1039,44 @@ function TernaryPanel({
 }
 
 function RegressionDataFramePanel({
-  compiled
+  compiled,
+  informativeUnavailable,
+  labelScheme,
+  onLabelSchemeChange
 }: {
   compiled: CompiledProblem | null;
+  informativeUnavailable: boolean;
+  labelScheme: FalseLabelScheme;
+  onLabelSchemeChange: (scheme: FalseLabelScheme) => void;
 }) {
   const rows = useMemo(
-    () => (compiled ? buildRegressionDataFrame(compiled) : []),
-    [compiled]
+    () => (compiled ? buildRegressionDataFrame(compiled, labelScheme) : []),
+    [compiled, labelScheme]
   );
 
   return (
     <section className="panel dataframe-panel" aria-label="p-adic linear regression dataframe">
       <PanelHeader icon={<FlaskConical size={21} />} title="p-adic linear regression dataframe" />
+      <label className="strategy-select label-scheme-select">
+        <span>False labels</span>
+        <select
+          aria-label="False label scheme"
+          value={labelScheme}
+          onChange={(event) => onLabelSchemeChange(event.target.value as FalseLabelScheme)}
+        >
+          <option value="uniform">Uniform · bᵢ = 1</option>
+          <option value="informative" disabled={informativeUnavailable}>
+            Informative · bᵢ = 1 + 17·2ⁱ
+          </option>
+        </select>
+      </label>
+      {informativeUnavailable && (
+        <p className="dataframe-note">
+          Informative labels are available for up to {INFORMATIVE_VARIABLE_LIMIT} variables;
+          beyond that 1 + 17·2ⁱ is no longer exactly representable in double precision, so the
+          uniform labelling is shown.
+        </p>
+      )}
       {compiled ? (
         <>
           <div className="dataframe-scroll">
@@ -1080,6 +1123,14 @@ function RegressionDataFramePanel({
             <span><i className="legend-unit" /> Unit wells</span>
             <span><i className="legend-negative" /> Negative clause reward</span>
           </div>
+          {labelScheme === "informative" && (
+            <p className="dataframe-note">
+              Informative labels encode false as bᵢ = 1 + 17·2ⁱ instead of 1. All labels stay
+              ≡ 1 (mod 17), so the p-adic loss at every Boolean-labelled assignment is identical
+              to the uniform labelling — but each clause residual now decodes to the exact set of
+              satisfied literals (count from the residue mod 17, identity from the binary quotient).
+            </p>
+          )}
         </>
       ) : (
         <EmptyState text="Enter valid CSP clauses to see the regression dataframe." />
@@ -1090,10 +1141,12 @@ function RegressionDataFramePanel({
 
 function SearchPlanPanel({
   compiled,
+  labelScheme,
   searchStrategy,
   workerCount
 }: {
   compiled: CompiledProblem | null;
+  labelScheme: FalseLabelScheme;
   searchStrategy: SearchStrategy;
   workerCount: number;
 }) {
@@ -1135,6 +1188,12 @@ function SearchPlanPanel({
             </>
           )}
           <MetricRow label="Clause reward" value="|u·x − t|ₚ  (p = 17)" />
+          <MetricRow
+            label="False labels"
+            value={labelScheme === "uniform"
+              ? "bᵢ = 1 (uniform)"
+              : "bᵢ = 1 + 17·2ⁱ (informative, same loss)"}
+          />
           <MetricRow
             label="Unit-well weight"
             value={`α = ${compiled.scoring.unitWellWeight} = clauses + 1`}
@@ -1248,12 +1307,14 @@ function ReadyBand({
 
 function RunDashboard({
   compiled,
+  labelScheme,
   resultsRef,
   searchStrategy,
   workerCount,
   controller
 }: {
   compiled: CompiledProblem;
+  labelScheme: FalseLabelScheme;
   resultsRef: RefObject<HTMLElement | null>;
   searchStrategy: SearchStrategy;
   workerCount: number;
@@ -1267,13 +1328,14 @@ function RunDashboard({
     ? evaluateAssignment(compiled, bestAssignment)
     : null;
   const regressionEvaluation = bestAssignment
-    ? evaluateRegressionDataFrame(compiled, bestAssignment)
+    ? evaluateRegressionDataFrame(compiled, bestAssignment, labelScheme)
     : null;
   const isComplete = snapshot.status === "complete";
   const isPaused = snapshot.status === "paused";
   const solutionEquation = bestAssignment
-    ? formatRegressionEquation(compiled, bestAssignment)
+    ? formatRegressionEquation(compiled, bestAssignment, labelScheme)
     : null;
+  const solutionLabels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const regressionFloor = compiled.scoring.theoreticalFloor;
 
   return (
@@ -1338,7 +1400,7 @@ function RunDashboard({
             <>
               {solutionEquation && (
                 <div className="solution-equation">
-                  <span>Boolean assignment (1 = selected)</span>
+                  <span>Recovered coefficient vector (0 = true, bᵢ = false)</span>
                   <code>{solutionEquation}</code>
                 </div>
               )}
@@ -1346,7 +1408,9 @@ function RunDashboard({
                 {compiled.variables.map((variable) => (
                   <div className="solution-row" key={variable.name}>
                     <strong>{variable.name}</strong>
-                    <span>{bestAssignment[variable.name] ? 1 : 0}</span>
+                    <span title={bestAssignment[variable.name] ? "true" : "false"}>
+                      {bestAssignment[variable.name] ? 0 : solutionLabels[variable.name]}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1367,7 +1431,9 @@ function RunDashboard({
               {regressionEvaluation && (
                 <RegressionEvaluationTable
                   evaluation={regressionEvaluation}
+                  labelScheme={labelScheme}
                   prime={compiled.scoring.prime}
+                  variables={compiled.variables}
                 />
               )}
             </>
@@ -1585,17 +1651,27 @@ function WorkerTable({
 
 function RegressionEvaluationTable({
   evaluation,
-  prime
+  labelScheme,
+  prime,
+  variables
 }: {
   evaluation: ReturnType<typeof evaluateRegressionDataFrame>;
+  labelScheme: FalseLabelScheme;
   prime: number;
+  variables: CompiledProblem["variables"];
 }) {
+  const showDecode = labelScheme === "informative";
+  const columnCount = showDecode ? 9 : 8;
   return (
     <section className="evaluation-section" aria-label="Regression row evaluation">
       <div className="evaluation-heading">
         <div>
           <h3>Regression row evaluation</h3>
-          <p>Affine coordinates use x = 0 for true CSP variables and x = 1 for false.</p>
+          <p>
+            {labelScheme === "uniform"
+              ? "Affine coordinates use x = 0 for true CSP variables and x = 1 for false."
+              : `Affine coordinates use x = 0 for true CSP variables and x = bᵢ = 1 + ${prime}·2ⁱ for false.`}
+          </p>
         </div>
         <strong>Total L = {evaluation.totalLoss}</strong>
       </div>
@@ -1612,6 +1688,7 @@ function RegressionEvaluationTable({
               <th>|r|<sub>{prime}</sub></th>
               <th>signed weight</th>
               <th>contribution to L</th>
+              {showDecode && <th>decoded satisfied literals</th>}
               <th>result</th>
             </tr>
           </thead>
@@ -1631,13 +1708,20 @@ function RegressionEvaluationTable({
                 <td className={row.contribution < 0 ? "negative-evaluation" : undefined}>
                   {formatSignedNumber(row.contribution)}
                 </td>
+                {showDecode && (
+                  <td className="decode-cell">
+                    {row.kind === "constraint"
+                      ? formatDecodedResidual(row.residual, prime, variables)
+                      : "—"}
+                  </td>
+                )}
                 <td><span className={`evaluation-status status-${row.status}`}>{formatEvaluationStatus(row.status)}</span></td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
-              <th colSpan={8}>Sum of signed row contributions</th>
+              <th colSpan={columnCount}>Sum of signed row contributions</th>
               <td>{evaluation.totalLoss}</td>
               <td>total loss</td>
             </tr>
@@ -1646,6 +1730,24 @@ function RegressionEvaluationTable({
       </div>
     </section>
   );
+}
+
+function formatDecodedResidual(
+  residual: number,
+  prime: number,
+  variables: CompiledProblem["variables"]
+): string {
+  const decoded = decodeClauseResidual(residual, prime);
+  if (!decoded) {
+    return "not decodable";
+  }
+  if (decoded.satisfiedCount === 0) {
+    return "none (clause falsified)";
+  }
+  const names = decoded.satisfiedVariableIndices
+    .map((index) => variables.find((variable) => variable.index === index)?.name ?? `x${index}`)
+    .join(", ");
+  return `${decoded.satisfiedCount} · on ${names}`;
 }
 
 function LossChart({
@@ -1938,13 +2040,15 @@ function isAbortError(error: unknown): boolean {
 
 function formatRegressionEquation(
   compiled: CompiledProblem,
-  coefficients: Record<string, boolean>
+  assignment: Record<string, boolean>,
+  labelScheme: FalseLabelScheme
 ): string {
+  const labels = falseLabels(compiled.variables, labelScheme, compiled.scoring.prime);
   const terms = compiled.variables.map((variable) => {
-    const coefficient = coefficients[variable.name] ? 1 : 0;
-    return `${coefficient} * ${variable.name}`;
+    const coordinate = assignment[variable.name] ? 0 : labels[variable.name];
+    return `${coordinate}·${variable.name}`;
   });
-  return `y = ${terms.join(" + ")}`;
+  return `x = ${terms.join(" + ")}`;
 }
 
 function formatRate(value: number): string {
