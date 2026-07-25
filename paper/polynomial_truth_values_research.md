@@ -1029,3 +1029,70 @@ which is a standing argument for the polynomial direction all by itself.
   literature under another name (Hensel decoding? lifting decoders for cyclic codes)?
 - Does the rational-reconstruction lemma interact with the NP-hardness reduction — i.e. can the height
   bound be maintained under the 3-SAT compilation, or do the weights grow past sqrt(p^k / 2)?
+
+## 12. Reconciliation with manuscript commit 4256b4e (2026-07-25)
+
+The sweep above was written against the manuscript as of 4305b90. Commit 4256b4e ("Add informative
+false labels that decode satisfied literals", #38) landed while it was being written and changes the
+state of play. Corrections and consequences:
+
+**Stale cross-references.** The sweep cites `Section~\ref{sec:polynomial-labels}`; that material is now
+`Appendix~\ref{app:polynomial-labels}`. The new manuscript sections to read first are
+`Section~\ref{sec:general-labels}` (general integer false labels) and
+`Appendix~\ref{app:label-requirements}` (conditions R1/R2 on labels and clause coefficients).
+
+**One sweep item has already landed, in a better form than proposed.** §1(c) above suggested curing
+ledger-style cancellation aliasing with Kronecker-substitution / dissociated weights, citing the
+dossier's provenance discussion. The manuscript now does exactly this in the integer setting: global
+labels \(b_i = 1 + p\,2^{i}\) make distinct subsets of satisfied literals have distinct residual sums,
+so the residual decodes into *which* literals are satisfied (count from the residue mod p, set from the
+binary expansion of the quotient), with the loss landscape provably unchanged. Two improvements over
+what the dossier and this sweep proposed:
+
+- The per-clause coefficient variant (fix \(b_i = 1\), choose \(c_{C,i}\) with \(w_{C,i} \equiv 2^{j}\)
+  where j indexes the literal *within its clause*) achieves the same provenance decoding needing only
+  \(p > 2^{s}\) for clause width s — **independent of the variable count**. This directly answers the
+  dossier's own open question about Kronecker weights growing exponentially in the number of
+  constraints: exercising the local coefficient freedom rather than the global label freedom removes
+  the growth.
+- The randomised variant (draw \(w_{C,i}\) uniformly from units of \(\mathbb F_p\); a claimed satisfied
+  set is checkable by one modular dot product with error \(\le 1/(p-1)\)) is the integer realisation of
+  the dossier's "top three move #3", the Schwartz–Zippel loss verifier — an audit of an untrusted
+  solver's per-clause claims requiring p only somewhat larger than the clause width. Note the honest
+  limit the manuscript states: fingerprints *verify* claims, they do not support direct decoding.
+
+**A negative claim the sweep inherited is now false.** The old text said the degree-at-infinity norm
+"does not automatically preserve the original clause-count loss", and that no useful application had
+been found. The manuscript now proves the affine signed scheme *does* preserve it: with labels
+\(f_i = T + m_i\), every residual at a satisfying assignment is \(-(kT + \text{const})\) with
+\(1 \le k \le\) clause width, so every satisfied clause is rewarded by the same magnitude \(c^{1}\).
+Uniform magnitude and injective residual values combine at \(m_i = 2^i\): cardinality from the leading
+coefficient, subset from the constant term. The Davenport constant of \(\mathbb Z/p\mathbb Z\) gives
+sharpness of the width bound in characteristic p for both the integer and polynomial labels.
+
+**What this does to the sweep's rankings.** Items 2 and 5 of §11 are affected; items 1, 3, 4 and 6 are
+untouched and remain the strongest leads.
+
+- The rational-reconstruction lemma (§1b, rank 2) becomes *more* attractive, not less: the manuscript
+  now has a family of labels with controlled heights (\(1 + p\,2^{i}\) grows with the variable index,
+  \(2^{j}\) per-clause does not), so the lemma's height threshold \(\sqrt{p^k/2}\) has something
+  concrete to bite on. The sixth open question of the sweep — whether the height bound survives the
+  3-SAT compilation — should now be asked specifically of the per-clause coefficient scheme, where the
+  answer looks favourable because the weights do not grow with variable count.
+- The power-sum / roots-of-unity encoding (§3, rank 5) should be compared against
+  `Appendix~\ref{app:label-requirements}`'s value labels, which already extend the construction to
+  multi-valued domains and make each satisfied Sudoku inequality row report the digits it compares.
+  The power-sum encoding's distinct claim is row count (216 versus 810), not provenance; that is now
+  the only part worth pursuing separately.
+- The contour-integral provenance decoder (§7) is the analytic twin of what the manuscript now does
+  algebraically. Its distinct contribution is numerical robustness (Rouché as a certificate under
+  floating-point perturbation), which the algebraic decoding does not provide. Worth keeping on that
+  basis alone.
+
+**Net effect.** The manuscript has moved from "polynomial labels are recorded as a direction for future
+research, no application found" to "informative labels are proved, implemented in the browser, and
+provenance-decodable in three ways (global labels, per-clause coefficients, randomised fingerprints)".
+The remaining gap the sweep points at is unchanged and is now the sharper question: all of this is
+still *indicator-valued at good primes*. Provenance is now decodable, but gradation is not — the
+residual tells you which constraints failed, not how nearly they were satisfied. §2 (ramification) is
+therefore promoted: it is the one item that addresses what the manuscript still cannot express.
