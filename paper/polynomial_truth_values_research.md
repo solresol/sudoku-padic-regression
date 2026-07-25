@@ -15,6 +15,12 @@ Bonacina–Levy SAT 2025, Mihara 2026, Martins arXiv:2512.22692, Bodirsky–Fehm
 The classical ones (Forney 1975, A. K. Lenstra 1985, Green–Karvounarakis–Tannen 2007,
 Artin–Whaples 1945, Alon–Tarsi 1992) are standard.
 
+A second, deliberately speculative pass — the "Left-field sweep, 2026-07-25" section at the end of
+this file — covers the unsigned `p^k - 1` formulations, prime iteration, the Riemann hypothesis, and
+root-free falsity polynomials. It was written from model knowledge in one session with **no web
+searches and no citation-verification pass at all**, so its references are leads rather than
+citations. Its ranked shortlist is in §11 of that section.
+
 ## Executive synthesis
 
 **The deflationary core.** The degree map is a homomorphism (k[t]∖{0}, ×) → (ℕ, +). If each
@@ -639,3 +645,387 @@ Two adjacent bodies of work both enable and temper novelty claims. Enabling: nob
 - Can Grädel–Tannen dual indeterminates be imported so that SATISFIED constraints also contribute informative (nonzero, non-unit) factors — giving the residual gradient-like structure near satisfaction instead of collapsing to 0 — without breaking the 'global minimisers = minimum-conflict assignments' theorem?
 - Does the Kronecker-weight construction (w_C as radix weights so the scalar degree losslessly decodes the violation multiset) interact badly with the hardness reduction or with numerical/complexity bounds, since weights grow exponentially in the number of constraints?
 - Is there a formal relationship between the k[t]-residual construction and Shapley-value/responsibility attribution of facts to query answers (Livshits–Bertossi–Kimelfeld–Sebag line of work), i.e., can root multiplicities be given a causal-attribution semantics rather than just a counting one?
+
+---
+
+# Left-field sweep, 2026-07-25
+
+*A deliberately speculative second pass, requested as "all the strangest possibilities" — covering the
+`p^k - 1` ("close is near enough") unsigned formulations, prime iteration, the Riemann hypothesis, and
+falsity polynomials without real roots. Written after reading both the manuscript
+(`sudoku_padic_regression.tex`, especially Section~\ref{sec:polynomial-labels} and
+Appendix~\ref{app:powers-two}) and the July 12 dossier above; it deliberately avoids re-treading the
+product formula, tropical, and weighted-Polynomial-Calculus material already covered.*
+
+**Provenance and verification status.** Unlike the seven-domain sweep above, this section was produced
+from model knowledge in a single session with **no web searches and no citation-verification pass**.
+Every named theorem, author, and date below should be treated as a lead to check, not as a verified
+citation. The classical items (Hensel, Krasner, Strassman, Chevalley–Warning, Monsky, Weil, Igusa,
+Lee–Yang, Nevanlinna, Ax–Kochen) are standard and low-risk; the attributions to specific recent papers
+and the numerical constants (e.g. Lehmer's 1.17628…) need checking before use. Each item is tagged
+with what kind of thing it is:
+
+- **[T] theorem-shaped** — a specific statement that looks provable, or a known theorem that applies directly.
+- **[X] experiment-shaped** — something the existing code/playground could test in days, not months.
+- **[D] decorative** — rhetorically useful framing, analogy, or footnote material with no load-bearing content.
+
+Ranked shortlist is at the end (§11).
+
+## 1. What the "close is near enough, p^k − 1" move actually is
+
+Three readings of replacing the negative label −1 by the positive label p^k − 1.
+
+**(a) Machine arithmetic.** [D] For p = 2 this is exactly two's complement: every CPU stores −1 as
+2^k − 1, so wraparound machine arithmetic *is* truncated 2-adic arithmetic, and overflow is not an
+error but a precision boundary. The general-p version is nine's complement, as used by mechanical
+calculators to subtract by adding; casting out nines is the mod-(p−1) sibling. Framing value: the
+unsigned formulation is not a hack but the native hardware semantics, and "signed versus unsigned
+objective" reduces to "same objective, different decoder". The all-nines number p^k − 1 is
+(p−1) times a repunit — the accountant's "999…9 ≈ −1".
+
+**(b) Rational reconstruction — the principled version.** [T] The reason p^k − 1 "is" −1 is that −1 is
+the *smallest-height rational in its residue ball*. Wang's rational-reconstruction algorithm recovers,
+from a residue mod p^k, the unique rational n/d with |n|, d below roughly sqrt(p^k / 2), by the extended
+Euclidean algorithm. Candidate lemma, which looks provable in a page:
+
+> **Lemma (unsigned–signed equivalence).** Let the compiled objective use labels and weights all of
+> height less than sqrt(p^k / 2). Then the unsigned mod-p^k compilation, composed with rational
+> reconstruction, has the same minimisers as the signed compilation, and the decoding is unique.
+
+This turns "close is near enough" into an exact equivalence with an explicit tolerance threshold. The
+respectable ancestor is Dixon's 1982 p-adic lifting for exact linear algebra: solve approximately at
+p^k, then snap to the exact rational — precisely the manuscript's move, done for a different reason.
+Ultrametric bonus [T]: labels pairwise separated by p^{−m} have *disjoint* balls at every radius below
+the separation, because in an ultrametric space two balls are disjoint or nested. Unique decoding
+without the Hamming d/2 halving. Krasner's lemma is the deluxe form — approximate a value more closely
+than its conjugates and you have captured its whole field, i.e. closeness thresholds force *algebraic*
+capture, not merely numeric agreement.
+
+**(c) The ledger reading.** [X, cautionary] Push further and let the *loss itself* live in Z/p^k:
+implement rewards as p^k − w rather than as negative reals. "Minimise the loss" becomes "maximise
+v_p(total)": not shrinking a number but balancing a ledger mod p^k, with penalties and rewards in one
+currency and satisfaction meaning *the books balance*. The failure mode is cancellation aliasing — two
+wrongs summing to a right — and **the manuscript has already run this experiment without naming it**:
+Appendix~\ref{app:powers-two}'s target 511 = 2^9 − 1 is exactly a ledger objective, and it failed
+because many wrong multisets balance the same ledger. The cure is already in the dossier under another
+name: Kronecker-substitution / dissociated (Sidon-type) weights chosen so that no signed subset sum
+collides. Good narrative arc for a section: the ledger reading comes with its own cautionary tale and
+its own fix, both already in the repository.
+
+## 2. Ramification: where "really p-adic" actually lives
+
+This is the most important structural item in the sweep, because it answers the manuscript's own
+self-criticism ("the norm collapses to a 0/1 indicator; nothing is really p-adic") in its own terms.
+
+The collapse is a statement about **good reduction**. Choosing p = 19 so that all digit differences
+stay distinct mod p is choosing an *unramified* prime for the digit polynomial prod_{d=1}^{9}(x − d),
+whose discriminant prod_{i<j}(j − i)^2 has prime support exactly {2, 3, 5, 7}. At good primes Hensel's
+lemma makes everything rigid: separable mod p implies every mod-p solution lifts uniquely, so tolerance
+adds nothing and the norm is an indicator. Hence:
+
+> **[T] Candidate theorem (gradation ⟺ ramification).** The induced loss on the digit alphabet is a
+> 0/1 indicator exactly at primes of good reduction for the alphabet polynomial. Genuinely graded
+> p-adic structure exists only at p ∈ {2, 3, 5, 7} — the primes smaller than the alphabet, where digits
+> collide mod p and separate only mod p^k.
+
+At p = 2 the digit set acquires a nontrivial ultrametric dendrogram: v_2(9 − 1) = 3, so 9 is *almost*
+1; the clusters {1,5,9}, {2,6}, {3,7}, {4,8} form at radius 1/4. Writing 9 for 1 is a small lie;
+writing 2 for 1 is a big one. That is exactly the "graded distance-to-satisfaction the 0/1 metric
+cannot express" that design caveat (e) of the executive synthesis asks for — obtained not by new
+machinery but by *deliberately choosing a lossy prime*. Carries then genuinely fire, which is the
+missing half of the dossier's Isaksen-cocycle observation: with p > q the construction never exercises
+a carry, so **use p < q**.
+
+The polynomial twin is the controlled comparison [X]: encode digit d by its binary expansion as an
+element of F_2[t]/(t^4). Then t-adic closeness = agreement of low bits — the same dendrogram, with no
+carries at all. Two experiments the existing solver suite could run almost immediately:
+
+1. Rerun the local searches at p = 2 and p = 3 with a p^k-tolerance loss schedule that anneals k upward
+   (solve mod p, then lift digit by digit, Hensel-style) — a genuinely p-adic search schedule rather
+   than a 0/1 conflict count.
+2. Run the identical schedule in the carry-free F_2[t] twin. The difference between the two isolates
+   the contribution of carries, giving direct evidence for or against the dossier's "carries cause
+   hardness" thesis.
+
+This also reinterprets the powers-of-two negative result: at p = 2 the landscape was graded but
+carry-chaotic, and there was no lift schedule — a plausible diagnosis of *why* it stopped in local
+minima, and a reason to expect the annealed version to behave differently.
+
+## 3. Truth values as roots of unity; Frobenius as denoiser
+
+Serendipity worth exploiting: 19 ≡ 1 (mod 9), so Z_19 already contains the ninth roots of unity. Map
+digit d to zeta^d in mu_9 ⊂ Z_19^×.
+
+- **Pinning becomes a single equation** [T]: x^9 = 1 replaces the nine digit wells.
+- **All-different becomes eight power sums** [T]: a multiset of nine elements of mu_9 satisfies
+  sum_i x_i^k = 0 for k = 1..8 iff it is exactly mu_9. (Newton's identities are invertible since
+  19 > 9, giving e_1 = … = e_8 = 0, so the elementary polynomial is X^9 − c; every root lies in mu_9,
+  forcing c = 1, hence X^9 − 1 with distinct roots.) That is 27 units × 8 = **216 rows replacing the
+  810 distinct pairwise negative rows** of eq.~\eqref{eq:objective} — a parsimony result in
+  Section~\ref{sec:parsimony}'s own currency, with graded near-violation values off-domain.
+- **Honesty note** [T]: on the pinned domain at the good prime 19, power-sum deviations are 19-adic
+  units (1 − zeta divides 3, not 19), so this encoding is *also* indicator-valued at good p. Its
+  virtues are row count and algebraic form; gradation again requires the ramified prime, here p = 3,
+  where mu_9 collapses. The bad-prime thesis of §2 recurs, which is itself evidence the thesis is the
+  right organising principle.
+- **Teichmüller as a decoder** [X]: for any unit x, x^{p^n} → omega(x), the nearest root of unity, so
+  *iterated Frobenius rounds an approximate truth value to an exact one*, fast. In the polynomial
+  world it is cleaner still: in characteristic p, (a + t·u)^{q^n} = a + t^{q^n} u^{q^n} with no cross
+  terms — exact, carry-free denoising by repeated q-th powering. "To find out what a corrupted value
+  really is, raise it to the p-th power until it stops moving" is strange, correct, and easy to
+  demonstrate in the browser playground. I am not aware of Teichmüller lifting being framed as a
+  denoising/decoding primitive for constraint encodings; possible novelty, needs a literature check.
+
+## 4. Iterating over all primes
+
+- **CRT as an ensemble of provably independent weak learners** [T/D]. Residues mod distinct primes are
+  independent, so prime channels are the rare ensemble whose independence is a theorem rather than an
+  assumption. A nonzero residual r hides from channel p iff p | r; the number of small primes it fools
+  is Erdős–Kac Gaussian with mean and variance log log |r|. The cost of deceiving *every* prime up to X
+  is |r| ≥ prod_{p ≤ X} p = e^{theta(X)}, so the Prime Number Theorem prices deception at
+  e^{(1+o(1))X}. See §5 for the RH refinement of that price.
+- **Redundant residue codes** [T]. Spreading one truth value over many lossy prime channels is
+  Chinese-remainder coding; list decoding of CRT codes (Goldreich–Ron–Sudan; Boneh;
+  Guruswami–Sahai–Sudan) is the exact "close at enough primes is near enough" theorem, and
+  Asmuth–Bloom secret sharing is its access-control reading. The digit alphabet does this in
+  miniature: digits 1–9 are determined by residues mod {2,5} or {3,5} but not mod {2,3} (1 and 7
+  collide mod 6) — a weighted threshold structure on which sets of primes jointly know the truth.
+- **Ax–Kochen–Ershov: the transfer principle** [T]. A nonprincipal ultraproduct of the Q_p is
+  elementarily equivalent to the same ultraproduct of the F_p((t)). So every first-order property of
+  the encoding holds at almost all primes in the number-field world iff it holds at almost all primes
+  in the polynomial world. **This is the formal licence for the whole prime-versus-polynomial
+  programme** — k[t] as a clean model of Z_p is a theorem, not an analogy. Łoś's theorem also gives
+  "iterate over all primes" its correct logical form: truth by ultrafilter vote, with finitely many
+  dissenting primes forgiven. (This is where nonstandard analysis genuinely earns its keep; the
+  hyperreals are the same construction aimed at R.)
+- **Heights: the universal all-places loss** [T/D]. The product formula says total falsity over all
+  places (R included) is conserved: an error small archimedeanly must be loud p-adically somewhere.
+  The Weil height sum_v log^+|·|_v is the canonical aggregate loss; Northcott's theorem (finitely many
+  points of bounded height and degree) is a finiteness/generalisation bound for near-truths. Best
+  decoration in the cluster: **Lehmer's problem is "is there a quantum of falsity?"** Kronecker's
+  theorem says Mahler measure 1 characterises roots of unity, so the zero-loss alphabet is exactly the
+  zero-height alphabet; Lehmer's conjecture (smallest lie ≥ log 1.17628…, open since 1933) says
+  nonzero falsity is bounded away from zero. And by Lind–Schmidt–Ward that same Mahler measure is the
+  entropy of the algebraic dynamical system the token defines — *lies generate entropy at rate
+  log M(f)*.
+- **Physics garnish** [D]. Freund–Witten: the Veneziano string amplitude formally satisfies
+  A_∞ · prod_p A_p = 1 — the archimedean answer is the reciprocal of the product over all primes.
+  Precedent that multiplying over all primes recovers the real world.
+
+## 5. The Riemann hypothesis, done honestly
+
+Four contact points, in decreasing solidity. Only the third is an equivalence rather than an analogy.
+
+1. **Function-field RH is a theorem** [T]. Weil proved RH for curves over F_q; even the Goss zeta
+   function of F_q[t] has its RH proven (Wan; Diaz-Vargas; Sheats — zeros simple, distinct valuations).
+   Consequence with teeth: Weil's character-sum bound |sum_x chi(f(x))| ≤ (deg f − 1) sqrt(q) gives
+   *unconditional* square-root concentration for any loss statistic built from multiplicative
+   characters over F_q[t]. Everything the number-field side must assume (GRH), the polynomial side can
+   prove. **This is a standing argument for the k[t] direction by itself**: state loss-concentration
+   unconditionally via Weil, and remark that the Z version is GRH-equivalent territory.
+2. **GRH as a prime-selection guarantee** [T]. "Does a good prime exist early?" is effective
+   Chebotarev. Primes with ninth roots of unity (p ≡ 1 mod 9) have density 1/6; under GRH the least
+   such prime is polylog-small. Iterating over primes is sampling Frobenius from a Galois group, and
+   GRH is what makes the sampling efficient — the standard shape of "RH matters algorithmically".
+3. **The deception-cost error term** [T]. From §4: the exchange rate between error magnitude and
+   number of fooled primes is governed by theta(X), and von Koch's theorem says RH holds iff
+   |theta(X) − X| = O(sqrt(X) log^2 X). So: **RH is the statement that the exchange rate between error
+   magnitude and number of fooled primes is as regular as possible.** This is the one honest
+   RH-attaches-as-an-equivalence sentence available here, and the one worth writing down.
+4. **Sarnak/Möbius as adversarial ML** [D]. Sarnak's conjecture says no low-complexity predictor
+   correlates with mu(n); RH is equivalent to square-root cancellation in its partial sums. Framing:
+   the Möbius sequence is the arithmetic residual stream on which the null model is optimal, and RH
+   says its loss is exactly sqrt(N) — "the primes are the one dataset provably adversarial to
+   regression". Website material, not paper material.
+
+## 6. Igusa zeta functions: the generating function of "close is near enough"
+
+Probably the deepest new machinery available, and it fits the tolerance tower exactly.
+
+Let N_k = the number of assignments satisfying the compiled system mod p^k — the census of near-truths
+at tolerance k. Then:
+
+- **[T] Rationality is free.** The Poincaré series sum_k N_k T^k is the Igusa local zeta function of the
+  constraint ideal, and Igusa (with Denef) proved it is always a rational function of T. A strong,
+  nonobvious structure theorem about the tolerance tower, off the shelf.
+- **[T] Deceptiveness becomes a singularity invariant.** The poles give the growth rate of ghost
+  near-solutions; the largest real pole is minus the log-canonical threshold, a singularity invariant
+  of the constraint variety. So *how fast phantom near-solutions proliferate as tolerance loosens* is
+  an invariant of the singularities of the constraint variety — a genuinely new quantity for CSP
+  encodings, computable in small examples. Denef–Pas definability makes the rational-function shape
+  uniform in p for almost all p: another payoff for "iterate over all primes".
+- **[T] The polynomial twin is jet schemes.** Solutions in k[t]/(t^{k+1}) are the jet schemes of the
+  constraint variety; the t-adic limit is the arc space; Denef–Loeser's motivic Igusa zeta is the
+  universal ghost census; Mustață's theorems tie jet-scheme behaviour to rational singularities.
+  **The "solutions to precision t^k" formulation *is* jet-scheme theory**, with two decades of
+  machinery attached, and Hensel says all of it trivialises over the smooth locus — difficulty
+  concentrates at singular points, which for these encodings means bad primes and constraint
+  interactions. Same moral as §2, arrived at independently.
+- **[D→T] The complex-residue answer hides here.** The monodromy conjecture (proven for curves) says
+  poles of the p-adic Igusa zeta are explained by *complex* monodromy eigenvalues: e^{2 pi i · pole}
+  must be an eigenvalue of the monodromy of the same polynomial over C. The p-adic near-truth census
+  and the complex vanishing-cycle structure are conjecturally two shadows of one object. If one
+  strange-but-real flag is to be planted, "the Igusa zeta function of a Sudoku" is it.
+
+## 7. Falsity with no real roots: the complex-analytic cluster
+
+Direct answer to "if we make the polynomials have no real roots, does that give us weird things with
+complex residues?" — yes, several, one of them load-bearing.
+
+- **Lee–Yang zeros and the computational phase transition** [T/X, strongest item here]. The manuscript
+  already gives the objective a Potts reading (Section~\ref{sec:minimum-conflicts-potts}). The
+  partition function Z(beta) = sum e^{−beta L} of that Potts energy is a polynomial in fugacity
+  variables, and the Lee–Yang/Fisher programme studies exactly where its complex zeros sit. Zero-free
+  region ⟺ analyticity ⟺ no phase transition; and by Barvinok's interpolation method (made efficient
+  by Patel–Regts), **zero-free regions yield polynomial-time approximate counting of near-solutions**,
+  while zeros pinching the real axis mark the onset of hardness. So "no real roots" has a precise
+  load-bearing meaning: it is the Lee–Yang property, and the locations of the complex zeros are
+  algorithmic phase boundaries. Antiferromagnetic Potts zero geography is an active area to which
+  concrete Sudoku instances could contribute. Immediate experiment: plot the complex zeros for carved
+  puzzles as clues are removed and watch them approach the real axis.
+- **Winding numbers count conflicts** [X]. With master residual M(t) = prod (t − alpha_C)^{w_C}, the
+  conflict count is the contour integral (1/2 pi i) ∮ M'/M dt, and the residue at alpha_C reads off the
+  multiplicity w_C. Two practical corollaries: provenance decoding by *numerical* contour integration
+  (Delves–Lyness root counting; FFT on a circle) instead of symbolic factorisation, which is
+  floating-point-friendly for the browser; and Rouché's theorem as a robustness certificate —
+  perturbations below min |M| on the contour cannot change any decoded count. "Which constraints
+  failed" becomes a topological invariant, stable by Rouché. Implementable in the playground now.
+- **A lie with no real witness is a sum of two squares** [T/D]. No real roots plus positive leading
+  coefficient implies f = A^2 + B^2 (pair the conjugate factors). That is the doorway from falsity
+  tokens to Positivstellensatz/SOS certificates and the Lasserre hierarchy — the certificate side of
+  polynomial optimisation. Decoration: Weil's criterion states RH itself as a positivity (explicit
+  formula) condition, so "falsity as failed positivity" has the same shape as the deepest open
+  positivity statement in mathematics.
+- **Electrostatics of falsity** [T]. log|M(z)| = sum_C w_C log|z − alpha_C| is the potential of the
+  violation measure, so token placement is a potential-theory design problem. Design principle: choose
+  the alpha_C as Fekete/Leja points (maximal transfinite diameter) for best-conditioned decoding, with
+  Leja ordering giving an *online* rule for adding constraints. Potential theory has a full
+  non-archimedean twin on the Berkovich line (Baker–Rumely), itself an R-tree — so the complex
+  picture, the p-adic picture, and the dossier's "Berkovich tree of design space" are one picture.
+  Capacity of the truth locus as a difficulty invariant is a plausible new quantity.
+- **Nevanlinna theory is the mature "close is near enough"** [T/D]. The proximity function m(r, a)
+  literally averages log^+ 1/|f − a| — how nearly f equals truth value a. The First Main Theorem
+  (proximity + counting = height) is conservation of falsity, archimedean edition, pairing with the
+  product formula. The Second Main Theorem's defect relation sum_a delta(a) ≤ 2 says a function can be
+  abnormally near at most two truth values. Vojta's dictionary translates the whole theory into
+  Diophantine approximation (Roth as SMT). Best of all: **non-archimedean Nevanlinna is stronger** —
+  a p-adic entire function with no zeros is constant (Newton-polygon rigidity), so a nonconstant
+  entire function omits *no* value, versus Picard's one exceptional value over C. In the polynomial
+  world falsity cannot be dodged at all: every truth value is attained. "The non-archimedean world has
+  no Picard exceptional values" is a clean rigidity slogan for why k[t] semantics are better behaved.
+- **Real-stable polynomials** [D]. If falsity tokens are chosen real-stable (no roots in the upper
+  half-plane), Borcea–Brändén's classification says exactly which operations preserve that property,
+  and interlacing families of such polynomials proved Kadison–Singer (Marcus–Spielman–Srivastava).
+  Left-field but respectable; hyperbolic programming is the associated relaxation family.
+
+## 8. Nonstandard analysis and the logic of infinitesimal falsity
+
+Beyond Łoś and Ax–Kochen (§4), the crisp formal home for graded falsity is many-valued logic.
+
+- **[T] MV-algebras are the right semantics.** Chang's MV-algebra with truth values
+  {0, eps, 2 eps, …, 1 − eps, 1} containing genuine infinitesimals is precisely the "true, but false to
+  order k" grading the p^k tower implements. The structure theory exists: perfect MV-algebras
+  (Di Nola–Lettieri) are equivalent to abelian lattice-ordered groups; Mundici's Gamma functor connects
+  MV-algebras to exactly the lattice-ordered value groups of valuation theory; and Di Nola's
+  representation theorem embeds every MV-algebra into an ultrapower of [0,1] — **hyperreal truth
+  degrees are universal for many-valued logic**. So "Łukasiewicz logic with infinitesimal truth
+  degrees" is the logician's name for this loss semantics, complete with a completeness literature,
+  and it formalises the executive synthesis's lexicographic-priorities item from the semantic side.
+- **[T] Overspill is the compactness statement.** Near-truth at every finite tolerance forces truth at
+  some infinite tolerance — the nonstandard proof that "solvable mod p^k for all k" yields a Z_p-point.
+  The tolerance tower has an inverse limit; ghosts are the failure of that limit to be an integer
+  point, i.e. the local–global gap. For pinned zero-dimensional systems the gap closes; for relaxations
+  it is exactly the interesting object, with Brauer–Manin as its general cohomological measure.
+
+## 9. The ultrametric-physics cluster
+
+A real, if speculative-in-detail, thesis: **the p-adic/degree loss is not an exotic replacement for the
+Euclidean one, it is the geometry the hard phase already has.**
+
+Statistical physics says the solution space of random CSPs near the hardness threshold shatters into
+clusters of clusters, and Parisi's replica symmetry breaking asserts — with Panchenko's theorem making
+it rigorous for mean-field spin glasses — that pure states organise *ultrametrically*. Survey
+propagation works because of this clustered geometry. The Berkovich tree of design space and the Parisi
+tree would then be the same kind of object on the two sides of the analogy. [D, but a strong
+related-work paragraph.]
+
+Supporting cast for that paragraph:
+
+- Anashin: automata-computable maps are exactly the 1-Lipschitz maps Z_p → Z_p, so "p-adic Lipschitz
+  regression" is literally learning transducers, and the solvers are p-adic dynamical systems.
+  Backtracking enumeration is an orbit of the mixed-radix odometer (the adding machine), whose
+  minimality is completeness of search. [T/D]
+- Zúñiga-Galindo's p-adic statistical field theory and p-adic neural networks. [D]
+- Khrennikov's p-adic probability, where relative frequencies converge p-adically. [D]
+
+## 10. Rapid fire — one strange fact each
+
+- **Strassman's theorem** [T]: a nonzero p-adic power series has finitely many zeros in Z_p, so a
+  p-adic-analytic loss is either identically zero or exactly right only finitely often. No analytic
+  model is "accidentally perfect infinitely often".
+- **Skolem–Mahler–Lech** [T] (proved p-adically, via Strassman): the perfect-fit times of a linearly
+  recurrent residual sequence form a finite set plus arithmetic progressions. If a loss trace is a
+  linear recurrence, its zeros are provably structured.
+- **Monsky's theorem** [D→T]: extending the 2-adic valuation to R proves a square admits no odd
+  equidissection — the template for valuation-based *impossibility certificates* in combinatorics. A
+  p-adic unsolvability proof for a puzzle class would be its descendant.
+- **Chevalley–Warning** [T]: over F_p, if the number of variables exceeds the total degree, the
+  solution count is ≡ 0 mod p. Free divisibility information about near-solution counts, and the
+  classical engine behind "solutions are never unique" — i.e. a uniqueness obstruction for
+  underdetermined puzzles.
+- **Zsygmondy's theorem** [D]: p^k − 1 has a primitive prime divisor for essentially every k, so each
+  new tolerance depth is certified by a prime certifying no shallower depth. (And 2^k − 1 prime =
+  Mersenne: falsity values that are themselves irreducible.)
+- **Goodstein / Kirby–Paris** [D]: iterating "rewrite in base p, bump the base" terminates but PA
+  cannot prove it — base-of-truth-value iteration has proof-theoretic strength. A warning label for
+  "iterate over all primes" schemes.
+- **Collatz** [D]: the parity-vector map is a 2-adic isometry (Lagarias), so the most famous open
+  dynamics problem already lives in this metric.
+- **Arithmetic topology** (Mazur; Morishita) [D]: primes are knots in a 3-sphere, Legendre symbols are
+  linking numbers, and the Iwasawa polynomial is the Alexander polynomial — precedent in which the
+  polynomial attached to a prime *is* a knot invariant. Pure poetry, still footnote-worthy.
+- **Iwasawa main conjecture as a template** [T]: "analytic falsity = algebraic falsity" (zeros of the
+  p-adic L-function = characteristic ideal) is the deepest known theorem of the desired shape, *order
+  of vanishing of the loss = colength of the obstruction ideal*. A baby version for zero-dimensional
+  constraint ideals (v_p of the analytic loss = intersection multiplicity) looks provable with standard
+  commutative algebra and would make a good capstone proposition.
+
+## 11. Ranked shortlist
+
+1. **Bad primes / ramification as the cure for indicator collapse** (§2). One theorem (gradation ⟺
+   ramification), one experiment (p = 2, 3 with a Hensel lift schedule against the F_2[t] carry-free
+   twin). Directly answers the manuscript's own self-criticism, and reinterprets the powers-of-two
+   negative result.
+2. **The rational-reconstruction equivalence lemma** (§1b). Small, exact, legitimises the entire
+   p^k − 1 formulation, connects to Dixon lifting.
+3. **Igusa zeta / jet schemes of the constraint variety** (§6). Rationality of the near-truth census is
+   free; log-canonical threshold as a deceptiveness invariant is a new quantity for CSPs; the
+   monodromy conjecture supplies the complex-residue connection.
+4. **Lee–Yang zeros of the Sudoku Potts partition function, plus Barvinok** (§7). Computable now (plot
+   zeros as clues are removed), and it plugs the objective into the counting-complexity literature.
+5. **Teichmüller / power-sum encoding at p = 19, Frobenius denoising** (§3). Cheap, elegant,
+   playground-friendly; 216 rows for 810.
+6. **Ax–Kochen transfer plus MV-algebra semantics** (§4, §8). Positioning ammunition: the formal
+   licence for k[t]-as-model-of-Z_p, and the logician's name for graded falsity.
+
+On the Riemann hypothesis specifically: the honest answer to write down is the Erdős–Kac / PNT "price
+of deceiving all primes" material (§4–§5), because von Koch's theorem makes it an equivalence rather
+than a vibe — and because the function-field side of the same statement (Weil, Goss RH) is *proven*,
+which is a standing argument for the polynomial direction all by itself.
+
+## Open questions from this sweep
+
+- Is the gradation ⟺ ramification statement (§2) actually a theorem in the generality of the
+  compiler template, or only for the digit alphabet {1,…,9}? What is the right invariant — the
+  discriminant's prime support, or something finer per-constraint?
+- Does the annealed Hensel-lift search at p = 2 outperform the p = 19 indicator search, or does
+  carry-chaos make it worse? (If worse, that is *also* publishable: it isolates carries as the
+  obstruction and supports the k[t] direction.)
+- Can the log-canonical threshold of a compiled Sudoku instance be computed for small cases, and does
+  it correlate with empirical solver difficulty as clues are removed?
+- Where are the Lee–Yang/Fisher zeros of the 1,299-row objective's partition function, and do they
+  approach the real axis at the clue count where local search starts failing?
+- Is Teichmüller-as-denoiser genuinely new for constraint encodings, or does it exist in the coding
+  literature under another name (Hensel decoding? lifting decoders for cyclic codes)?
+- Does the rational-reconstruction lemma interact with the NP-hardness reduction — i.e. can the height
+  bound be maintained under the 3-SAT compilation, or do the weights grow past sqrt(p^k / 2)?
