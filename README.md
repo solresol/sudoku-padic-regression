@@ -1,16 +1,16 @@
 # Sudoku via integer p-adic regression
 
-This repository contains the paper, reference Python experiments, and interactive
-browser implementation for encoding finite-domain constraint problems as signed
-integer p-adic regression data.
+This public repository is the reproducibility archive for the paper
+*Signed p-adic Residual Encodings of Finite-Domain All-Different Systems with a
+Sudoku Case Study*. It contains the manuscript, the reference Python
+experiments, the exact archived result sets, and the submission documentation.
 
 ## Repository map
 
 - `paper/`: LaTeX source, figures, and compiled paper PDF.
 - `code/`: the 81-coefficient Sudoku solver, unique-puzzle generator, CNF
-  comparison algorithms, and experiment driver.
-- `padic-logic.symmachus.org/`: the TypeScript/React CSP and Sudoku compiler at
-  <https://padic-logic.symmachus.org> (Sudoku: `#sudoku`).
+  comparison algorithms, and experiment driver used by the paper.
+- `fixtures/`: stable cross-language objective fixtures.
 - `tests/`: Python regression tests.
 - `submission/`: cover letter, reviewer notes, and source-package documentation.
 - `archive/`: frozen earlier experiments and their separate environment.
@@ -75,9 +75,9 @@ uv run python code/padic_comparison_algorithms.py --seed 0
 uv run python code/padic_comparison_algorithms.py --dimacs problem.cnf
 ```
 
-The browser CSP page exposes ordered and randomly permuted exhaustive search,
-the Zubarev walk, and the Mihara diagnostic from the Algorithm selector. The
-Sudoku page exposes row-swap, Zubarev, and Mihara comparison buttons.
+The separate browser implementation exposes the corresponding exhaustive,
+Zubarev, and Mihara comparison paths at
+<https://github.com/solresol/padic-logic>.
 
 ## Reproduce experiments
 
@@ -104,18 +104,15 @@ make site      # copy the current PDF into site/
 make kindle    # compact PDF in tmp/pdfs/
 ```
 
-## Test and build the browser app
+## Companion repositories
 
-```sh
-cd padic-logic.symmachus.org
-npm ci
-npm test
-npm run build
-```
-
-The GitHub Actions workflow runs the browser tests and production build, then
-deploys pushes to `main`. It also runs the root Python test suite when the Python
-implementation, fixtures, or dependency metadata changes.
+- [`solresol/padic-logic`](https://github.com/solresol/padic-logic): public
+  TypeScript/React browser application deployed at
+  <https://padic-logic.symmachus.org>.
+- `solresol/degree-window-feasibility`: private follow-up paper programme for
+  polynomial degree-window systems and their tropical shadow.
+- `solresol/constraint-zeta`: private exploratory graph-zeta and
+  partition-polynomial programme.
 
 The related neighbour-hyperplane landscape code is in the sibling repository
 `../padic-landscapes`.

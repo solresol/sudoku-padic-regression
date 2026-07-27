@@ -82,7 +82,8 @@ jobs:
               of the paper.
             - Flag unsupported or overstated claims, unclear exposition, missing citations/references, and
               inconsistencies with the implementation or results elsewhere in the repo (code/, tests/,
-              fixtures/, padic-logic.symmachus.org/).
+              fixtures/, archive/). The separately maintained browser application is in
+              solresol/padic-logic.
             - Ignore LaTeX formatting nits and code style; focus on correctness, clarity, and rigor of the
               argument.
             - Post your findings as a normal PR review.
