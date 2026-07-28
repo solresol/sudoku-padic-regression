@@ -224,6 +224,8 @@ paper/*.run.xml
 
 # Local document-correction renderings and comparison artefacts
 /scratch/
+*-annotated.pdf
+*-corrections*.pdf
 paper/*.nav
 paper/*.snm
 paper/*.xdv

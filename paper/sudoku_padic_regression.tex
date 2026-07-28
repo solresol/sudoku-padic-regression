@@ -54,11 +54,11 @@ The paper makes the following contributions.
 \item A compiler template from finite-domain all-different systems and CNF formulae to signed weighted affine \(p\)-adic residual objectives, with a coordinatewise domination theorem locating every global minimiser in the finite domain, on \(\mathbb Z_p^n\) and on \(\mathbb Q_p^n\) (Theorem~\ref{thm:compiler-template}, Corollary~\ref{cor:qp-extension}).
 \item An exact characterisation of the global minimisers for all-different systems in list-colouring form as the domain-respecting minimum-conflict assignments, covering the unsatisfiable Max-CSP regime and the antiferromagnetic Potts reading (Theorem~\ref{thm:all-different}, Section~\ref{sec:minimum-conflicts-potts}).
 \item NP-hardness of the signed threshold problem at the fixed prime \(p=5\), by an elementary reduction through the clause compiler (Corollary~\ref{cor:signed-nphard}).
-\item Polynomial-size positive-only complement expansions for the negative CNF and pairwise all-different rows, supporting a diagnostic comparison with Mihara's digitwise equality regression while the signed rows are retained for valuation and loss reporting (Section~\ref{sec:mihara-digitwise}).
+\item Polynomial-size positive-only complement expansions for the negative CNF and pairwise all-different rows, supporting a diagnostic comparison with Mihara's digitwise equality regression while the signed rows are retained for valuation and loss reporting (Appendix~\ref{sec:mihara-digitwise}).
 \item A Sudoku case study on the native \(81\)-cell digit space using a variety of \(p\)-adic linear-regression techniques; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
 \end{itemize}
 
-Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances and the Potts interpretation. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations and compares Mihara's digitwise regression, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices record the heuristics, their traces, the experiments, the failed powers-of-two encoding, the label and coefficient requirements together with an approximate-negation variant, and a polynomial-valued labelling.
+Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, report the experiments and failed powers-of-two encoding, state the label and coefficient requirements together with an approximate-negation variant, and give a polynomial-valued labelling.
 
 \section{\texorpdfstring{\(p\)-adic}{p-adic} linear regression}
 \label{sec:padic-regression-background}
@@ -77,19 +77,7 @@ This norm makes numbers close when their difference is divisible by a large powe
 This is a weighted \(p\)-adic linear-regression objective.
 Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective used below. On \(\mathbb Z_p\), every affine residual in this paper has norm at most one, so each finite signed objective is bounded despite its negative terms. We demonstrate that such objectives give useful representations of constraint-satisfaction problems: source forms can be transformed mechanically into datasets, and a global minimiser can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment.
 
-\subsection{An example}
-\label{sec:worked-all-different}
-
-We begin with an example rather than the general theorem. Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
-
-For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), while every nonzero integer residual that occurs below has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
-\[
-w\,|u^\top x-b|_5
-\]
-to the objective. Positive rows of weight \(3\) pin each coefficient to its allowed values. Negative rows of weight \(-1\) reward unequal endpoints.
-
-\clearpage
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \begin{tikzpicture}[vertex/.style={circle,draw,thick,minimum size=8mm,inner sep=0pt}]
 \node[vertex] (x1) at (0,1.45) {$x_1$};
@@ -104,7 +92,7 @@ to the objective. Positive rows of weight \(3\) pin each coefficient to its allo
 \label{fig:list-colouring-example}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \small
 \begin{tabular}{@{}crrrrc l@{}}
@@ -125,9 +113,7 @@ $E_2$ & $0$ & $1$ & $-1$ & $0$ & $-1$ & reward $x_2\ne x_3$ \\
 \label{tab:list-colouring-dataframe}
 \end{table}
 
-Table~\ref{tab:list-colouring-dataframe} gives the eight observations in dataframe form, with one column for each model coefficient. Figure~\ref{fig:list-colouring-regression} then shows the same observations in compact tuple notation. Each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
-
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \small
 \begin{tabular}{@{}cllp{0.27\linewidth}@{}}
@@ -147,13 +133,26 @@ $E_2$ & negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
 \caption{Synthetic dataset for the toy list-colouring instance in Figure~\ref{fig:list-colouring-example}. Here \(e_1,e_2,e_3\) denote the standard basis vectors of \(\mathbb Z^3\).}
 \label{fig:list-colouring-regression}
 \end{figure}
-\clearpage
+
+\subsection{An example}
+\label{sec:worked-all-different}
+
+We begin with an example rather than the general theorem. Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
+
+For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), while every nonzero integer residual that occurs below has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
+\[
+w\,|u^\top x-b|_5
+\]
+to the objective. Positive rows of weight \(3\) pin each coefficient to its allowed values. Negative rows of weight \(-1\) reward unequal endpoints.
+
+
+The eight observations have two equivalent presentations: Table \ref{tab:list-colouring-dataframe} and Figure~\ref{fig:list-colouring-regression} which uses a compact tuple notation, in which each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 The zero-intercept model is the hyperplane
 \[
 b=u^\top x=u_1x_1+u_2x_2+u_3x_3.
 \]
-The general theorem below (Theorem~\ref{thm:compiler-template}) guarantees that at least one global minimum occurs among the finitely many domain-respecting candidates.
+The general theorem below (Theorem~\ref{thm:compiler-template} on page~\pageref{thm:compiler-template}) guarantees that at least one global minimum occurs among the finitely many domain-respecting candidates.
 
 On a domain-respecting vector the six positive rows contribute \(9\), while each unequal edge subtracts one. Thus
 \[
@@ -161,7 +160,9 @@ L_{\mathrm{toy}}(x)=9-\mathbf 1_{x_1\ne x_2}-\mathbf 1_{x_2\ne x_3}.
 \]
 Brute-force evaluation gives Table~\ref{tab:list-colouring-candidates}.
 
-\begin{table}[H]
+
+
+\begin{table}[t]
 \centering
 \small
 \begin{tabular}{@{}ccc@{}}
@@ -192,6 +193,8 @@ Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \Phi=(z_1)\wedge(\neg z_1\vee z_2).
 \]
 What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
+
+We want to make sure that \(x_1\) and \(x_2\) take values only in \(\{0,1\}\), so we make two deep holes (``Boolean wells'') in the loss landscape for each variable. If the wells are deeper than the rewards from the clause-derived rows, then the optimal values of \(x_1\) and \(x_2\) are suitably constrained.
 
 \begin{table}[H]
 \centering
@@ -238,7 +241,7 @@ The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying 
 
 The preceding CNF uses \(0\) for true and \(1\) for false for both variables. The false values need not coincide. They could be other \(p\)-adic integers, and they need not be distinct.
 
-Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\): give a positive literal the coefficient \(+1\), a negated literal the coefficient \(-1\), and take as the forbidden target the sum of the false labels of the positive literals. On Boolean-labelled assignments the residual equals minus the sum of the false labels of the satisfied literals, and a nonempty subset of \(k\) such labels sums to \(k\) modulo \(p\), a unit whenever \(k<p\). Every satisfied clause is therefore rewarded by exactly one; the labels need not be distinct, and the uniform label \(b_i=1\) used above is the degenerate member of the family. Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information rather than correctness: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The width bound \(k<p\) is sharp for any labelling with uniform unit rewards, because the Davenport constant of \(\mathbb Z/p\mathbb Z\) is \(p\): among any \(p\) residues there is a nonempty subset summing to zero modulo \(p\). The companion browser's Boolean-CSP page implements both labellings: switching to \(b_i=1+p\,2^{i}\) leaves every displayed loss unchanged, while its row-evaluation table decodes each clause residual into the satisfied literals it names. Appendix~\ref{app:label-requirements} states the general conditions under which any labels and clause coefficients preserve the clause-count loss---and shows that per-clause coefficients recover the same provenance with a prime that depends only on the clause width, not the variable count, and that value labels extend the construction to multi-valued domains, making each satisfied Sudoku inequality row report the digits it compares---while Appendix~\ref{app:approximate-negation} notes that negation may be encoded with non-negative coefficients. Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant of these labels as a direction for future research.
+Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\). Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information rather than correctness: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The companion browser's \href{https://padic-logic.symmachus.org/\#csp}{Boolean-CSP page} implements both labellings: switching to \(b_i=1+p\,2^{i}\) leaves every displayed loss unchanged, while its row-evaluation table decodes each clause residual into the satisfied literals it names. Appendix~\ref{app:label-requirements} states the general conditions under which labels and clause coefficients preserve the clause-count loss, while Appendix~\ref{app:approximate-negation} notes that negation may be encoded with non-negative coefficients. Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant of these labels as a direction for future research.
 
 \section{A general all-different residual-objective template}
 \label{construction}
@@ -590,16 +593,13 @@ W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
 When \(p>s\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
 
-\section{Minimum conflicts and Potts energies}
+\section{Minimum conflicts}
 \label{sec:minimum-conflicts-potts}
 
 \subsection{Unsatisfiable instances}
 The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
 
 If a best-effort solution should treat some constraints as more important than others, assign them correspondingly higher or lower losses. Replacing the unit reward on an edge \(e\) by a weight \(w_e>0\), and raising each pinning weight \(\lambda_i\) above the total weight incident on coordinate \(i\), gives the weighted minimum-conflict objective by the same domination argument.
-
-\subsection{Potts energies}
-On domain-respecting states the objective equals, up to the additive constant \(\lambda\sum_i(|D_i|-1)-|E|\), the number of monochromatic edges \(\sum_{\{i,j\}\in E}\mathbf 1_{x_i=x_j}\), which is the energy of an antiferromagnetic \(q\)-state Potts model on \(G\) with the lists \(D_i\) as local state constraints. The construction does not alter that energy landscape; its content is the representation of this Potts/Max-CSP energy as a signed affine \(p\)-adic residual objective on the native finite-domain variables.
 
 \section{Sudoku as a special case}
 \label{sec:sudoku}
@@ -724,22 +724,20 @@ with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(
 
 The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables.
 
-Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, this encoding produced no successful solves: the search repeatedly stopped in local minima.
+Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, that encoding produced no successful solves: the search repeatedly stopped in local minima.
 
 \section{Computations with the induced \texorpdfstring{\(p\)-adic}{p-adic} loss}
 \label{sec:illustrative-computations}
 
-We implemented two finite-state local-search solvers: a greedy row-swap search and a discrete Zubarev walk. We also implemented a Mihara-inspired last-digit (modulo-\(p\)) equality fit as a diagnostic comparison, not as a claimed Sudoku solver or as a complete implementation of Mihara's published algorithm. Appendix~\ref{app:heuristics} defines the solver loss, records the two algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
+We implemented two finite-state local-search solvers: a greedy row-swap search and a discrete Zubarev walk. We also implemented a Mihara-inspired last-digit (modulo-\(p\)) equality fit as a diagnostic comparison. Appendix~\ref{app:heuristics} defines the solver loss, records the two algorithms and a locality lemma for row swaps, and gives traces on a standard puzzle.
 
-The greedy solver simply counts integer conflicts: it does not evaluate a \(p\)-adic valuation numerically. On the digit-restricted state space this count is an exact integer representative of the induced zero-or-one residual loss, with column--box overlaps counted twice. The Zubarev solver uses the same induced loss through the Boltzmann transition rule \(\exp(-\beta\,\Delta L)\); its finite implementation can likewise compute \(\Delta L\) from integer conflicts because all relevant norms have already collapsed to indicators. The Mihara-inspired comparison instead performs modulo-\(19\) last-digit equality fitting on a positive-only expansion: every negative peer row is replaced by the sixteen equalities for nonzero digit differences, and unary-row weights are preserved in the consensus score. Fresh full-rank starts can therefore improve the displayed positive-consensus loss. This corrects the sign mismatch, but the rows remain synthetic constraints rather than noisy samples from one hidden affine response law, so Mihara's probabilistic recovery assumptions and termination analysis do not transfer to Sudoku.
+The greedy solver simply counts integer conflicts: it does not evaluate a \(p\)-adic valuation numerically. On the digit-restricted state space this count is an exact integer representative of the induced zero-or-one residual loss, with column--box overlaps counted twice. The Zubarev solver uses the same induced loss through the Boltzmann transition rule \(\exp(-\beta\,\Delta L)\); its finite implementation can likewise compute \(\Delta L\) from integer conflicts because all relevant norms have already collapsed to indicators. The Mihara-inspired comparison instead performs modulo-\(19\) last-digit equality fitting on a positive-only expansion: every negative peer row is replaced by the sixteen equalities for nonzero digit differences, and unary-row weights are preserved in the consensus score.
 
-The practical result is improvement without solution. On the standard example puzzle, a reproducible run with seed \(0\) completed \(500\) full-rank starts without a singular sample. The retained positive-complement loss fell from \(21{,}703\) after the first start to \(21{,}436\), against the satisfiable floor \(20{,}718\). The retained coefficient vector nevertheless had \(19\) off-domain entries and violated \(22\) of the \(30\) clues; its original signed-objective audit was \(8{,}423\), and no Sudoku solution was recovered. This is one diagnostic trace rather than a performance benchmark, but it illustrates why a descending consensus chart must not be reported as progress toward a valid Sudoku unless the domain, clue, and peer checks also improve.
+On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These smoke tests show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. The Mihara-inspired solver is not included among the \(36\) solver runs, since it did not successfully solve any of the sample puzzles.
 
-On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These smoke tests show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. Mihara's diagnostic is not included among the \(36\) solver runs.
+The solver is available at \url{https://padic-logic.symmachus.org/} (with source code at \url{https://github.com/solresol/padic-logic}. The code that ran these experiments is at
+\url{https://github.com/solresol/sudoku-padic-regression}.
 
-\begin{quote}\small
-\url{https://padic-logic.symmachus.org}
-\end{quote}
 
 \begin{figure}[H]
 \centering
@@ -748,7 +746,26 @@ On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solv
 \label{fig:browser-sudoku-solution}
 \end{figure}
 
-\subsection{Mihara's digitwise regression and positive complement expansion}
+\section{Related work and scope}
+\label{sec:related-work}
+
+\subsection{Earlier regression and constraint models}
+
+From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts} and to Lewis's metaheuristic Sudoku study \cite{lewis2007metaheuristics}, whose simulated annealing keeps each \(3\times3\) box as a permutation of \(1,\dots,9\) and swaps two non-clue cells within a box; the heuristics in Appendix~\ref{app:heuristics} make the analogous choice with rows as the permutation unit. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
+
+\section{Conclusion}
+
+Signed \(p\)-adic residuals have a direct finite-domain role. Positive synthetic terms pin variables to a finite set; after that, negative terms are bounded rewards for inequality or clause satisfaction.
+
+Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
+
+The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:general-labels} shows how variables can receive distinct false labels whose residual values identify the satisfied literals without changing the loss landscape, and Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant. No optimisation or verification advantage is claimed for these labellings.
+
+The companion site, \url{https://padic-logic.symmachus.org}, lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor.
+
+\appendix
+
+\section{Mihara's digitwise regression and positive complement expansion}
 \label{sec:mihara-digitwise}
 
 Mihara's forcing theorem \cite{mihara2026forcing} considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
@@ -810,25 +827,6 @@ For a CNF clause, \(S_C=\{u_C^\top x:x\in\{0,1\}^n\}\) contains at most one more
 For a Sudoku peer row, \(S=\{-8,-7,\ldots,7,8\}\) and the forbidden target is \(0\). The positive complement therefore contains the sixteen equalities \(x_i-x_j=s\) with \(s\ne0\). Choosing \(p=19\) keeps those integer differences distinct modulo \(p\). On digit states an unequal peer satisfies exactly one complementary equality and an equal peer satisfies none. The browser preserves the pinning weight \(\alpha=21\), scores candidate vectors by total positive weight minus weighted inlier count, and retains the best score across random full-rank bases. This weighting, complement expansion, grouped basis sampler, and best-consensus retention are adaptations made for the browser comparison; they are not claimed as steps of Mihara's published pseudocode. The browser implements only a last-digit modulo-\(p\) fit, not the recursive recovery of coefficients modulo \(p^E\). It separately evaluates the original signed rows, including the counts with \(v_{19}(x_i-x_j)=0\) and with zero residual.
 
 The companion browser uses the positive complement expansion in both its Boolean-CSP and Sudoku Mihara modes. For Sudoku it plots two histories: the non-increasing positive-consensus loss used to select fits and the original signed objective used only as an audit. A better consensus fit can still be off-domain or violate clues, and the signed audit need not decrease. The interface therefore continues fresh starts until a decoded vector satisfies the original constraints or the user stops it. It treats the procedure as an unbounded-restart heuristic rather than a polynomial-time solver. A method guaranteed to solve every compiled instance in polynomial time would decide the NP-hard threshold problem of Corollary~\ref{cor:signed-nphard}; Mihara's algorithm makes no such guarantee.
-
-\section{Related work and scope}
-\label{sec:related-work}
-
-\subsection{Earlier regression and constraint models}
-
-From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts} and to Lewis's metaheuristic Sudoku study \cite{lewis2007metaheuristics}, whose simulated annealing keeps each \(3\times3\) box as a permutation of \(1,\dots,9\) and swaps two non-clue cells within a box; the heuristics in Appendix~\ref{app:heuristics} make the analogous choice with rows as the permutation unit. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
-
-\section{Conclusion}
-
-Signed \(p\)-adic residuals have a direct finite-domain role. Positive synthetic terms pin variables to a finite set; after that, negative terms are bounded rewards for inequality or clause satisfaction. This bounded construction should not be conflated with inserting negative weights into ordinary Euclidean least squares.
-
-Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
-
-The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:general-labels} shows how variables can instead receive distinct false labels whose residual values identify the satisfied literals without changing the loss landscape, and Appendix~\ref{app:polynomial-labels} records a polynomial-valued variant. No optimisation or verification advantage is claimed for these labellings.
-
-The companion site in Figure~\ref{fig:browser-sudoku-solution} lets readers trace a Boolean CSP from clauses to forbidden affine equalities and a signed residual dataframe, or compile an editable Sudoku into its \(1{,}299\)-row objective and watch search reach the theoretical floor. Its Mihara views expose the corresponding positive complement data, weighted-consensus loss, original signed-loss audit, and continued fresh-start policy rather than presenting consensus improvement as a Sudoku solution.
-
-\appendix
 
 \section{Heuristic details}
 \label{app:heuristics}
@@ -1026,13 +1024,13 @@ Step & Row & Swap (columns) & Conflicts (before) & (after) \\
 
 \section{Illustrative experiments}
 \label{app:heuristics-results}
-We implemented both solvers above in pure Python (see accompanying code). The prime was set to $p=11$, but in the digit-restricted regime the relevant residual norms are exactly zero-or-one indicators. The greedy solver evaluates the resulting integer conflict count \(H_{\mathrm{cb}}\) directly. The Zubarev solver uses changes in the same induced loss in its Boltzmann probabilities; those changes can also be computed from \(H_{\mathrm{cb}}\) without numerically calling a valuation routine. Thus the \(p\)-adic construction determines the finite-state loss, while the implementation uses its exact integer representation.
+We implemented both solvers above in JavaScript for the website and in pure Python; the experiment code is available at \url{https://github.com/solresol/sudoku-padic-regression}. The prime was set to $p=11$, but in the digit-restricted regime the relevant residual norms are exactly zero-or-one indicators. The greedy solver evaluates the resulting integer conflict count \(H_{\mathrm{cb}}\) directly. The Zubarev solver uses changes in the same induced loss in its Boltzmann probabilities; those changes can also be computed from \(H_{\mathrm{cb}}\) without numerically calling a valuation routine. Thus the \(p\)-adic construction determines the finite-state loss, while the implementation uses its exact integer representation.
 
 \subsection{Experimental setup}
 To obtain a quick, reproducible testbed, we generated random puzzles by:
 \begin{enumerate}
     \item sampling a random solved grid; then
-    \item \emph{carving} it down to a specified clue count by removing entries uniformly at random.
+    \item carving it down to a specified clue count by removing entries uniformly at random.
 \end{enumerate}
 This procedure does \emph{not} enforce uniqueness of the resulting puzzle. Since Theorem~\ref{thm:all-different} characterises the entire set of global minimisers as the set of valid completions, a puzzle with several completions has several global minimisers, and the heuristics report whichever one their trajectory reaches first. Each carved puzzle was then solved with up to $T=60{,}000$ steps and $R=15$ random restarts. All results reported below use a fixed RNG seed ($123$) for reproducibility. The two methods receive the same \(18\) puzzle seeds and the same corresponding solve seeds, so their results are paired. There is only one solve seed per method--puzzle pair; the sample is not difficulty-normalised and supports no inferential performance claim.
 
@@ -1117,14 +1115,12 @@ E2 SA & Simulated annealing on the same \(750\) runs & \(0/750\) & Mean lift \(0
 \label{tab:powers-two-results}
 \end{table}
 
-This failure and the labelled residuals of Section~\ref{sec:general-labels} use the same combinatorial fact---a superincreasing set has distinct subset sums---in opposite roles. Here the fact aggregates constraints: it replaces the pairwise penalties of each unit by a single sum residual, which discards most of the objective's structure, and the runs above strand local search in local minima. There the fact annotates residuals: with false labels \(1+p\,2^{i}\) the powers of two occupy \(p\)-adic digits that never affect which residuals vanish or what norm they take, so the loss landscape is identical to the uniform labelling and the structure only makes residual values self-describing. These experiments are therefore evidence that subset-sum structure is better used to label residuals than to replace constraints.
-
 \section{False-label and coefficient requirements}
 \label{app:label-requirements}
 
 Section~\ref{sec:general-labels} used false labels \(b_i\equiv 1\pmod p\) with the standard \(\pm 1\) literal coefficients. This appendix records the full set of conditions under which a signed clause row rewards satisfaction by exactly one unit, allowing both the label \(b_i\) and the clause coefficients to be chosen freely, and shows that the two freedoms are the same freedom.
 
-Fix a clause \(C\) of width \(s\). As before a variable's true value is \(x_i=0\) and its false value is \(x_i=b_i\); now give literal \(i\) of \(C\) an integer coefficient \(c_{C,i}\), and write \(\epsilon_i=-1\) when the literal is positive and \(\epsilon_i=+1\) when it is negated. Take the forbidden target \(t_C=\sum_{\text{positive }i}c_{C,i}b_i\). On a Boolean-labelled assignment the affine residual is
+Fix a clause \(C\) of width \(s\). As before a variable's true value is \(x_i=0\) and its false value is \(x_i=b_i\); now give literal \(i\) of \(C\) an integer coefficient \(c_{C,i}\), and write \(\epsilon_i=-1\) when the literal is positive and \(\epsilon_i=+1\) when it is negated. Take the forbidden target \(t_C=\sum_{\substack{i\in C\\\text{positive}}}c_{C,i}b_i\). On a Boolean-labelled assignment the affine residual is
 \[
 u_C^\top x-t_C=\sum_{i\in \operatorname{Sat}(x)} w_{C,i},
 \qquad
@@ -1141,9 +1137,9 @@ Two conditions make the negative row \((-1,u_C,t_C,1)\) reward satisfaction exac
 
 Applied to singletons, (R2) forces each \(w_{C,i}\), hence each coefficient \(c_{C,i}\), to be a unit, so \(|c_{C,i}x_i|_p=|x_i|_p\) as the domination step requires. Because (R2) constrains only the residues \(w_{C,i}=\epsilon_i c_{C,i}b_i\bmod p\), the label and the coefficient enter solely through their product: choosing \(b_i\) and choosing \(c_{C,i}\) are interchangeable up to that product.
 
-A convenient sufficient form of (R2) is to choose representatives \(r_i\in\{1,\dots,p-1\}\) of \(w_{C,i}\bmod p\) with \(\sum_{i\in C}r_i<p\); every nonempty subset then sums to a positive integer below \(p\). The uniform labelling \(b_i=1\) (all \(r_i=1\)) is the case \(s<p\), and \(b_i=2^{i}\) with per-clause label-sum below \(p\) is another. The width bound is sharp: the Davenport constant of \(\mathbb Z/p\mathbb Z\) is \(p\), so any sequence of \(p\) residues has a nonempty zero-sum subsequence, and no choice of labels or coefficients admits clauses of width \(p\) or more or lowers the prime below the maximum clause width.
+A convenient sufficient form of (R2) is to choose representatives \(r_i\in\{1,\dots,p-1\}\) of \(w_{C,i}\bmod p\) with \(\sum_{i\in C}r_i<p\); every nonempty subset then sums to a positive integer below \(p\). The uniform labelling \(b_i=1\) (all \(r_i=1\)) is the case \(s<p\), and \(b_i=2^{i}\) with per-clause label-sum below \(p\) is another.
 
-Failing (R2) breaks the objective rather than only its bookkeeping. Over \(p=5\) with labels \(b_1=1\), \(b_2=4\), the clause \((z_1\vee z_2)\) has \(b_1+b_2=5\equiv 0\): an assignment satisfying both literals has residual \(-5\) and is rewarded \(|{-5}|_5=\tfrac15\) instead of \(1\), so a doubly-satisfied clause counts as almost falsified and the loss stops tracking the satisfied-clause count.
+Failing (R2) causes obvious problems. Over \(p=5\) with labels \(b_1=1\), \(b_2=4\), the clause \((z_1\vee z_2)\) has \(b_1+b_2=5\equiv 0\): an assignment satisfying both literals has residual \(-5\) and is rewarded \(|{-5}|_5=\tfrac15\) instead of \(1\), so a doubly-satisfied clause counts as almost falsified and the loss stops tracking the satisfied-clause count.
 
 \paragraph{Correctness modulo \(p\), information in the lift.}
 Conditions (R1) and (R2) depend only on residues modulo \(p\), and on Boolean-labelled assignments the loss \(L_\Phi\) depends only on the dataframe reduced modulo \(p\), while the off-domain snapping argument uses only the fact that the relevant quantities are units. The integer dataframe is therefore best regarded as a choice of lift of a fixed matrix over \(\mathbb F_p\): every lift of the same reduced dataframe defines the same objective on the finite domain, and the higher \(p\)-adic digits of the lift are free bandwidth. The uniform construction takes the trivial lift; the labels \(b_i=1+p\,2^{i}\) of Section~\ref{sec:general-labels}, the per-clause coefficients below, and the substitution of Appendix~\ref{app:approximate-negation} are different lifts of the same reduced dataframe, chosen so that residual values carry useful information. Correctness lives in digit zero; information lives in the lift.
@@ -1152,17 +1148,6 @@ Conditions (R1) and (R2) depend only on residues modulo \(p\), and on Boolean-la
 
 \paragraph{Random coefficients as residual fingerprints.}
 The coefficient freedom can be exercised by sampling instead of design. Draw each residue \(w_{C,i}\) uniformly from the units of \(\mathbb F_p\). Conditioning on all but one variable of a nonempty subset shows each subset sum vanishes with probability at most \(1/(p-1)\), so (R2) fails with probability at most \((2^{s}-1)/(p-1)\) per clause; a draw is checked directly and resampled on failure. More useful is the pairwise guarantee: for distinct candidate sets \(S\neq S'\) of satisfied literals, the residuals \(\sum_{i\in S}w_{C,i}\) and \(\sum_{i\in S'}w_{C,i}\) coincide with probability at most \(1/(p-1)\), by the same conditioning applied to their difference. A claimed satisfied set can therefore be checked against the observed residual by one modular dot product, with error probability at most \(1/(p-1)\): a randomised audit of an untrusted solver's per-clause claims that needs only \(p\) somewhat larger than the clause width, not \(p>2^{s}\). The fingerprint verifies claims rather than supporting direct decoding; injective decoding still requires the deterministic constructions above.
-
-\paragraph{Syndrome rows and exact recovery.}
-A clause may also carry several rows. Fix distinct nonzero evaluation points \(\alpha_1,\dots,\alpha_s\) and give clause \(C\) the rows \(j=1,\dots,s\) with coefficients chosen so that \(w^{(j)}_{C,i}\equiv\alpha_j^{\,i-1}\pmod p\), each with weight \(1/s\). The residual of row \(j\) on a Boolean-labelled assignment is \(-\chi(\alpha_j)\), where \(\chi(X)=\sum_{i\in\operatorname{Sat}(x)}X^{\,i-1}\), so the \(s\) residuals are evaluations of the indicator polynomial of the satisfied set, and solving the Vandermonde system over \(\mathbb F_p\) recovers that set exactly. Condition (R2) for row \(j\) says that \(\alpha_j\) avoids the roots of the \(2^{s}-1\) subset polynomials \(\sum_{i\in S}X^{\,i-1}\); each has degree below \(s\), so points can be checked directly, or drawn at random when \(p\) is large against \(s2^{s}\). Under (R2) every row individually rewards satisfaction, so the weights \(1/s\) restore one unit of reward per satisfied clause and the loss identity is unchanged. This realises, inside the integer construction, the syndrome-decoding pattern of Reed--Solomon codes: residuals are syndromes and the satisfied set is recovered by interpolation. The cost is \(s\) rows per clause, so it is optional instrumentation rather than a replacement for the one-row encoding.
-
-\paragraph{Value labels for finite domains.}
-The same freedom applies to the multi-valued construction of Theorem~\ref{thm:all-different}. Relabel domain value \(v\) by any \(\ell_v\), pairwise incongruent modulo \(p\); the wells move to the labelled values, and every pairwise inequality residual takes the value \(\ell_v-\ell_w\), a unit precisely when \(v\neq w\), so the conflict count and the snapping argument are unchanged. The standard values \(1,\dots,q\) with \(p>q\) are one such labelling. The informative choice \(\ell_v=v+p\,2^{v}\) makes every satisfied inequality row self-describing: its residual is \((v-w)+p\,(2^{v}-2^{w})\), and when \(p>2(q-1)\) the nearest integer to the residual divided by \(p\) is exactly \(2^{v}-2^{w}\), whose sign orders the pair and whose magnitude---a run of ones from bit \(\min(v,w)\) through bit \(\max(v,w)-1\)---recovers both values. For Sudoku at \(p=17\) this holds for all eighty-one ordered value pairs, and the residual column of the compiled objective then reports the actual digits in each constrained pair of cells without consulting the coefficient vector. Unlike the Boolean provenance schemes above, no larger prime and no bound on the number of variables is needed: the label set depends only on the domain size.
-
-\paragraph{Signs as a presentational choice.} Together the two freedoms show that signed coefficients are inessential. Setting every \(c_{C,i}=1\) turns each clause row into a pure unsigned incidence sum \(\sum_{i\in C}x_i=t_C\); condition (R2) then falls on the signed labels \(\{\epsilon_i b_i\}\), and any zero-sum-free choice---for instance distinct powers of two whose per-clause signed sums stay below \(p\) in absolute value---encodes the clause correctly. A literal's polarity can thus be carried by the coefficient sign or by the label, just as the forbidden-versus-allowed distinction can be carried by a signed weight or by the positive complement of Section~\ref{construction}. This is the positive resolution of the failed unsigned attempt of Appendix~\ref{app:polynomial-labels}: the labels \(T,T+1,T+2,T+3\) collide only because they are not chosen zero-sum-free.
-
-\paragraph{Two limits.}
-Two tempting uses of these freedoms are unavailable. First, relabelling cannot assist search: every admissible labelling induces the identical loss landscape on the finite domain, so re-randomising labels or coefficients between restarts changes nothing about which states are local minima---in pointed contrast to Appendix~\ref{app:powers-two}, where changing the encoding did change the landscape, for the worse. The invariance that makes the information channels free makes them useless for escaping minima, by the same token. Second, the freedoms cannot compress rows: a single affine row forbids a single hyperplane, and a union of two forbidden hyperplanes is not a hyperplane, so no choice of labels or coefficients merges two clauses into one row. Attempts to do so by aggregation are precisely the failure recorded in Appendix~\ref{app:powers-two}.
 
 \section{Approximate negation}
 \label{app:approximate-negation}
@@ -1217,11 +1202,11 @@ Multiplicativity follows from additivity of degree under products. The inequalit
 gives the strong triangle inequality. Hence
 \(d_\infty(F,G):=|F-G|_\infty\) is an ultrametric.
 
-For more than two variables, the choice of clause row matters. Simply continuing the labels \(T,T+1,T+2,T+3\) does not support a direct unsigned encoding. For example, the raw-value sum for the falsifying assignment of \(\neg A\vee B\vee C\vee\neg D\) is \((T+1)+(T+2)=2T+3\), but the complementary assignment has the same sum \(T+(T+3)=2T+3\); the label sets \(\{T,T+3\}\) and \(\{T+1,T+2\}\) collide because \(0+3=1+2\), as in any four-term arithmetic progression of constants. A direct unsigned-sum row therefore cannot distinguish these two assignments.
+For more than two variables, the choice of clause row does matter. Simply continuing the labels \(T,T+1,T+2,T+3\) does not support a direct unsigned encoding. For example, the raw-value sum for the falsifying assignment of \(\neg A\vee B\vee C\vee\neg D\) is \((T+1)+(T+2)=2T+3\), but the complementary assignment has the same sum \(T+(T+3)=2T+3\); the label sets \(\{T,T+3\}\) and \(\{T+1,T+2\}\) collide because \(0+3=1+2\), as in any four-term arithmetic progression of constants. A direct unsigned-sum row therefore cannot distinguish these two assignments.
 
-The clause-signed rows do not have this defect, and no per-assignment checking is needed. As with the integer labels of Section~\ref{sec:general-labels}, the residual on Boolean-labelled assignments equals minus the sum of the false labels of the satisfied literals, so the row vanishes exactly at the falsifying assignment if and only if no nonempty subset of the clause's false labels sums to zero. Affine labels \(f_i=T+m_i\) with distinct constants \(m_i\) satisfy this condition for every clause, since a nonempty subset of size \(k\) sums to \(kT\) plus a constant: over \(\mathbb Q(T)\) unconditionally, and in characteristic \(p\) for clauses of width below \(p\), the same width bound as the integer labels and sharp for the same Davenport-constant reason. In particular the labels \(T,T+1,T+2,T+3\) support every clause once the rows are signed: for the displayed clause the signed functional \(-x_A+x_B+x_C-x_D\) attains its target \(2T+3\) only at the falsifying assignment.
+The clause-signed rows do not have this defect, and no per-assignment checking is needed. As with the integer labels of Section~\ref{sec:general-labels}, the residual on Boolean-labelled assignments equals minus the sum of the false labels of the satisfied literals, so the row vanishes exactly at the falsifying assignment if and only if no nonempty subset of the clause's false labels sums to zero. Affine labels \(f_i=T+m_i\) with distinct constants \(m_i\) satisfy this condition for every clause, since a nonempty subset of size \(k\) sums to \(kT\) plus a constant: over \(\mathbb Q(T)\) unconditionally, and in characteristic \(p\) for clauses of width below \(p\), the same width bound as the integer labels.
 
-The degree-at-infinity norm does not automatically preserve the original clause-count loss, because different nonzero residuals can have different degrees and hence different magnitudes. The affine signed scheme, however, does preserve it: every residual at a satisfying assignment is \(-(kT+\text{const})\) with \(k\) between \(1\) and the clause width, so each satisfied clause is rewarded by the same magnitude \(c^{1}\), and on Boolean-labelled assignments the loss again decreases by one unit of reward per satisfied clause. Uniform magnitude and injective residual values can even be combined: with \(m_i=2^i\) the residual determines exactly which literals of the clause are satisfied, the cardinality from the leading coefficient and the subset from the constant term. We have not developed an application of these labelled residuals, such as reading violation provenance from the loss value, and record the construction as a direction for future research.
+The degree-at-infinity norm does not automatically preserve the original clause-count loss, because different nonzero residuals can have different degrees and hence different magnitudes. The affine signed scheme, however, does preserve it: every residual at a satisfying assignment is \(-(kT+\text{const})\) with \(k\) between \(1\) and the clause width, so each satisfied clause is rewarded by the same magnitude \(c^{1}\), and on Boolean-labelled assignments the loss again decreases by one unit of reward per satisfied clause. Uniform magnitude and injective residual values can even be combined: with \(m_i=2^i\) the residual determines exactly which literals of the clause are satisfied, the cardinality from the leading coefficient and the subset from the constant term. We have not developed an application of these labelled residuals and record the construction as a direction for future research.
 
 \section*{Funding}
 This research was supported by an Australian Government Research Training Program Scholarship.
@@ -1254,7 +1239,7 @@ A browser-based demonstration of the construction is shown in Figure~\ref{fig:br
 \url{https://padic-logic.symmachus.org}\\
 \url{https://padic-logic.symmachus.org/\#sudoku}
 \end{quote}
-The Sudoku and Boolean-CSP compilers, residual dataframes, objective evaluations, and representative searches run client-side. Their source is maintained separately at \url{https://github.com/solresol/padic-logic}, with the paper-linked application snapshot pinned at \href{https://github.com/solresol/padic-logic/commit/a8130ee7784035d17fc2aea3af56eda27bf478e1}{revision \texttt{a8130ee}}; the deployed values shown in Figure~\ref{fig:browser-sudoku-solution} were checked on 13 July 2026. The optional natural-language schema extractor requires a browser exposing the on-device Prompt API and is therefore not part of the browser-independent reproducibility claim. The complete batch results remain tied to the experiment-code revision and dataset archive above rather than to the mutable teaching site.
+The Sudoku and Boolean-CSP compilers, residual dataframes, objective evaluations, and representative searches run client-side. Their source is maintained separately at \url{https://github.com/solresol/padic-logic}, with the paper-linked application snapshot pinned at \href{https://github.com/solresol/padic-logic/commit/a8130ee7784035d17fc2aea3af56eda27bf478e1}{revision \texttt{a8130ee}}; the deployed values shown in Figure~\ref{fig:browser-sudoku-solution} were checked on 13 July 2026. The optional natural-language schema extractor requires a browser exposing the on-device Prompt API and is therefore not part of the browser-independent reproducibility claim.
 
 \begin{thebibliography}{99}
 
