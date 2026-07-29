@@ -18,11 +18,18 @@ PAPER_ASSETS := \
 	$(PAPER_DIR)/figures/padic_logic_sudoku_solution.png
 SITE_PDF := $(SITE_DIR)/$(PAPER_NAME).pdf
 
+DIST_DIR := dist
+SUBMISSION_ZIP := $(DIST_DIR)/$(PAPER_NAME)-source.zip
+SUBMISSION_FILES := \
+	$(PAPER_NAME).tex \
+	loss_curve.pdf \
+	figures/padic_logic_sudoku_solution.png
+
 KINDLE_NAME := $(PAPER_NAME)_kindle
 KINDLE_TEX := $(TMP_PDF_DIR)/$(KINDLE_NAME).tex
 KINDLE_PDF := $(TMP_PDF_DIR)/$(KINDLE_NAME).pdf
 
-.PHONY: all paper site kindle clean distclean help
+.PHONY: all paper site submission kindle clean distclean help
 
 all: paper
 
@@ -30,6 +37,7 @@ help:
 	@printf '%s\n' \
 		'make paper      Build paper/sudoku_padic_regression.pdf' \
 		'make site       Copy the latest paper PDF into site/' \
+		'make submission Build the journal source ZIP in dist/' \
 		'make kindle     Build the small-page Kindle-sized PDF in tmp/pdfs/' \
 		'make clean      Remove LaTeX auxiliary files' \
 		'make distclean  Remove auxiliary files and latexmk-managed build outputs'
@@ -37,6 +45,8 @@ help:
 paper: $(PAPER_PDF)
 
 site: $(SITE_PDF)
+
+submission: $(SUBMISSION_ZIP)
 
 kindle: $(KINDLE_PDF)
 
@@ -46,6 +56,13 @@ $(PAPER_PDF): $(PAPER_TEX) $(PAPER_ASSETS)
 $(SITE_PDF): $(PAPER_PDF)
 	mkdir -p $(SITE_DIR)
 	cp $(PAPER_PDF) $(SITE_PDF)
+
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
+
+$(SUBMISSION_ZIP): $(PAPER_PDF) $(PAPER_TEX) $(PAPER_ASSETS) | $(DIST_DIR)
+	cd $(PAPER_DIR) && zip -q -FS -X ../$(SUBMISSION_ZIP) $(SUBMISSION_FILES)
+	unzip -tq $(SUBMISSION_ZIP)
 
 $(TMP_PDF_DIR):
 	mkdir -p $(TMP_PDF_DIR)
