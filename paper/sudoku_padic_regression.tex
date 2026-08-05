@@ -58,10 +58,10 @@ The paper makes the following contributions.
 \item A Sudoku case study on the native \(81\)-cell digit space using a variety of \(p\)-adic linear-regression techniques; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
 \end{itemize}
 
-Section~\ref{sec:padic-regression-background} fixes notation, works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, report the experiments and failed powers-of-two encoding, state the label and coefficient requirements together with an approximate-negation variant, and give a polynomial-valued labelling.
+Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format, and records in Table~\ref{tab:terminology} a correspondence between the applied vocabulary used throughout and its classical reading. Section~\ref{sec:padic-regression-background} works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, report the experiments and failed powers-of-two encoding, state the label and coefficient requirements together with an approximate-negation variant, and give a polynomial-valued labelling.
 
-\section{\texorpdfstring{\(p\)-adic}{p-adic} linear regression}
-\label{sec:padic-regression-background}
+\section{Preliminaries and terminology}
+\label{sec:preliminaries}
 
 Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent of \(p\) in its factorisation and define
 \[
@@ -69,13 +69,73 @@ Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent o
 \qquad
 |0|_p=0.
 \]
-This norm makes numbers close when their difference is divisible by a large power of \(p\). Ordinary (Euclidean) weighted least squares normally uses nonnegative weights. Inserting negative coefficients into its quadratic objective can destroy convexity and boundedness, but this does not happen for the \(p\)-adic objective used here. In affine \(p\)-adic linear regression, an observation with feature vector \(u\) and target \(b\) has residual \(u^\top x-b\), and the usual positive-weight objective sums terms of the form
+Setting \(v_p(a/b)=v_p(a)-v_p(b)\) extends \(|\cdot|_p\) multiplicatively to \(\mathbb Q\). The field \(\mathbb Q_p\) of \(p\)-adic numbers is the completion of \(\mathbb Q\) with respect to \(|\cdot|_p\), and the ring of \(p\)-adic integers is
+\[
+\mathbb Z_p=\{t\in\mathbb Q_p:|t|_p\le 1\}.
+\]
+This norm makes numbers close when their difference is divisible by a large power of \(p\). It is non-Archimedean: beyond the ordinary triangle inequality it satisfies the strong triangle inequality
+\[
+|s+t|_p\le\max\bigl(|s|_p,|t|_p\bigr),
+\]
+so \(d(s,t):=|s-t|_p\) is an ultrametric on \(\mathbb Q_p\). Two consequences recur throughout. First, every integer lies in \(\mathbb Z_p\), so every residual formed below from integer data has norm at most \(1\). Second, if \(s\neq t\) are integers with \(1\le s,t\le q<p\), then \(p\nmid s-t\) and hence \(|s-t|_p=1\): on a finite alphabet separated by \(p\), the residual norm is exactly a zero-or-one inequality indicator.
+
+In affine \(p\)-adic linear regression, an observation with feature vector \(u\in\mathbb Z^n\) and target \(b\in\mathbb Z\) has residual \(u^\top x-b\) at the coefficient vector \(x\in\mathbb Z_p^n\), and the usual positive-weight objective sums terms of the form
 \[
 \gamma\,|u^\top x-b|_p,
 \qquad \gamma>0.
 \]
 This is a weighted \(p\)-adic linear-regression objective.
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective used below. On \(\mathbb Z_p\), every affine residual in this paper has norm at most one, so each finite signed objective is bounded despite its negative terms. We demonstrate that such objectives give useful representations of constraint-satisfaction problems: source forms can be transformed mechanically into datasets, and a global minimiser can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective studied here, which is fixed by the following definition.
+
+\begin{definition}[Signed synthetic $p$-adic residual dataset]
+\label{def:signed-dataset}
+For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a quadruple \((\sigma,u,b,\gamma)\), where \(\sigma\in\{+1,-1\}\) is the sign, \(u\in\mathbb Z^n\) is the feature vector, \(b\in\mathbb Z\) is the target, and \(\gamma>0\) is the weight. It contributes the term
+\[
+\sigma\gamma\,|u^\top x-b|_p
+\]
+to the loss; this is the basic term in the signed weighted $p$-adic objective.
+\end{definition}
+
+Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards. In ordinary (Euclidean) weighted least squares the analogous move fails: inserting negative weights into the quadratic objective can destroy convexity and boundedness, whereas over \(\mathbb Z_p\) every residual norm is bounded by \(1\) and a negative row acts as a bounded reward.
+
+\subsection{Terminology}
+\label{sec:terminology}
+
+The construction is described throughout in the operational vocabulary of constraint satisfaction and machine learning: a constraint system is \emph{compiled} into a \emph{dataframe} of observations, positive \emph{wells} \emph{pin} coefficients to their finite domains, and global minimisers \emph{snap} onto those domains. Table~\ref{tab:terminology} maps this vocabulary onto the classical language of penalty-function theory, graph theory, and ultrametric analysis, and points to the statement where each notion first does formal work.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}p{0.23\linewidth}p{0.55\linewidth}p{0.13\linewidth}@{}}
+\toprule
+Term used here & Classical reading & Reference \\
+\midrule
+digit-snapping; snapping & Localisation of the minimiser: a coordinatewise projection onto the finite domain that strictly decreases the objective, as in an exact penalty method & Lemma~\ref{lem:digit-snapping} \\
+well (unary, Boolean, digit) & Separable penalty summand \(U_i(t)=\sum_{a\in D_i}|t-a|_p\), minimised exactly on the allowed set \(D_i\) & Lemma~\ref{lem:unary-well} \\
+compiler; compilation & Constructive polynomial-time reduction from a constraint system to a signed residual objective & Theorem~\ref{thm:compiler-template} \\
+coordinatewise domination & Exact-penalty threshold: each pinning weight exceeds the total interaction weight incident on its coordinate & Theorem~\ref{thm:compiler-template} \\
+pinning weight & Penalty weight \(\lambda_i\) on the unary well of coordinate \(i\) & Theorem~\ref{thm:compiler-template} \\
+dataframe; row; synthetic observation & Finite family of signed weighted affine forms; a row \((\sigma,u,b,\gamma)\) contributes \(\sigma\gamma\,|u^\top x-b|_p\) & Definition~\ref{def:signed-dataset} \\
+feature vector \(u\); target \(b\) & Coefficient vector and constant term of the affine form \(x\mapsto u^\top x-b\) & Definition~\ref{def:signed-dataset} \\
+loss & The objective functional \(L\) to be minimised & Definition~\ref{def:signed-dataset} \\
+finite-domain all-different system & Constraint system whose variables range over finite sets \(D_i\), with specified sets of variables required to take pairwise distinct values & Section~\ref{sec:introduction} \\
+list-colouring & Proper vertex colouring in which each vertex \(i\) draws its colour from its own list \(D_i\) & Definition~\ref{def:list-dataset} \\
+primal graph; peer graph & Constraint (Gaifman) graph: variables are adjacent exactly when they share a constraint; the deduplicated Sudoku peer graph is \(20\)-regular, so its maximum degree is \(\Delta=20\) & Corollary~\ref{cor:all-different-csp} \\
+Max-CSP; minimum conflicts & Minimisation of the number of violated constraints when not all can be satisfied simultaneously & Section~\ref{sec:minimum-conflicts-potts} \\
+one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
+QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
+clue; carving & Cell whose domain is a singleton \(\{g_i\}\); random deletion of entries from a solved grid to generate instances & Section~\ref{sec:sudoku} \\
+local search; restart & Iterative neighbourhood descent on a finite state space; an independent random re-initialisation of that descent & Section~\ref{sec:illustrative-computations} \\
+\bottomrule
+\end{tabular}
+\caption{Correspondence between the applied vocabulary used in this paper and its classical reading. Coined terms are anchored to the statements where they first do formal work; standard CSP and machine-learning terms are glossed for reference.}
+\label{tab:terminology}
+\end{table}
+
+\section{Worked examples}
+\label{sec:padic-regression-background}
+
+Signed residual objectives give useful representations of constraint-satisfaction problems: source forms can be transformed mechanically into datasets, and a global minimiser can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment. This section demonstrates the construction on two small instances before the general theorems of Section~\ref{construction}.
 
 \begin{figure}[t]
 \centering
@@ -146,7 +206,7 @@ w\,|u^\top x-b|_5
 to the objective. Positive rows of weight \(3\) pin each coefficient to its allowed values. Negative rows of weight \(-1\) reward unequal endpoints.
 
 
-The eight observations have two equivalent presentations: Table \ref{tab:list-colouring-dataframe} and Figure~\ref{fig:list-colouring-regression} which uses a compact tuple notation, in which each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
+The eight observations have two equivalent presentations: Table \ref{tab:list-colouring-dataframe} and Figure~\ref{fig:list-colouring-regression}, which uses the compact tuple notation of Definition~\ref{def:signed-dataset}; each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 The zero-intercept model is the hyperplane
 \[
@@ -247,20 +307,9 @@ Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for
 \label{construction}
 
 The worked examples can now be put on a general footing.
-We work in the $p$-adic integers $\mathbb Z_p$, where every norm is at most $1$. If $p>q$, the difference between any two distinct values in $\{1,\dots,q\}$ has norm $1$. For comparison, the discrete metric \(d_{\mathrm{disc}}(s,t):=\mathbf 1_{s\neq t}\) is also an ultrametric; a discrete version of the construction is stated after the main theorem.
+We work in the $p$-adic integers $\mathbb Z_p$ of Section~\ref{sec:preliminaries}, where every norm is at most $1$. If $p>q$, the difference between any two distinct values in $\{1,\dots,q\}$ has norm $1$. For comparison, the discrete metric \(d_{\mathrm{disc}}(s,t):=\mathbf 1_{s\neq t}\) is also an ultrametric; a discrete version of the construction is stated after the main theorem.
 
-Many finite-domain all-different systems can be viewed as list-colouring problems. Each variable $x_i$ has a finite allowed set $D_i$, and an edge \(\{i,j\}\) requires \(x_i\neq x_j\). An all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique.
-
-\begin{definition}[Signed synthetic $p$-adic residual dataset]
-\label{def:signed-dataset}
-For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a quadruple \((\sigma,u,b,\gamma)\), where \(\sigma\in\{+1,-1\}\) is the sign, \(u\in\mathbb Z^n\) is the feature vector, \(b\in\mathbb Z\) is the target, and \(\gamma>0\) is the weight. It contributes the term
-\[
-\sigma\gamma\,|u^\top x-b|_p
-\]
-to the loss; this is the basic term in the signed weighted $p$-adic objective.
-\end{definition}
-
-Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards.
+Many finite-domain all-different systems can be viewed as list-colouring problems. Each variable $x_i$ has a finite allowed set $D_i$, and an edge \(\{i,j\}\) requires \(x_i\neq x_j\). An all-different constraint of arity \(r\) contributes the \(\binom{r}{2}\) pairwise edges of its primal-graph clique. The observations below are the signed weighted affine observations of Definition~\ref{def:signed-dataset}.
 
 \begin{theorem}[Finite-domain signed affine compiler template]
 \label{thm:compiler-template}
@@ -603,7 +652,7 @@ If a best-effort solution should treat some constraints as more important than o
 
 \section{Sudoku as a special case}
 \label{sec:sudoku}
-Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with \(p\)-adic machine-learning training methods on a small sample of randomly carved Sudoku instances.
+Sudoku has standard exact-cover, constraint-programming, and SAT formulations \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}, and puzzle variants have their own complexity theory \cite{yato-seta}. The construction below is not meant to compete with those solvers. Sudoku is used because its variables, domains, and all-different constraints are small enough to write out explicitly. We then perform experiments with stochastic optimisation methods from the \(p\)-adic regression literature on a small sample of randomly carved Sudoku instances.
 
 \subsection{Sudoku}
 A (standard) Sudoku puzzle consists of a partially filled $9\times 9$ grid. The task is to assign a digit in $\{1,\dots,9\}$ to each empty cell such that:
@@ -733,7 +782,7 @@ We implemented two finite-state local-search solvers: a greedy row-swap search a
 
 The greedy solver simply counts integer conflicts: it does not evaluate a \(p\)-adic valuation numerically. On the digit-restricted state space this count is an exact integer representative of the induced zero-or-one residual loss, with column--box overlaps counted twice. The Zubarev solver uses the same induced loss through the Boltzmann transition rule \(\exp(-\beta\,\Delta L)\); its finite implementation can likewise compute \(\Delta L\) from integer conflicts because all relevant norms have already collapsed to indicators. The Mihara-inspired comparison instead performs modulo-\(19\) last-digit equality fitting on a positive-only expansion: every negative peer row is replaced by the sixteen equalities for nonzero digit differences, and unary-row weights are preserved in the consensus score.
 
-On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These smoke tests show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. The Mihara-inspired solver is not included among the \(36\) solver runs, since it did not successfully solve any of the sample puzzles.
+On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These proof-of-concept experiments show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. The Mihara-inspired solver is not included among the \(36\) solver runs, since it did not successfully solve any of the sample puzzles.
 
 The solver is available at \url{https://padic-logic.symmachus.org/} (with source code at \url{https://github.com/solresol/padic-logic}. The code that ran these experiments is at
 \url{https://github.com/solresol/sudoku-padic-regression}.
@@ -1064,7 +1113,7 @@ Zubarev walk & 30 & 6 & 6 & 8751.5 & 3.951 \\
 Zubarev walk & 26 & 6 & 6 & 9911 & 4.786 \\
 \bottomrule
 \end{tabular}
-\caption{Descriptive smoke-test results on \(18\) paired, randomly carved puzzles (not uniqueness-checked), using $T=60{,}000$ steps and $R=15$ restarts. The Zubarev walk uses a linear schedule $\beta_0=0.5$ to $\beta_1=6.0$.}
+\caption{Descriptive proof-of-concept results on \(18\) paired, randomly carved puzzles (not uniqueness-checked), using $T=60{,}000$ steps and $R=15$ restarts. The Zubarev walk uses a linear schedule $\beta_0=0.5$ to $\beta_1=6.0$.}
 \label{tab:results}
 \end{table}
 
