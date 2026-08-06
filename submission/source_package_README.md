@@ -20,8 +20,6 @@ https://huggingface.co/datasets/gregb/sudoku-padic-regression-experiments
   at revision `a8130ee7784035d17fc2aea3af56eda27bf478e1`; the deployed application is
   https://padic-logic.symmachus.org.
 - `README.txt`: repository-level reproduction notes.
-- `submission/cover_letter.md`: cover letter draft.
-- `submission/reviewer_objections.md`: prepared responses to likely reviewer objections.
 - `submission/huggingface_dataset_README.md`: dataset-card draft for the public experiment archive.
 
 The experiment table in the manuscript is regenerated with:

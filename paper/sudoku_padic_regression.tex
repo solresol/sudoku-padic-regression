@@ -9,6 +9,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{sudoku}
 \usepackage{tikz}
+\usetikzlibrary{patterns.meta}
 
 \title{Signed p-adic Residual Encodings of Finite-Domain All-Different Systems\\with a Sudoku Case Study}
 \author{Greg Baker\\\small School of Computing, Australian National University\\\small Canberra, Australia\\\small \href{mailto:greg.baker@anu.edu.au}{greg.baker@anu.edu.au}\\\small ORCID: \href{https://orcid.org/0000-0002-6910-3011}{0000-0002-6910-3011}}
@@ -40,10 +41,46 @@ We study signed, weighted affine \(p\)-adic residual objectives as native encodi
 
 \noindent\textbf{Keywords:} p-adic regression; signed residual objectives; all-different constraints; list colouring; Sudoku
 
+\begin{table}[t!]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{0.96}
+\begin{tabular}{@{}p{0.27\linewidth}p{0.54\linewidth}p{0.13\linewidth}@{}}
+\toprule
+Term used here & Classical reading & Reference \\
+\midrule
+finite-domain all-different system & Finite-domain constraint system in which every designated scope must take pairwise distinct values & Section~\ref{sec:introduction} \\
+dataframe; row; synthetic observation & Tabular presentation of signed weighted affine forms; a row \((\sigma,u,b,\gamma)\) contributes \(\sigma\gamma|u^\top x-b|_p\). Positive rows are penalties and negative rows are bounded rewards & Definition~\ref{def:signed-dataset} \\
+feature vector \(u\); target \(b\) & Normal vector and right-hand side defining the affine residual \(u^\top x-b\) & Definition~\ref{def:signed-dataset} \\
+coefficient vector \(x\) & Optimisation variable in \(\mathbb Z_p^n\); in the Sudoku model its coordinates are cell values, not fitted slopes from observed data & Definition~\ref{def:signed-dataset} \\
+compiler; compilation & Constructive encoding or reduction from a constraint system to a signed residual objective & Theorem~\ref{thm:compiler-template} \\
+coordinatewise domination & Exact-penalty threshold: each pinning weight exceeds the total interaction weight incident on its coordinate & Theorem~\ref{thm:compiler-template} \\
+pinning weight & Exact-penalty multiplier \(\lambda_i\) on the unary well of coordinate \(i\) & Theorem~\ref{thm:compiler-template} \\
+list-colouring & Proper vertex colouring in which each vertex \(i\) draws its colour from its own list \(D_i\) & Definition~\ref{def:list-dataset} \\
+well (unary, Boolean, digit) & Finite-alphabet multiwell penalty \(U_i(t)=\sum_{a\in D_i}|t-a|_p\), minimised exactly on the allowed set \(D_i\) & Lemma~\ref{lem:unary-well} \\
+digit-snapping; snapping & Coordinate retraction onto the finite domain that strictly decreases the objective under the domination condition & Lemma~\ref{lem:digit-snapping} \\
+primal graph; peer graph & Constraint (Gaifman) graph: variables are adjacent exactly when they share a constraint; the deduplicated Sudoku peer graph is \(20\)-regular, so its maximum degree is \(\Delta=20\) & Corollary~\ref{cor:all-different-csp} \\
+Max-CSP; minimum conflicts & Maximisation of satisfied constraint weight, equivalently minimisation of conflict weight & Section~\ref{sec:minimum-conflicts-potts} \\
+clue & Given digit in a pre-filled cell, represented by a singleton allowed set \(\{g_i\}\) & Section~\ref{sec:sudoku} \\
+unit & Sudoku constraint scope: one row, one column, or one \(3\times3\) box; each induces a \(K_9\) clique in the peer graph & Section~\ref{sec:sudoku} \\
+one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
+local search; restart & Iterative exploration by local moves on a finite state space; a restart begins from a fresh random initialisation & Section~\ref{sec:illustrative-computations} \\
+QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
+\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Replacement, on a finite residual range, of a negative reward for avoiding a forbidden equality by positive terms for the allowed equalities, up to an additive constant & Appendix~\ref{sec:mihara-digitwise} \\
+carving & Generation of a puzzle by deleting entries from a solved grid; the random procedure used here does not enforce a unique completion & Appendix~\ref{app:heuristics-results} \\
+\bottomrule
+\end{tabular}
+\caption{Correspondence between the applied vocabulary used in this paper and standard mathematical or constraint-programming readings.}
+\label{tab:terminology}
+\end{table}
+
+
 \section{Introduction}
 \label{sec:introduction}
 
-In affine \(p\)-adic linear regression, an observation pairs a feature vector \(u\in\mathbb Z^n\) with a target \(b\in\mathbb Z\), and a coefficient vector \(x\) is scored by a weighted sum of residual norms \(|u^\top x-b|_p\). Earlier work establishes the geometry and complexity of this problem when every weight is positive \cite{baker2025padic,baker2026nphard,mihara2026forcing}. This paper studies the signed variant, in which an observation may carry a negative weight. In ordinary least squares, negative weights can destroy convexity and boundedness. Over \(\mathbb Z_p\), by contrast, every affine residual has norm at most one, so a finite signed objective remains bounded and a negative row acts as a bounded reward.
+In affine \(p\)-adic linear regression, an observation pairs a feature vector \(u\in\mathbb Z^n\) with a target \(b\in\mathbb Z\), and a coefficient vector \(x\) is scored by a weighted sum of residual norms \(|u^\top x-b|_p\). It is analogous to Euclidean linear regression, but uses \(p\)-adic residual norms in place of squared Euclidean residuals.
+
+Earlier work establishes the geometry and complexity of this problem when every weight is positive \cite{baker2025padic,baker2026nphard,mihara2026forcing}. This paper studies the signed variant, in which an observation may carry a negative weight. In ordinary (Euclidean) least squares, negative weights can destroy convexity and boundedness (as discussed in Section~\ref{sec:preliminaries}). Over \(\mathbb Z_p\), by contrast, every affine residual has norm at most one, so a finite signed objective remains bounded and a negative row acts as a bounded reward.
 
 This makes \(p\)-adic linear regression surprisingly expressive. Finite-domain all-different systems and CNF formulae compile mechanically into signed objectives: sufficiently weighted positive unary rows pin each coefficient to a finite allowed set, and a coordinatewise domination theorem (Theorem~\ref{thm:compiler-template}) shows that every global minimiser lies in that finite domain. There each remaining residual norm is a zero-or-one indicator, so a negative row rewards an unequal pair \(x_i\neq x_j\) or a satisfied clause, and the loss is, up to an additive constant, the conflict count of the all-different system or the negative number of satisfied clauses. The global minimisers are exactly the domain-respecting minimum-conflict assignments, and exactly the satisfying assignments when the instance is satisfiable (Theorem~\ref{thm:all-different}, Corollary~\ref{cor:all-different-csp}).
 
@@ -58,9 +95,17 @@ The paper makes the following contributions.
 \item A Sudoku case study on the native \(81\)-cell digit space using a variety of \(p\)-adic linear-regression techniques; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
 \end{itemize}
 
-Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format, and records in Table~\ref{tab:terminology} a correspondence between the applied vocabulary used throughout and its classical reading. Section~\ref{sec:padic-regression-background} works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}. Section~\ref{construction} states and proves the general template and its corollaries. Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, report the experiments and failed powers-of-two encoding, state the label and coefficient requirements together with an approximate-negation variant, and give a polynomial-valued labelling.
+This interdisciplinary work is written from the perspective of computer science and applied mathematics.
+The construction is described throughout in the vocabulary of constraint satisfaction and machine learning: a constraint system is \emph{compiled} into a \emph{dataframe} of observations, positive \emph{wells} \emph{pin} coefficients to their finite domains, and global minimisers \emph{snap} onto those domains. Table~\ref{tab:terminology} maps this vocabulary to standard language from penalty-function theory, graph theory, and constraint programming.
 
-\section{Preliminaries and terminology}
+Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format.
+Section~\ref{sec:padic-regression-background} works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; a polynomial-valued variant is deferred to Appendix~\ref{app:polynomial-labels}.
+
+Section~\ref{construction} states and proves the general template and its corollaries. Theorem~\ref{thm:compiler-template} is an exact-penalty theorem in the ultrametric setting: the strong triangle inequality puts a bound on the interaction perturbation of any coordinate change, so pinning weights that are above the weight of the incident interactions ensures that every minimiser has its parameters in the desired set of distinct values.
+
+Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, report the experiments and failed powers-of-two encoding, state the label and coefficient requirements together with an approximate-negation variant, and give a polynomial-valued labelling.
+
+\section{Preliminaries}
 \label{sec:preliminaries}
 
 Fix a prime \(p\). For a nonzero integer \(n\), let \(v_p(n)\) be the exponent of \(p\) in its factorisation and define
@@ -96,48 +141,93 @@ For parameters \(x\in \mathbb Z_p^n\), a signed weighted affine observation is a
 to the loss; this is the basic term in the signed weighted $p$-adic objective.
 \end{definition}
 
-Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards. In ordinary (Euclidean) weighted least squares the analogous move fails: inserting negative weights into the quadratic objective can destroy convexity and boundedness, whereas over \(\mathbb Z_p\) every residual norm is bounded by \(1\) and a negative row acts as a bounded reward.
+Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards.
 
-\subsection{Terminology}
-\label{sec:terminology}
 
-The construction is described throughout in the operational vocabulary of constraint satisfaction and machine learning: a constraint system is \emph{compiled} into a \emph{dataframe} of observations, positive \emph{wells} \emph{pin} coefficients to their finite domains, and global minimisers \emph{snap} onto those domains. Table~\ref{tab:terminology} maps this vocabulary onto the classical language of penalty-function theory, graph theory, and ultrametric analysis, and points to the statement where each notion first does formal work.
 
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{@{}p{0.23\linewidth}p{0.55\linewidth}p{0.13\linewidth}@{}}
-\toprule
-Term used here & Classical reading & Reference \\
-\midrule
-digit-snapping; snapping & Localisation of the minimiser: a coordinatewise projection onto the finite domain that strictly decreases the objective, as in an exact penalty method & Lemma~\ref{lem:digit-snapping} \\
-well (unary, Boolean, digit) & Separable penalty summand \(U_i(t)=\sum_{a\in D_i}|t-a|_p\), minimised exactly on the allowed set \(D_i\) & Lemma~\ref{lem:unary-well} \\
-compiler; compilation & Constructive polynomial-time reduction from a constraint system to a signed residual objective & Theorem~\ref{thm:compiler-template} \\
-coordinatewise domination & Exact-penalty threshold: each pinning weight exceeds the total interaction weight incident on its coordinate & Theorem~\ref{thm:compiler-template} \\
-pinning weight & Penalty weight \(\lambda_i\) on the unary well of coordinate \(i\) & Theorem~\ref{thm:compiler-template} \\
-dataframe; row; synthetic observation & Finite family of signed weighted affine forms; a row \((\sigma,u,b,\gamma)\) contributes \(\sigma\gamma\,|u^\top x-b|_p\) & Definition~\ref{def:signed-dataset} \\
-feature vector \(u\); target \(b\) & Coefficient vector and constant term of the affine form \(x\mapsto u^\top x-b\) & Definition~\ref{def:signed-dataset} \\
-loss & The objective functional \(L\) to be minimised & Definition~\ref{def:signed-dataset} \\
-finite-domain all-different system & Constraint system whose variables range over finite sets \(D_i\), with specified sets of variables required to take pairwise distinct values & Section~\ref{sec:introduction} \\
-list-colouring & Proper vertex colouring in which each vertex \(i\) draws its colour from its own list \(D_i\) & Definition~\ref{def:list-dataset} \\
-primal graph; peer graph & Constraint (Gaifman) graph: variables are adjacent exactly when they share a constraint; the deduplicated Sudoku peer graph is \(20\)-regular, so its maximum degree is \(\Delta=20\) & Corollary~\ref{cor:all-different-csp} \\
-Max-CSP; minimum conflicts & Minimisation of the number of violated constraints when not all can be satisfied simultaneously & Section~\ref{sec:minimum-conflicts-potts} \\
-one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
-QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
-clue; carving & Cell whose domain is a singleton \(\{g_i\}\); random deletion of entries from a solved grid to generate instances & Section~\ref{sec:sudoku} \\
-local search; restart & Iterative neighbourhood descent on a finite state space; an independent random re-initialisation of that descent & Section~\ref{sec:illustrative-computations} \\
-\bottomrule
-\end{tabular}
-\caption{Correspondence between the applied vocabulary used in this paper and its classical reading. Coined terms are anchored to the statements where they first do formal work; standard CSP and machine-learning terms are glossed for reference.}
-\label{tab:terminology}
-\end{table}
+\paragraph{Comparison with the Archimedean case.}
+It is worth recording exactly how the analogous move fails over
+$\mathbb{R}$. The signed objective built from the same data with squared
+residuals,
+\begin{equation*}
+L_{\mathbb{R}}(x) \;=\; \sum_{\ell} \sigma_\ell\,\gamma_\ell\,
+\bigl(u_\ell^{\top}x - b_\ell\bigr)^{2},
+\qquad x \in \mathbb{R}^{n},
+\end{equation*}
+is a quadratic function whose leading form is $x^{\top}Qx$ with
+$Q = \sum_{\ell}\sigma_\ell\gamma_\ell\,u_\ell u_\ell^{\top}$. Such a
+function is bounded below on $\mathbb{R}^{n}$ if and only if $Q$ is
+positive semidefinite and the linear part vanishes on $\ker Q$.
+Boundedness is therefore governed by global spectral and null-space
+conditions on the entire design, rather than by a termwise bound on the
+residuals. A sufficiently weighted negative row can make $Q$ indefinite
+and thereby destroy both convexity and boundedness. In particular, the
+coordinatewise domination hypothesis of Theorem~\ref{thm:compiler-template}
+is unsound over $\mathbb{R}$. Take
+$n=2$, pin each variable to the singleton domain $\{0\}$ with weight
+$\lambda$, and reward their inequality with one negative row:
+\begin{equation*}
+L_{\mathbb{R}}(x_1,x_2) \;=\; \lambda x_1^{2} + \lambda x_2^{2}
+\;-\; \gamma\,(x_1-x_2)^{2}.
+\end{equation*}
+Along the line $x_1=-x_2=t$ this equals $2(\lambda-2\gamma)\,t^{2}$, so
+the choice $\lambda=3$, $\gamma=2$ satisfies the domination condition
+$\lambda>\gamma$ while $L_{\mathbb{R}}\to-\infty$; recentring the wells
+at nonzero values changes only lower-order terms. (The $p$-adic
+compilation of the same contradictory two-variable system is bounded and
+returns its minimum-conflict assignment, as in
+Section~\ref{sec:minimum-conflicts-potts}.) Adding linear inequality
+constraints to make the real problem well posed does not remove the
+computational obstruction: minimising a quadratic function with a single
+negative eigenvalue under linear inequality constraints is NP-hard
+\cite{PardalosVavasis1991}. Convexity imposes a second, independent
+obstruction: the convex analogue $\sum_{a\in D_i}(t-a)^{2}$ of the unary
+well is minimised at the mean of $D_i$, rather than precisely on every
+point of $D_i$. More generally, the minimiser set of a convex function
+is convex, so a convex separable penalty cannot pin a real variable
+exactly to a finite non-singleton domain. Such pinning over $\mathbb{R}$
+already requires nonconvex multiwell penalties before any negative weight
+appears.
+
+Over $\mathbb{Z}_p$ both obstructions disappear at once. Each residual
+norm lies in $[0,1]$, so for every $x\in\mathbb{Z}_p^{n}$,
+\begin{equation*}
+-\sum_{\ell:\,\sigma_\ell=-1}\gamma_\ell
+\;\le\; L(x) \;\le\; \sum_{\ell:\,\sigma_\ell=+1}\gamma_\ell,
+\end{equation*}
+a two-sided bound that holds term by term, for every configuration of
+signs and weights: a negative row is a bounded reward, not a source of
+indefiniteness. At the same time the unary sum
+$\sum_{a\in D_i}|t-a|_p$ is minimised exactly on $D_i$
+(Lemma~\ref{lem:unary-well}), so
+multiwell pinning is available inside the affine residual class itself.
+These two facts are what make the coordinatewise condition of
+Theorem~\ref{thm:compiler-template} an exact penalty: the strong triangle
+inequality caps the effect of any single-coordinate change on every
+interaction row, so a pinning weight above the incident interaction
+weight dominates all rewards simultaneously. The point of the comparison
+is well-posedness rather than complexity: the signed threshold problem is
+itself NP-hard (Corollary~\ref{cor:signed-nphard}), but its objective is
+bounded, its global minimisers are characterised exactly, and the
+domination condition is sound.
+
+The same ultrametric geometry has a cost. Away from its zero hyperplane
+the map $x\mapsto|u^{\top}x-b|_p$ is locally constant, so the loss
+offers no gradient and no notion of a residual being ``nearly'' zero;
+this is why Zubarev proposes random-walk rather than gradient dynamics
+for $p$-adic losses \cite{zubarev2025padic}. The boundedness that licenses
+signed weights and the flatness that starves local search are two faces
+of the same non-Archimedean absolute value;
+Appendix~\ref{app:powers-two} analyses a concrete instance of the latter
+for the powers-of-two encoding.
+
 
 \section{Worked examples}
 \label{sec:padic-regression-background}
 
 Signed residual objectives give useful representations of constraint-satisfaction problems: source forms can be transformed mechanically into datasets, and a global minimiser can be transformed mechanically into a satisfying CSP assignment when one exists, or otherwise into a domain-respecting minimum-conflict assignment. This section demonstrates the construction on two small instances before the general theorems of Section~\ref{construction}.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[vertex/.style={circle,draw,thick,minimum size=8mm,inner sep=0pt}]
 \node[vertex] (x1) at (0,1.45) {$x_1$};
@@ -197,7 +287,7 @@ $E_2$ & negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
 \subsection{An example}
 \label{sec:worked-all-different}
 
-We begin with an example rather than the general theorem. Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
+Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
 
 For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), while every nonzero integer residual that occurs below has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
 \[
@@ -254,7 +344,7 @@ Consider the CNF expression in the two Boolean variables \(z_1\) and \(z_2\):
 \]
 What values of \(z_1\) and \(z_2\) make \(\Phi\) true? Encode \(x_i=0\) as \(z_i=\mathrm{true}\) and \(x_i=1\) as \(z_i=\mathrm{false}\). A clause is false at one affine equality, so a negative row rewards every coefficient vector away from that equality. The first clause is false when \(x_1=1\), giving the residual \(x_1-1\). The second is false when \((x_1,x_2)=(0,1)\), giving \(-x_1+x_2-1\). With \(p=5\) and Boolean-pinning weight \(3\), the complete dataframe is Table~\ref{tab:cnf-dataframe}.
 
-We want to make sure that \(x_1\) and \(x_2\) take values only in \(\{0,1\}\), so we make two deep holes (``Boolean wells'') in the loss landscape for each variable. If the wells are deeper than the rewards from the clause-derived rows, then the optimal values of \(x_1\) and \(x_2\) are suitably constrained.
+We want to make sure that \(x_1\) and \(x_2\) take values only in \(\{0,1\}\), so we make two deep Boolean wells in the loss landscape for each variable. If the wells are deeper than the rewards from the clause-derived rows, then the optimal values of \(x_1\) and \(x_2\) are suitably constrained.
 
 \begin{table}[H]
 \centering
@@ -719,7 +809,63 @@ L_{\min}(x) &=
 \sum_{(i,j)\in\mathcal{P}} |x_i-x_j|_p.
 \label{eq:objective-minimal}
 \end{align}
-A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\). Thus \(\alpha\) itself plays the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations. This is the formulation used in the correctness statements below.
+A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\).
+Each term will appear in 20 pairs: the 8 row disequalities, the 8 column disequalities and the other 4 disequalities in its square. (See Figure \ref{fig:twenty})
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  x=0.56cm,
+  y=0.56cm,
+  row peer/.style={
+    pattern={Lines[angle=0,distance=2.4pt,line width=0.25pt]},
+    pattern color=black
+  },
+  column peer/.style={
+    pattern={Lines[angle=90,distance=2.4pt,line width=0.25pt]},
+    pattern color=black
+  },
+  box peer/.style={
+    pattern={Dots[distance=2.6pt,radius=0.38pt]},
+    pattern color=black
+  }
+]
+% The selected cell is (row 2, column 2), in the top-left box.
+\foreach \c in {1,3,4,5,6,7,8,9}
+  \path[row peer] ({\c-1},7) rectangle (\c,8);
+\foreach \r in {1,3,4,5,6,7,8,9}
+  \path[column peer] (1,{9-\r}) rectangle (2,{10-\r});
+\foreach \xmin/\ymin in {0/8,2/8,0/6,2/6}
+  \path[box peer] (\xmin,\ymin) rectangle ({\xmin+1},{\ymin+1});
+\path[fill=black] (1,7) rectangle (2,8);
+\node[font=\bfseries\large,text=white] at (1.5,7.5) {$x$};
+
+% Cell grid and the heavier 3-by-3 box boundaries.
+\draw[line width=0.3pt] (0,0) grid (9,9);
+\foreach \k in {0,3,6,9} {
+  \draw[line width=1.1pt] (\k,0) -- (\k,9);
+  \draw[line width=1.1pt] (0,\k) -- (9,\k);
+}
+\foreach \n in {1,...,9} {
+  \node[font=\scriptsize] at ({\n-0.5},9.32) {\n};
+  \node[font=\scriptsize] at (-0.32,{9.5-\n}) {\n};
+}
+
+% Greyscale-safe legend.
+\path[row peer,draw=black,line width=0.3pt] (0,-0.95) rectangle (0.72,-0.45);
+\node[anchor=west,font=\scriptsize] at (0.92,-0.70) {8 same row};
+\path[column peer,draw=black,line width=0.3pt] (0,-1.65) rectangle (0.72,-1.15);
+\node[anchor=west,font=\scriptsize] at (0.92,-1.40) {8 same column};
+\path[box peer,draw=black,line width=0.3pt] (0,-2.35) rectangle (0.72,-1.85);
+\node[anchor=west,font=\scriptsize] at (0.92,-2.10) {4 additional in box};
+\node[anchor=west,draw=black,line width=0.5pt,inner sep=4pt,font=\bfseries\scriptsize]
+  at (5.05,-1.40) {20 distinct peers};
+\end{tikzpicture}
+\caption{The \(20\) distinct peers of cell \(x\): eight cells in the same row, eight in the same column, and four additional cells in the same \(3\times3\) box. }
+\label{fig:twenty}
+\end{figure}
+
+Thus \(\alpha\) itself can play the role of the general pinning weight \(\lambda\), and any choice \(\alpha>20\) satisfies the domination condition from Theorem~\ref{thm:all-different}. The minimal dataset therefore contains \(9(81-|\mathcal C|)+|\mathcal C|=729-8|\mathcal C|\) positive observations and \(810\) negative observations. This is the formulation used in the correctness statements below.
 
 For exposition, we also use the redundant expanded objective
 \begin{align}
@@ -773,7 +919,7 @@ with the intended meaning that cell $(r,c)$ contains digit $d$. This produces \(
 
 The minimal objective \eqref{eq:objective-minimal} is already a single scalar loss on that state space. The theorem-side expanded objective \eqref{eq:objective} contains \(729\) digit-snapping residuals, \(|\mathcal{C}|\) clue residuals, and \(810\) pairwise residuals. A structured constraint-programming model with \(81\) cell variables and \(27\) \emph{alldifferent} constraints is already semantically close to the puzzle, so the comparison here is not based on raw constraint count alone. The signed $p$-adic construction packages the all-different structure into one residual objective on the \(81\) cell variables.
 
-Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, that encoding produced no successful solves: the search repeatedly stopped in local minima.
+Appendix~\ref{app:powers-two} records an alternative encoding that maps digits to powers of two so that each row, column, or box contributes a single sum residual rather than pairwise terms. In local-search experiments on \(50\) benchmark puzzles, that encoding produced no successful solves: the search repeatedly stalled on loss plateaus.
 
 \section{Computations with the induced \texorpdfstring{\(p\)-adic}{p-adic} loss}
 \label{sec:illustrative-computations}
@@ -1164,6 +1310,127 @@ E2 SA & Simulated annealing on the same \(750\) runs & \(0/750\) & Mean lift \(0
 \label{tab:powers-two-results}
 \end{table}
 
+
+\paragraph{Why the encoding defeats local search.}
+The failure recorded in Table~\ref{tab:powers-two-results} is structural,
+and the reason is
+topological. An Archimedean search on the same statistic would see a graded
+signal: the deficit $|511 - \sum_{(r,c)\in g}\beta_{r,c}|$ is monotone on
+either side of the target, its sublevel sets are nested intervals, and a
+single-cell change moves the unit sum by at most $255$ --- a
+warmer/colder signal pointing at $511$. Nothing of the sort survives
+$p$-adically. The sublevel sets
+$\{t \in \mathbb{Z}_p : |t|_p \le p^{-k}\} = p^k\mathbb{Z}_p$ are clopen
+subgroups of a totally disconnected space, and $|\cdot|_p$ is locally
+constant on $\mathbb{Z}_p \setminus \{0\}$. Since the attainable residuals
+satisfy $|r_g(\beta)| \le 1793$, each unit term $|r_g(\beta)|_p$ depends on
+the unit sum only through its residue modulo $p^{K}$ with
+$K = \lfloor \log_p 1793 \rfloor + 1$, and takes at most $K+1$ values. The
+loss is therefore constant on large congruence fibres --- ultrametric
+plateaus --- that stand in no monotone relation to the Archimedean deficit:
+at $p=11$ a unit summing to $390$ (residual $121 = 11^2$) receives the
+near-perfect term $11^{-2}$, while a unit summing to $510$ (residual $1$)
+receives the worst possible term $1$.
+
+\begin{lemma}[Plateaus, near-misses, and all-or-nothing progress]
+\label{lem:pow2-landscape}
+Let $p$ be an odd prime and $g$ a unit with residual $r = r_g(\beta)$.
+Consider a local move that changes one entry of $g$ from $2^b$ to $2^a$
+with $a \ne b \in \{0,\dots,8\}$ (for a two-cell swap, each unit containing
+exactly one of the cells is of this form), so that the residual becomes
+$r' = r - \varepsilon$ with $\varepsilon = 2^{a} - 2^{b}$.
+\begin{enumerate}
+\item[(i)] $|\varepsilon|_p = |2^{|a-b|}-1|_p$, which equals $1$ unless
+$\mathrm{ord}_p(2)$ divides $|a-b| \le 8$. This divisibility is impossible
+for $p \in \{11, 13, 23, 47, 73, 97\}$, whose orders are
+$10, 12, 11, 23, 9, 48$, and automatically for $p > 255 \ge |\varepsilon|$.
+For all such primes every move is a $p$-adic unit step; in particular, a
+state differing from a valid completion in a single cell has every affected
+unit term equal to $1$, and is scored identically to a unit whose sum is
+arbitrary and coprime to $p$.
+\item[(ii)] If $r \ne 0$, the move strictly decreases the unit term if and
+only if $\varepsilon \equiv r \pmod{p^{\,v_p(r)+1}}$: improvement requires
+the move to reproduce the residual's leading $p$-adic digit exactly.
+\item[(iii)] If $|\varepsilon|_p > |r|_p$ --- in particular whenever
+$\varepsilon$ is a unit and the unit sum is exactly ($r=0$) or approximately
+($v_p(r) \ge 1$) satisfied --- then $|r'|_p = |\varepsilon|_p$: a single
+generic move erases all accumulated valuation on that unit at once.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(i) $2^{a}-2^{b} = 2^{\min(a,b)}\bigl(2^{|a-b|}-1\bigr)$ and $|2|_p = 1$
+for odd $p$; $p \mid 2^{d}-1$ if and only if $\mathrm{ord}_p(2) \mid d$,
+and the listed orders all exceed $8$, while $0 < |\varepsilon| \le 255 < p$
+settles $p > 255$. A single-cell error leaves each affected unit with
+residual $\pm\varepsilon$. (ii) $|r-\varepsilon|_p < |r|_p$ if and only if
+$v_p(r-\varepsilon) > v_p(r)$, i.e.\ $p^{\,v_p(r)+1} \mid r - \varepsilon$.
+(iii) The strong triangle inequality holds with equality when the two norms
+differ.
+\end{proof}
+
+The inversion can be exhibited exactly. For $p = 7$
+($\mathrm{ord}_7(2) = 3$), note $511 = 7 \cdot 73$, so the target itself is
+$7$-adically small and any unit whose sum is divisible by $7$ has
+$|r_g|_7 \le 7^{-1}$. Concretely, the near-miss unit holding eight correct
+entries and $2^{0}=1$ in place of $2^{8}=256$ has residual
+$255 = 3\cdot 5\cdot 17$ and term $1$, while the scrambled multiset
+$(8,4,2,2,1,1,1,1,1)$ sums to $21$, has residual $490 = 2\cdot 5\cdot 7^{2}$,
+and receives the term $7^{-2}$: eight-ninths of a solved unit is ranked
+forty-nine times worse than noise. The same inversion occurs at $p = 73$.
+For the remaining small sweep primes the occasional sub-unit steps reward
+divisibility of the digit gap by $\mathrm{ord}_p(2)$ --- $p=7$ discounts
+gaps $3$ and $6$, $p=17$ the single gap $8$ ($255 = 3\cdot 5\cdot 17$),
+$p=127$ the gap $7$ ($127 = 2^{7}-1$) --- congruences between the exchanged
+digits with no relation to correctness. The even prime is no better: for
+$p=2$ the valuation of $r_g$ counts how many low-order binary digits of the
+unit sum agree with $511 = 111111111_2$, a carry condition on the multiset
+of entries, again independent of how many cells hold their correct values.
+
+The landscape consequences follow. Under the heuristic model that unit sums
+equidistribute modulo powers of $p$, part~(ii) makes the per-unit
+improvement event a leading-digit hit of density about $1/p$, while
+part~(iii) makes all partial progress fragile: a cell lies in three units
+whose residuals shift in lockstep, so repairing one unit while protecting
+another requires simultaneous congruences. For $p \ge 43$ one has
+$p^{2} \ge 1849 > 1793$, so the attainable valuations are $0$ or $1$ and
+each unit term is $0$, $p^{-1}$, or $1$; for $p > 1793$ --- the sweep's
+$p = 2311$ --- every nonzero attainable residual is a unit and the loss
+collapses exactly to the number of unsatisfied unit sums, an integer in
+$\{0,\dots,27\}$ that a move improves only by making some unit sum exactly
+$511$. At small $p$ the landscape is arithmetic noise; at large $p$ it is
+an exact-hit count; at no prime does the term grade progress toward a
+permutation. The archived traces are consistent with plateau termination
+rather than descent into structured basins: the greedy runs ended after
+$12.5$ and $19.3$ steps on average with mean lift at most $0.009$, and
+annealing achieved mean lift $0.000$ over $5000$-step runs
+(Table~\ref{tab:powers-two-results}).
+
+The pairwise construction of Section~\ref{sec:sudoku} is immune precisely because it never
+asks the norm to measure anything. Its off-target residuals on the domain
+are differences of digits, bounded by $8 < p$, so
+Lemma~\ref{lem:edge-indicator} collapses every
+edge term to an equality indicator; the loss becomes an integer conflict
+count whose single-swap increments are small, informative integers
+(Lemma~\ref{lem:row-swap-locality}), and local search behaves as it does on
+any Max-CSP objective.
+The powers-of-two encoding fails this twice over: at moderate primes its
+off-target residuals carry spurious valuations, and at $p > 1793$, where
+the norm does degenerate to an indicator, it indicates only $27$ exact-sum
+events, each flipped by a vanishing fraction of moves, where the pairwise
+family fields $810$ local indicators, several of which change under every
+swap. The compilation principle is that a $p$-adic residual should be
+engineered so that its off-target values are units --- the norm employed as
+an indicator, never as a measurement of size --- and that the indicators be
+numerous and local enough for the neighbourhood structure to see them. The
+construction of Sections~\ref{construction} and~\ref{sec:sudoku} satisfies
+both by design. This is the concrete instance promised in
+Section~\ref{sec:preliminaries}: the local constancy that starves the search
+here is the same non-Archimedean geometry that makes signed weights safe
+there.
+
+
+
 \section{False-label and coefficient requirements}
 \label{app:label-requirements}
 
@@ -1303,6 +1570,12 @@ G. Baker.
 \newblock Expressivity and NP-hardness of \(p\)-adic linear regression.
 \newblock \emph{p-Adic Numbers, Ultrametric Analysis and Applications} 18(2), 210--216 (2026).
 \newblock \url{https://doi.org/10.1134/S2070046626020081}
+
+\bibitem{PardalosVavasis1991}
+P. M. Pardalos and S. A. Vavasis.
+\newblock Quadratic programming with one negative eigenvalue is NP-hard.
+\newblock \emph{Journal of Global Optimization} 1(1), 15--22 (1991).
+\newblock \url{https://doi.org/10.1007/BF00120662}
 
 \bibitem{schiex1995vcsp}
 T. Schiex, H. Fargier, and G. Verfaillie.

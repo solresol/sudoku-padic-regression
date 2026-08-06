@@ -1,0 +1,112 @@
+name: Paper CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/paper.yml"
+      - "Makefile"
+      - "paper/**"
+      - "site/**"
+      - "submission/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/paper.yml"
+      - "Makefile"
+      - "paper/**"
+      - "site/**"
+      - "submission/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build manuscript and submission archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install LaTeX and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            cm-super \
+            latexmk \
+            poppler-utils \
+            texlive-fonts-recommended \
+            texlive-games \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            unzip \
+            zip
+
+      - name: Build paper and source archive
+        run: |
+          make paper
+          make site
+          make submission
+
+      - name: Check manuscript diagnostics
+        run: |
+          set -euo pipefail
+          log=paper/sudoku_padic_regression.log
+          test -s paper/sudoku_padic_regression.pdf
+          test -s site/sudoku_padic_regression.pdf
+          test -s "$log"
+          cmp paper/sudoku_padic_regression.pdf site/sudoku_padic_regression.pdf
+
+          if grep -E \
+            'LaTeX Warning: (Citation|Reference).*undefined|There were undefined references|Overfull \\[hv]box' \
+            "$log"; then
+            echo "The manuscript has unresolved references or overfull content." >&2
+            exit 1
+          fi
+
+          pdfinfo paper/sudoku_padic_regression.pdf
+
+      - name: Rebuild from the standalone submission archive
+        run: |
+          set -euo pipefail
+          archive=dist/sudoku_padic_regression-source.zip
+          build_dir=tmp/submission-ci
+          test -s "$archive"
+          mkdir -p "$build_dir"
+          unzip -q "$archive" -d "$build_dir"
+          latexmk \
+            -cd \
+            -pdf \
+            -interaction=nonstopmode \
+            -halt-on-error \
+            -file-line-error \
+            "$build_dir/sudoku_padic_regression.tex"
+
+          log="$build_dir/sudoku_padic_regression.log"
+          test -s "$build_dir/sudoku_padic_regression.pdf"
+          if grep -E \
+            'LaTeX Warning: (Citation|Reference).*undefined|There were undefined references|Overfull \\[hv]box' \
+            "$log"; then
+            echo "The standalone submission build has unresolved references or overfull content." >&2
+            exit 1
+          fi
+
+          pdfinfo "$build_dir/sudoku_padic_regression.pdf"
+
+      - name: Upload paper artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sudoku-padic-regression-paper
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            paper/sudoku_padic_regression.pdf
+            site/sudoku_padic_regression.pdf
+            dist/sudoku_padic_regression-source.zip
+            tmp/submission-ci/sudoku_padic_regression.pdf

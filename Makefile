@@ -1,4 +1,4 @@
-SHELL := /bin/zsh
+SHELL := /bin/bash
 
 .DEFAULT_GOAL := paper
 .DELETE_ON_ERROR:
