@@ -58,7 +58,7 @@ coordinatewise domination & Exact-penalty threshold: each pinning weight exceeds
 pinning weight & Exact-penalty multiplier \(\lambda_i\) on the unary well of coordinate \(i\) & Theorem~\ref{thm:compiler-template} \\
 list-colouring & Proper vertex colouring in which each vertex \(i\) draws its colour from its own list \(D_i\) & Definition~\ref{def:list-dataset} \\
 well (unary, Boolean, digit) & Finite-alphabet multiwell penalty \(U_i(t)=\sum_{a\in D_i}|t-a|_p\), minimised exactly on the allowed set \(D_i\) & Lemma~\ref{lem:unary-well} \\
-digit-snapping; snapping & Coordinate retraction onto the finite domain that strictly decreases the objective under the domination condition & Lemma~\ref{lem:digit-snapping} \\
+digit-snapping; snapping & Replacement of an out-of-domain coordinate by an allowed value; under the domination condition this strictly decreases the objective & Lemma~\ref{lem:digit-snapping} \\
 primal graph; peer graph & Constraint (Gaifman) graph: variables are adjacent exactly when they share a constraint; the deduplicated Sudoku peer graph is \(20\)-regular, so its maximum degree is \(\Delta=20\) & Corollary~\ref{cor:all-different-csp} \\
 Max-CSP; minimum conflicts & Maximisation of satisfied constraint weight, equivalently minimisation of conflict weight & Section~\ref{sec:minimum-conflicts-potts} \\
 clue & Given digit in a pre-filled cell, represented by a singleton allowed set \(\{g_i\}\) & Section~\ref{sec:sudoku} \\
@@ -66,7 +66,7 @@ unit & Sudoku constraint scope: one row, one column, or one \(3\times3\) box; ea
 one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
 local search; restart & Iterative exploration by local moves on a finite state space; a restart begins from a fresh random initialisation & Section~\ref{sec:illustrative-computations} \\
 QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
-\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Replacement, on a finite residual range, of a negative reward for avoiding a forbidden equality by positive terms for the allowed equalities, up to an additive constant & Section~\ref{sec:mihara-digitwise} \\
+\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Rewriting of a negative reward row as positive wells at the allowed residual values; equal up to an additive constant on the finite domain & Section~\ref{sec:mihara-digitwise} \\
 carving & Generation of a puzzle by deleting entries from a solved grid; the random procedure used here does not enforce a unique completion & Appendix~\ref{app:heuristics-results} \\
 \bottomrule
 \end{tabular}
