@@ -66,7 +66,7 @@ unit & Sudoku constraint scope: one row, one column, or one \(3\times3\) box; ea
 one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
 local search; restart & Iterative exploration by local moves on a finite state space; a restart begins from a fresh random initialisation & Section~\ref{sec:illustrative-computations} \\
 QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
-\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Rewriting of a negative reward row as positive wells at the allowed residual values; equal up to an additive constant on the finite domain & Appendix~\ref{sec:mihara-digitwise} \\
+\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Rewriting of a negative reward row as positive wells at the allowed residual values; equal up to an additive constant on the finite domain & Appendix~\ref{app:mihara-digitwise} \\
 carving & Generation of a puzzle by deleting entries from a solved grid; the random procedure used here does not enforce a unique completion & Appendix~\ref{app:heuristics-results} \\
 \bottomrule
 \end{tabular}
@@ -91,7 +91,7 @@ The paper makes the following contributions.
 \item A compiler template from finite-domain all-different systems and CNF formulae to signed weighted affine \(p\)-adic residual objectives, with a coordinatewise domination theorem locating every global minimiser in the finite domain, on \(\mathbb Z_p^n\) and on \(\mathbb Q_p^n\) (Theorem~\ref{thm:compiler-template}, Corollary~\ref{cor:qp-extension}).
 \item An exact characterisation of the global minimisers for all-different systems in list-colouring form as the domain-respecting minimum-conflict assignments, covering the unsatisfiable Max-CSP regime and the antiferromagnetic Potts reading (Theorem~\ref{thm:all-different}, Section~\ref{sec:minimum-conflicts-potts}).
 \item NP-hardness of the signed threshold problem at the fixed prime \(p=5\), by an elementary reduction through the clause compiler (Corollary~\ref{cor:signed-nphard}).
-\item Polynomial-size positive-only complement expansions for the negative CNF and pairwise all-different rows, supporting a diagnostic comparison with Mihara's digitwise equality regression while the signed rows are retained for valuation and loss reporting (Appendix~\ref{sec:mihara-digitwise}).
+\item Polynomial-size positive-only complement expansions for the negative CNF and pairwise all-different rows, supporting a diagnostic comparison with Mihara's digitwise equality regression while the signed rows are retained for valuation and loss reporting (Appendix~\ref{app:mihara-digitwise}).
 \item A Sudoku case study on the native \(81\)-cell digit space using a variety of \(p\)-adic linear-regression techniques; a negative result for a powers-of-two encoding; and a client-side browser implementation exposing the generated dataframes, loss arithmetic, and searches (Sections~\ref{sec:sudoku}--\ref{sec:illustrative-computations}, Appendices~\ref{app:heuristics}--\ref{app:powers-two}).
 \end{itemize}
 
@@ -961,7 +961,7 @@ The companion site, \url{https://padic-logic.symmachus.org}, lets readers trace 
 \appendix
 
 \section{Mihara's digitwise regression and positive complement expansion}
-\label{sec:mihara-digitwise}
+\label{app:mihara-digitwise}
 
 Mihara's forcing theorem \cite{mihara2026forcing} considers a product \(C=\prod_i B_i\) of residue sets, a nonnegative base objective satisfying a concentration condition near \(C\), and a positive unary forcing term whose weight \(M\) exceeds the base objective's range on \(C\). The forced objective has the same optima on \(C\); specialising the construction to affine residual data proves ordinary positive \(p\)-adic linear regression NP-hard for every fixed prime.
 
