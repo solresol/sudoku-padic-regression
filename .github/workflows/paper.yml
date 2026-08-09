@@ -51,7 +51,6 @@ jobs:
       - name: Build paper and source archive
         run: |
           make paper
-          make site
           make submission
 
       - name: Check manuscript diagnostics
@@ -61,6 +60,26 @@ jobs:
           test -s paper/sudoku_padic_regression.pdf
           test -s site/sudoku_padic_regression.pdf
           test -s "$log"
+
+          # Check the committed site PDF before make site can overwrite it.
+          # Compare extracted text and rendered pages so harmless PDF metadata
+          # timestamps do not make the check platform-dependent.
+          check_dir=tmp/site-pdf-check
+          mkdir -p "$check_dir/paper-pages" "$check_dir/site-pages"
+          pdftotext -layout paper/sudoku_padic_regression.pdf "$check_dir/paper.txt"
+          pdftotext -layout site/sudoku_padic_regression.pdf "$check_dir/site.txt"
+          cmp "$check_dir/paper.txt" "$check_dir/site.txt"
+
+          paper_pages="$(pdfinfo paper/sudoku_padic_regression.pdf | awk '/^Pages:/ { print $2 }')"
+          site_pages="$(pdfinfo site/sudoku_padic_regression.pdf | awk '/^Pages:/ { print $2 }')"
+          test "$paper_pages" = "$site_pages"
+          pdftoppm -png -r 72 \
+            paper/sudoku_padic_regression.pdf "$check_dir/paper-pages/page"
+          pdftoppm -png -r 72 \
+            site/sudoku_padic_regression.pdf "$check_dir/site-pages/page"
+          diff -qr "$check_dir/paper-pages" "$check_dir/site-pages"
+
+          make site
           cmp paper/sudoku_padic_regression.pdf site/sudoku_padic_regression.pdf
 
           if grep -E \

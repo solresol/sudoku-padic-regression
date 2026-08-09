@@ -98,10 +98,10 @@ The paper makes the following contributions.
 This interdisciplinary work is written from the perspective of computer science and applied mathematics.
 The construction is described throughout in the vocabulary of constraint satisfaction and machine learning: a constraint system is \emph{compiled} into a \emph{dataframe} of observations, positive \emph{wells} \emph{pin} coefficients to their finite domains, and global minimisers \emph{snap} onto those domains. Table~\ref{tab:terminology} maps this vocabulary to standard language from penalty-function theory, graph theory, and constraint programming.
 
-Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format.
+Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format, and compares the signed objective with its Archimedean analogue.
 Section~\ref{sec:padic-regression-background} works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; the full admissibility conditions and a polynomial-valued variant are developed in the author's doctoral thesis.
 
-Section~\ref{construction} states and proves the general template and its corollaries. Theorem~\ref{thm:compiler-template} is an exact-penalty theorem in the ultrametric setting: the strong triangle inequality puts a bound on the interaction perturbation of any coordinate change, so pinning weights that are above the weight of the incident interactions ensures that every minimiser has its parameters in the desired set of distinct values.
+Section~\ref{construction} states and proves the general template and its corollaries. Theorem~\ref{thm:compiler-template} is an exact-penalty theorem in the ultrametric setting: the strong triangle inequality puts a bound on the interaction perturbation of any coordinate change, so pinning weights that are above the weight of the incident interactions ensure that every minimiser has its parameters in the desired set of distinct values.
 
 Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, and report the experiments and the failed powers-of-two encoding.
 
@@ -810,7 +810,7 @@ L_{\min}(x) &=
 \label{eq:objective-minimal}
 \end{align}
 A separate coefficient on the pairwise term is unnecessary here: any positive edge weight can be scaled out, so we normalise that coefficient to \(1\).
-Each term will appear in 20 pairs: the 8 row disequalities, the 8 column disequalities and the other 4 disequalities in its square. (See Figure \ref{fig:twenty})
+Each cell appears in 20 pairs: the 8 row disequalities, the 8 column disequalities and the other 4 disequalities in its box. (See Figure~\ref{fig:twenty}.)
 
 \begin{figure}[t]
 \centering
@@ -1391,9 +1391,9 @@ unit sum agree with $511 = 111111111_2$, a carry condition on the multiset
 of entries, again independent of how many cells hold their correct values.
 
 The landscape consequences follow. Under the heuristic model that unit sums
-equidistribute modulo powers of $p$, part~(ii) makes the per-unit
+equidistribute modulo powers of $p$, Lemma~\ref{lem:pow2-landscape}(ii) makes the per-unit
 improvement event a leading-digit hit of density about $1/p$, while
-part~(iii) makes all partial progress fragile: a cell lies in three units
+Lemma~\ref{lem:pow2-landscape}(iii) makes all partial progress fragile: a cell lies in three units
 whose residuals shift in lockstep, so repairing one unit while protecting
 another requires simultaneous congruences. For $p \ge 43$ one has
 $p^{2} \ge 1849 > 1793$, so the attainable valuations are $0$ or $1$ and
