@@ -49,7 +49,7 @@ We study signed, weighted affine \(p\)-adic residual objectives as native encodi
 \toprule
 Term used here & Classical reading & Reference \\
 \midrule
-finite-domain all-different system & Finite-domain constraint system in which every designated scope must take pairwise distinct values & Section~\ref{sec:introduction} \\
+finite-domain all-different system & Finite-domain constraint system in which the variables in each designated scope must take pairwise distinct values & Section~\ref{sec:introduction} \\
 dataframe; row; synthetic observation & Tabular presentation of signed weighted affine forms; a row \((\sigma,u,b,\gamma)\) contributes \(\sigma\gamma|u^\top x-b|_p\). Positive rows are penalties and negative rows are bounded rewards & Definition~\ref{def:signed-dataset} \\
 feature vector \(u\); target \(b\) & Normal vector and right-hand side defining the affine residual \(u^\top x-b\) & Definition~\ref{def:signed-dataset} \\
 coefficient vector \(x\) & Optimisation variable in \(\mathbb Z_p^n\); in the Sudoku model its coordinates are cell values, not fitted slopes from observed data & Definition~\ref{def:signed-dataset} \\
@@ -66,7 +66,7 @@ unit & Sudoku constraint scope: one row, one column, or one \(3\times3\) box; ea
 one-hot lift & Embedding of a \(q\)-valued variable as a \(0/1\) indicator vector of length \(q\) & Section~\ref{sec:parsimony} \\
 local search; restart & Iterative exploration by local moves on a finite state space; a restart begins from a fresh random initialisation & Section~\ref{sec:illustrative-computations} \\
 QUBO & Quadratic unconstrained binary optimisation: minimisation of a quadratic form over \(\{0,1\}^n\) & Section~\ref{sec:related-work} \\
-\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Replacement, on a finite residual range, of a negative reward for avoiding a forbidden equality by positive terms for the allowed equalities, up to an additive constant & Appendix~\ref{sec:mihara-digitwise} \\
+\parbox[t]{\linewidth}{\raggedright positive complement\\expansion} & Replacement, on a finite residual range, of a negative reward for avoiding a forbidden equality by positive terms for the allowed equalities, up to an additive constant & Section~\ref{sec:mihara-digitwise} \\
 carving & Generation of a puzzle by deleting entries from a solved grid; the random procedure used here does not enforce a unique completion & Appendix~\ref{app:heuristics-results} \\
 \bottomrule
 \end{tabular}
