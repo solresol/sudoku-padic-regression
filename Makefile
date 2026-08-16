@@ -1,4 +1,4 @@
-SHELL := /bin/zsh
+SHELL := /bin/bash
 
 .DEFAULT_GOAL := paper
 .DELETE_ON_ERROR:
@@ -17,6 +17,7 @@ PAPER_ASSETS := \
 	$(PAPER_DIR)/loss_curve.pdf \
 	$(PAPER_DIR)/figures/padic_logic_sudoku_solution.png
 SITE_PDF := $(SITE_DIR)/$(PAPER_NAME).pdf
+SITE_SOURCE_MANIFEST := $(SITE_DIR)/$(PAPER_NAME).sources.sha256
 
 DIST_DIR := dist
 SUBMISSION_ZIP := $(DIST_DIR)/$(PAPER_NAME)-source.zip
@@ -44,7 +45,7 @@ help:
 
 paper: $(PAPER_PDF)
 
-site: $(SITE_PDF)
+site: $(SITE_PDF) $(SITE_SOURCE_MANIFEST)
 
 submission: $(SUBMISSION_ZIP)
 
@@ -56,6 +57,10 @@ $(PAPER_PDF): $(PAPER_TEX) $(PAPER_ASSETS)
 $(SITE_PDF): $(PAPER_PDF)
 	mkdir -p $(SITE_DIR)
 	cp $(PAPER_PDF) $(SITE_PDF)
+
+$(SITE_SOURCE_MANIFEST): $(PAPER_TEX) $(PAPER_ASSETS)
+	mkdir -p $(SITE_DIR)
+	shasum -a 256 $(PAPER_TEX) $(PAPER_ASSETS) > $(SITE_SOURCE_MANIFEST)
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
