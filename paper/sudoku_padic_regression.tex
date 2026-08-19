@@ -52,7 +52,7 @@ Term used here & Classical reading & Reference \\
 finite-domain all-different system & Finite-domain constraint system in which the variables in each designated scope must take pairwise distinct values & Section~\ref{sec:introduction} \\
 dataframe; row; synthetic observation & Tabular presentation of signed weighted affine forms; a row \((\sigma,u,b,\gamma)\) contributes \(\sigma\gamma|u^\top x-b|_p\). Positive rows are penalties and negative rows are bounded rewards & Definition~\ref{def:signed-dataset} \\
 feature vector \(u\); target \(b\) & Normal vector and right-hand side defining the affine residual \(u^\top x-b\) & Definition~\ref{def:signed-dataset} \\
-coefficient vector \(x\) & Optimisation variable in \(\mathbb Z_p^n\); in the Sudoku model its coordinates are cell values, not fitted slopes from observed data & Definition~\ref{def:signed-dataset} \\
+coefficient vector \(x\) & Optimisation variable in \(\mathbb Z_p^n\); in the Sudoku model its coordinates are cell values & Definition~\ref{def:signed-dataset} \\
 compiler; compilation & Constructive encoding or reduction from a constraint system to a signed residual objective & Theorem~\ref{thm:compiler-template} \\
 coordinatewise domination & Exact-penalty threshold: each pinning weight exceeds the total interaction weight incident on its coordinate & Theorem~\ref{thm:compiler-template} \\
 pinning weight & Exact-penalty multiplier \(\lambda_i\) on the unary well of coordinate \(i\) & Theorem~\ref{thm:compiler-template} \\
@@ -80,7 +80,7 @@ carving & Generation of a puzzle by deleting entries from a solved grid; the ran
 
 In affine \(p\)-adic linear regression, an observation pairs a feature vector \(u\in\mathbb Z^n\) with a target \(b\in\mathbb Z\), and a coefficient vector \(x\) is scored by a weighted sum of residual norms \(|u^\top x-b|_p\). It is analogous to Euclidean linear regression, but uses \(p\)-adic residual norms in place of squared Euclidean residuals.
 
-Earlier work establishes the geometry and complexity of this problem when every weight is positive \cite{baker2025padic,baker2026nphard,mihara2026forcing}. This paper studies the signed variant, in which an observation may carry a negative weight. In ordinary (Euclidean) least squares, negative weights can destroy convexity and boundedness (as discussed in Section~\ref{sec:preliminaries}). Over \(\mathbb Z_p\), by contrast, every affine residual has norm at most one, so a finite signed objective remains bounded and a negative row acts as a bounded reward.
+Earlier work establishes the geometry and complexity of this problem when every weight is positive \cite{baker2025padic,baker2026nphard,mihara2026forcing}. This paper studies the signed variant, in which an observation may carry a negative weight. In ordinary (Euclidean) least squares, negative weights can destroy convexity and boundedness (as discussed in Section~\ref{sec:archimedean-comparison}). Over \(\mathbb Z_p\), by contrast, every affine residual has norm at most one, so a finite signed objective remains bounded and a negative row acts as a bounded reward.
 
 This makes \(p\)-adic linear regression surprisingly expressive. Finite-domain all-different systems and CNF formulae compile mechanically into signed objectives: sufficiently weighted positive unary rows pin each coefficient to a finite allowed set, and a coordinatewise domination theorem (Theorem~\ref{thm:compiler-template}) shows that every global minimiser lies in that finite domain. There each remaining residual norm is a zero-or-one indicator, so a negative row rewards an unequal pair \(x_i\neq x_j\) or a satisfied clause, and the loss is, up to an additive constant, the conflict count of the all-different system or the negative number of satisfied clauses. The global minimisers are exactly the domain-respecting minimum-conflict assignments, and exactly the satisfying assignments when the instance is satisfiable (Theorem~\ref{thm:all-different}, Corollary~\ref{cor:all-different-csp}).
 
@@ -98,12 +98,12 @@ The paper makes the following contributions.
 This interdisciplinary work is written from the perspective of computer science and applied mathematics.
 The construction is described throughout in the vocabulary of constraint satisfaction and machine learning: a constraint system is \emph{compiled} into a \emph{dataframe} of observations, positive \emph{wells} \emph{pin} coefficients to their finite domains, and global minimisers \emph{snap} onto those domains. Table~\ref{tab:terminology} maps this vocabulary to standard language from penalty-function theory, graph theory, and constraint programming.
 
-Section~\ref{sec:preliminaries} fixes the \(p\)-adic notation and the signed-observation format, and compares the signed objective with its Archimedean analogue.
-Section~\ref{sec:padic-regression-background} works a three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals; the full admissibility conditions and a polynomial-valued variant are developed in the author's doctoral thesis.
+Section~\ref{sec:preliminaries} describes the \(p\)-adic notation and the signed-observation format.
+Section~\ref{sec:padic-regression-background} provides a worked three-variable list-colouring example and a two-variable CNF example in full, and records a family of integer false labellings with the uniform labelling as its degenerate member and a member whose residual values identify the satisfied literals.
 
-Section~\ref{construction} states and proves the general template and its corollaries. Theorem~\ref{thm:compiler-template} is an exact-penalty theorem in the ultrametric setting: the strong triangle inequality puts a bound on the interaction perturbation of any coordinate change, so pinning weights that are above the weight of the incident interactions ensure that every minimiser has its parameters in the desired set of distinct values.
+Section~\ref{construction} states and proves the general template and its corollaries. Theorem~\ref{thm:compiler-template} is an exact-penalty theorem in the ultrametric setting: the strong triangle inequality puts a bound on the interaction perturbation of any coordinate change, so pinning weights that are above the weight of the incident interactions ensure that every minimiser has its parameters in the desired set of distinct values. The section closes by comparing the signed objective with its Archimedean analogue, for which the corresponding move fails twice over: a sufficiently weighted negative row destroys boundedness, and convex penalties cannot pin a real variable to a finite non-singleton domain.
 
-Section~\ref{sec:minimum-conflicts-potts} treats unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations, while Section~\ref{sec:related-work} locates the construction among valued CSPs and Potts energies. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, and report the experiments and the failed powers-of-two encoding.
+Section~\ref{sec:minimum-conflicts-potts} considers unsatisfiable instances. Sections~\ref{sec:sudoku} and~\ref{sec:parsimony} specialise the construction to Sudoku. Section~\ref{sec:illustrative-computations} reports the computations. Section~\ref{sec:related-work} discusses related work. The appendices compare Mihara's digitwise regression, record the heuristics and their traces, and report the experiments and the failed powers-of-two encoding.
 
 \section{Preliminaries}
 \label{sec:preliminaries}
@@ -122,7 +122,11 @@ This norm makes numbers close when their difference is divisible by a large powe
 \[
 |s+t|_p\le\max\bigl(|s|_p,|t|_p\bigr),
 \]
-so \(d(s,t):=|s-t|_p\) is an ultrametric on \(\mathbb Q_p\). Two consequences recur throughout. First, every integer lies in \(\mathbb Z_p\), so every residual formed below from integer data has norm at most \(1\). Second, if \(s\neq t\) are integers with \(1\le s,t\le q<p\), then \(p\nmid s-t\) and hence \(|s-t|_p=1\): on a finite alphabet separated by \(p\), the residual norm is exactly a zero-or-one inequality indicator.
+so \(d(s,t):=|s-t|_p\) is an ultrametric on \(\mathbb Q_p\).
+
+Every integer lies in \(\mathbb Z_p\), so every residual formed below from integer data has norm at most \(1\).
+
+If \(s\neq t\) are integers with \(1\le s,t\le q<p\), then \(p\nmid s-t\) and hence \(|s-t|_p=1\): on a finite alphabet separated by \(p\), the residual norm is exactly a zero-or-one inequality indicator.
 
 In affine \(p\)-adic linear regression, an observation with feature vector \(u\in\mathbb Z^n\) and target \(b\in\mathbb Z\) has residual \(u^\top x-b\) at the coefficient vector \(x\in\mathbb Z_p^n\), and the usual positive-weight objective sums terms of the form
 \[
@@ -130,7 +134,7 @@ In affine \(p\)-adic linear regression, an observation with feature vector \(u\i
 \qquad \gamma>0.
 \]
 This is a weighted \(p\)-adic linear-regression objective.
-Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective studied here, which is fixed by the following definition.
+Earlier results establish geometric and complexity properties of this positive-weight problem \cite{baker2025padic,baker2026nphard}; broader recent work develops classification, regression, and representation-learning primitives over the \(p\)-adics \cite{martins2025learning}. We find no prior treatment of the signed affine objective.
 
 \begin{definition}[Signed synthetic $p$-adic residual dataset]
 \label{def:signed-dataset}
@@ -143,83 +147,7 @@ to the loss; this is the basic term in the signed weighted $p$-adic objective.
 
 Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards.
 
-
-
-\paragraph{Comparison with the Archimedean case.}
-It is worth recording exactly how the analogous move fails over
-$\mathbb{R}$. The signed objective built from the same data with squared
-residuals,
-\begin{equation*}
-L_{\mathbb{R}}(x) \;=\; \sum_{\ell} \sigma_\ell\,\gamma_\ell\,
-\bigl(u_\ell^{\top}x - b_\ell\bigr)^{2},
-\qquad x \in \mathbb{R}^{n},
-\end{equation*}
-is a quadratic function whose leading form is $x^{\top}Qx$ with
-$Q = \sum_{\ell}\sigma_\ell\gamma_\ell\,u_\ell u_\ell^{\top}$. Such a
-function is bounded below on $\mathbb{R}^{n}$ if and only if $Q$ is
-positive semidefinite and the linear part vanishes on $\ker Q$.
-Boundedness is therefore governed by global spectral and null-space
-conditions on the entire design, rather than by a termwise bound on the
-residuals. A sufficiently weighted negative row can make $Q$ indefinite
-and thereby destroy both convexity and boundedness. In particular, the
-coordinatewise domination hypothesis of Theorem~\ref{thm:compiler-template}
-is unsound over $\mathbb{R}$. Take
-$n=2$, pin each variable to the singleton domain $\{0\}$ with weight
-$\lambda$, and reward their inequality with one negative row:
-\begin{equation*}
-L_{\mathbb{R}}(x_1,x_2) \;=\; \lambda x_1^{2} + \lambda x_2^{2}
-\;-\; \gamma\,(x_1-x_2)^{2}.
-\end{equation*}
-Along the line $x_1=-x_2=t$ this equals $2(\lambda-2\gamma)\,t^{2}$, so
-the choice $\lambda=3$, $\gamma=2$ satisfies the domination condition
-$\lambda>\gamma$ while $L_{\mathbb{R}}\to-\infty$; recentring the wells
-at nonzero values changes only lower-order terms. (The $p$-adic
-compilation of the same contradictory two-variable system is bounded and
-returns its minimum-conflict assignment, as in
-Section~\ref{sec:minimum-conflicts-potts}.) Adding linear inequality
-constraints to make the real problem well posed does not remove the
-computational obstruction: minimising a quadratic function with a single
-negative eigenvalue under linear inequality constraints is NP-hard
-\cite{PardalosVavasis1991}. Convexity imposes a second, independent
-obstruction: the convex analogue $\sum_{a\in D_i}(t-a)^{2}$ of the unary
-well is minimised at the mean of $D_i$, rather than precisely on every
-point of $D_i$. More generally, the minimiser set of a convex function
-is convex, so a convex separable penalty cannot pin a real variable
-exactly to a finite non-singleton domain. Such pinning over $\mathbb{R}$
-already requires nonconvex multiwell penalties before any negative weight
-appears.
-
-Over $\mathbb{Z}_p$ both obstructions disappear at once. Each residual
-norm lies in $[0,1]$, so for every $x\in\mathbb{Z}_p^{n}$,
-\begin{equation*}
--\sum_{\ell:\,\sigma_\ell=-1}\gamma_\ell
-\;\le\; L(x) \;\le\; \sum_{\ell:\,\sigma_\ell=+1}\gamma_\ell,
-\end{equation*}
-a two-sided bound that holds term by term, for every configuration of
-signs and weights: a negative row is a bounded reward, not a source of
-indefiniteness. At the same time the unary sum
-$\sum_{a\in D_i}|t-a|_p$ is minimised exactly on $D_i$
-(Lemma~\ref{lem:unary-well}), so
-multiwell pinning is available inside the affine residual class itself.
-These two facts are what make the coordinatewise condition of
-Theorem~\ref{thm:compiler-template} an exact penalty: the strong triangle
-inequality caps the effect of any single-coordinate change on every
-interaction row, so a pinning weight above the incident interaction
-weight dominates all rewards simultaneously. The point of the comparison
-is well-posedness rather than complexity: the signed threshold problem is
-itself NP-hard (Corollary~\ref{cor:signed-nphard}), but its objective is
-bounded, its global minimisers are characterised exactly, and the
-domination condition is sound.
-
-The same ultrametric geometry has a cost. Away from its zero hyperplane
-the map $x\mapsto|u^{\top}x-b|_p$ is locally constant, so the loss
-offers no gradient and no notion of a residual being ``nearly'' zero;
-this is why Zubarev proposes random-walk rather than gradient dynamics
-for $p$-adic losses \cite{zubarev2025padic}. The boundedness that licenses
-signed weights and the flatness that starves local search are two faces
-of the same non-Archimedean absolute value;
-Appendix~\ref{app:powers-two} analyses a concrete instance of the latter
-for the powers-of-two encoding.
+Over \(\mathbb R\) the same signed move fails for two independent reasons: a sufficiently weighted negative row destroys boundedness, and convex penalties cannot pin a variable to a finite non-singleton set. The precise comparison is deferred to Section~\ref{sec:archimedean-comparison}, after the template theorem whose hypotheses it illuminates.
 
 
 \section{Worked examples}
@@ -732,6 +660,102 @@ W_S(t)=\sum_{a\in S}|t-a|_p.
 \]
 When \(p>s\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals \(s-1\) on the satisfying values \(0,\dots,s-1\) and \(s\) on the forbidden value \(s\). It therefore encodes exactly the same clause penalty using \(s\) positive observations. By contrast, the signed encoding uses one negative observation for the single forbidden affine equality. Filling the missing positive well at \(s\) makes the positive sum constant, which illustrates the complement relationship. The contribution of the signed form is the direct one-row representation of a small forbidden set, together with the coordinatewise domination theorem that keeps its negative reward bounded and snaps variables to their domains.
 
+\subsection{Comparison with the Archimedean case}
+\label{sec:archimedean-comparison}
+
+The hypotheses of Theorem~\ref{thm:compiler-template} are genuinely
+non-Archimedean. Transplanting the construction to \(\mathbb{R}\) ---
+scoring the same signed data with squared residuals,
+\begin{equation*}
+L_{\mathbb{R}}(x) \;=\; \sum_{\ell} \sigma_\ell\,\gamma_\ell\,
+\bigl(u_\ell^{\top}x - b_\ell\bigr)^{2},
+\qquad x \in \mathbb{R}^{n}
+\end{equation*}
+--- fails for two independent reasons.
+
+\paragraph{First obstruction: unboundedness.}
+\(L_{\mathbb{R}}\) is a quadratic function whose leading form is
+$x^{\top}Qx$ with
+$Q = \sum_{\ell}\sigma_\ell\gamma_\ell\,u_\ell u_\ell^{\top}$. Such a
+function is bounded below on $\mathbb{R}^{n}$ if and only if $Q$ is
+positive semidefinite and the linear part vanishes on $\ker Q$.
+Boundedness is therefore governed by global spectral and null-space
+conditions on the entire design, rather than by a termwise bound on the
+residuals, and a sufficiently weighted negative row makes $Q$
+indefinite. In particular, the coordinatewise domination hypothesis of
+Theorem~\ref{thm:compiler-template} is unsound over $\mathbb{R}$. Take
+$n=2$, pin each variable to the singleton domain $\{0\}$ with weight
+$\lambda$, and reward their inequality with one negative row:
+\begin{equation*}
+L_{\mathbb{R}}(x_1,x_2) \;=\; \lambda x_1^{2} + \lambda x_2^{2}
+\;-\; \gamma\,(x_1-x_2)^{2}.
+\end{equation*}
+Along the line $x_1=-x_2=t$ this equals $2(\lambda-2\gamma)\,t^{2}$, so
+the choice $\lambda=3$, $\gamma=2$ satisfies the domination condition
+$\lambda>\gamma$ while $L_{\mathbb{R}}\to-\infty$; recentring the wells
+at nonzero values changes only lower-order terms. (The $p$-adic
+compilation of the same contradictory two-variable system is bounded and
+returns its minimum-conflict assignment, as in
+Section~\ref{sec:minimum-conflicts-potts}.) Adding linear inequality
+constraints to make the real problem well posed does not remove the
+computational obstruction: minimising a quadratic function with a single
+negative eigenvalue under linear inequality constraints is NP-hard
+\cite{PardalosVavasis1991}.
+
+\paragraph{Second obstruction: no exact pinning.}
+Convexity defeats the pinning rows before any negative weight appears.
+Score the pinning rows of a Boolean coordinate, \(D_i=\{0,1\}\), with
+squared residuals: the unary well becomes
+$\lambda\bigl(t^{2}+(t-1)^{2}\bigr)$, minimised at the mean
+$t=\tfrac12$ --- in neither well --- and it remains so however large
+$\lambda$ is taken. Heavily weighted observations at $0$ and $1$ do not
+force the fitted coefficient to be Boolean; they force it to be
+one-half. The same holds for any finite domain: the convex analogue
+$\sum_{a\in D_i}(t-a)^{2}$ of the unary well is minimised at the mean
+of $D_i$, rather than precisely on every point of $D_i$. More
+generally, the minimiser set of a convex function is convex, so no
+convex separable penalty can pin a real variable exactly to a finite
+non-singleton domain. Even where the real penalty method does work ---
+a singleton domain, i.e.\ an equality constraint --- the quadratic
+penalty is only asymptotically exact: at any finite weight the
+remaining rows drag the minimiser off the constraint, and exactness
+requires $\lambda\to\infty$. The domination threshold of
+Theorem~\ref{thm:compiler-template} is, by contrast, a finite weight
+that pins exactly. Exact pinning over $\mathbb{R}$ already requires
+nonconvex multiwell penalties before any negative weight appears.
+
+Over $\mathbb{Z}_p$ both obstructions disappear at once. Each residual
+norm lies in $[0,1]$, so for every $x\in\mathbb{Z}_p^{n}$,
+\begin{equation*}
+-\sum_{\ell:\,\sigma_\ell=-1}\gamma_\ell
+\;\le\; L(x) \;\le\; \sum_{\ell:\,\sigma_\ell=+1}\gamma_\ell,
+\end{equation*}
+a two-sided bound that holds term by term, for every configuration of
+signs and weights: a negative row is a bounded reward, not a source of
+indefiniteness. At the same time the unary sum
+$\sum_{a\in D_i}|t-a|_p$ is minimised exactly on $D_i$
+(Lemma~\ref{lem:unary-well}), so
+multiwell pinning is available inside the affine residual class itself.
+These two facts are what make the coordinatewise condition of
+Theorem~\ref{thm:compiler-template} an exact penalty: the strong triangle
+inequality caps the effect of any single-coordinate change on every
+interaction row, so a pinning weight above the incident interaction
+weight dominates all rewards simultaneously. The point of the comparison
+is well-posedness rather than complexity: the signed threshold problem is
+itself NP-hard (Corollary~\ref{cor:signed-nphard}), but its objective is
+bounded, its global minimisers are characterised exactly, and the
+domination condition is sound.
+
+The same ultrametric geometry has a cost. Away from its zero hyperplane
+the map $x\mapsto|u^{\top}x-b|_p$ is locally constant, so the loss
+offers no gradient and no notion of a residual being ``nearly'' zero;
+this is why Zubarev proposes random-walk rather than gradient dynamics
+for $p$-adic losses \cite{zubarev2025padic}. The boundedness that licenses
+signed weights and the flatness that starves local search are two faces
+of the same non-Archimedean absolute value;
+Appendix~\ref{app:powers-two} analyses a concrete instance of the latter
+for the powers-of-two encoding.
+
 \section{Minimum conflicts}
 \label{sec:minimum-conflicts-potts}
 
@@ -797,7 +821,7 @@ This is Lemma~\ref{lem:edge-indicator} with \(q=9\).
 \end{proof}
 
 \subsection{Minimal and expanded residual objectives}
-Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share a unit (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
+Let $\mathcal{P}$ be the set of cell-pairs $(i,j)$ that share an exclusion constraint (same row, same column, or same box). Let $\mathcal{C}$ be the set of given clues; for $i\in\mathcal{C}$ let $g_i\in D$ be the fixed digit.
 
 Specialising Definitions~\ref{def:list-dataset} and \ref{def:list-loss}, together with Theorem~\ref{thm:all-different}, to the Sudoku graph gives the minimal synthetic dataset
 \begin{align}
@@ -840,8 +864,12 @@ Each cell appears in 20 pairs: the 8 row disequalities, the 8 column disequaliti
 \path[fill=black] (1,7) rectangle (2,8);
 \node[font=\bfseries\large,text=white] at (1.5,7.5) {$x$};
 
-% Cell grid and the heavier 3-by-3 box boundaries.
-\draw[line width=0.3pt] (0,0) grid (9,9);
+% Draw cell boundaries individually so every line renders at the same weight.
+\foreach \k in {0,...,9} {
+  \draw[line width=0.45pt] (\k,0) -- (\k,9);
+  \draw[line width=0.45pt] (0,\k) -- (9,\k);
+}
+% Heavier 3-by-3 box boundaries.
 \foreach \k in {0,3,6,9} {
   \draw[line width=1.1pt] (\k,0) -- (\k,9);
   \draw[line width=1.1pt] (0,\k) -- (9,\k);
@@ -944,10 +972,8 @@ The solver is available at \url{https://padic-logic.symmachus.org/} (with source
 \label{fig:browser-sudoku-solution}
 \end{figure}
 
-\section{Related work and scope}
+\section{Related work}
 \label{sec:related-work}
-
-\subsection{Earlier regression and constraint models}
 
 From the constraint-programming side, the finite-domain objective is a valued-CSP or Max-CSP penalty function \cite{schiex1995vcsp}. Replacing a global \emph{alldifferent} constraint by a clique of pairwise inequalities preserves its solutions but not the stronger propagation of a matching-based global constraint \cite{regin1994alldifferent}. On the finite domain, the list-colouring objective is the zero-temperature antiferromagnetic Potts energy with local list constraints \cite{ellismonaghan2014potts}; related discrete problems are often mapped to Ising or QUBO objectives \cite{lucas2014ising}. The local-search experiments are closest algorithmically to min-conflicts repair search \cite{minton1990minconflicts} and to Lewis's metaheuristic Sudoku study \cite{lewis2007metaheuristics}, whose simulated annealing keeps each \(3\times3\) box as a permutation of \(1,\dots,9\) and swaps two non-clue cells within a box; the heuristics in Appendix~\ref{app:heuristics} make the analogous choice with rows as the permutation unit. Sudoku itself is routinely formulated using exact cover, SAT, or \emph{alldifferent} constraints \cite{knuth2000dancing,simonis2005sudoku,lynce2006sudoku}. Martins gives a broader recent account of learning primitives over \(p\)-adic spaces \cite{martins2025learning}; the present construction specialises instead to signed affine objectives that compile finite-domain constraints.
 
@@ -1022,9 +1048,9 @@ Indeed, at \(u^\top x=t\) all \(|S|-1\) positive rows contribute one, whereas at
 
 For a CNF clause, \(S_C=\{u_C^\top x:x\in\{0,1\}^n\}\) contains at most one more value than the clause width. Replacing the forbidden row \(u_C^\top x=t_C\) by the positive rows \(u_C^\top x=s\) for \(s\in S_C\setminus\{t_C\}\) is therefore a polynomial-size expansion. Together with the positive weighted Boolean wells, it gives Mihara's modulo-\(p\) stage a positive-only weighted-consensus dataset: a satisfying clause contributes one unit of inlier weight, while a failed clause contributes none. The original signed row is retained for reporting \(v_p(u_C^\top x-t_C)\), its norm, and its signed contribution to the displayed loss.
 
-For a Sudoku peer row, \(S=\{-8,-7,\ldots,7,8\}\) and the forbidden target is \(0\). The positive complement therefore contains the sixteen equalities \(x_i-x_j=s\) with \(s\ne0\). Choosing \(p=19\) keeps those integer differences distinct modulo \(p\). On digit states an unequal peer satisfies exactly one complementary equality and an equal peer satisfies none. The browser preserves the pinning weight \(\alpha=21\), scores candidate vectors by total positive weight minus weighted inlier count, and retains the best score across random full-rank bases. This weighting, complement expansion, grouped basis sampler, and best-consensus retention are adaptations made for the browser comparison; they are not claimed as steps of Mihara's published pseudocode. The browser implements only a last-digit modulo-\(p\) fit, not the recursive recovery of coefficients modulo \(p^E\). It separately evaluates the original signed rows, including the counts with \(v_{19}(x_i-x_j)=0\) and with zero residual.
+For a Sudoku peer row, \(S=\{-8,-7,\ldots,7,8\}\) and the forbidden target is \(0\). The positive complement therefore contains the sixteen equalities \(x_i-x_j=s\) with \(s\ne0\). Choosing \(p=19\) keeps those integer differences distinct modulo \(p\). On digit states an unequal peer satisfies exactly one complementary equality and an equal peer satisfies none.
 
-The companion browser uses the positive complement expansion in both its Boolean-CSP and Sudoku Mihara modes. For Sudoku it plots two histories: the non-increasing positive-consensus loss used to select fits and the original signed objective used only as an audit. A better consensus fit can still be off-domain or violate clues, and the signed audit need not decrease. The interface therefore continues fresh starts until a decoded vector satisfies the original constraints or the user stops it. It treats the procedure as an unbounded-restart heuristic rather than a polynomial-time solver. A method guaranteed to solve every compiled instance in polynomial time would decide the NP-hard threshold problem of Corollary~\ref{cor:signed-nphard}; Mihara's algorithm makes no such guarantee.
+The companion website uses the positive complement expansion in both its Boolean-CSP and Sudoku Mihara modes. For Sudoku it plots two histories: the non-increasing positive-consensus loss used to select fits and the original signed objective used only as an audit. A better consensus fit can still be off-domain or violate clues, and the signed audit need not decrease. The interface therefore continues fresh starts until a decoded vector satisfies the original constraints or the user stops it. It treats the procedure as an unbounded-restart heuristic rather than a polynomial-time solver. A method guaranteed to solve every compiled instance in polynomial time would decide the NP-hard threshold problem of Corollary~\ref{cor:signed-nphard}; Mihara's algorithm makes no such guarantee.
 
 \section{Heuristic details}
 \label{app:heuristics}
@@ -1295,7 +1321,7 @@ L_p(\beta) := \sum_g |r_g(\beta)|_p,
 \]
 optionally together with a regulariser that encourages \(\beta_{r,c}\in A\) and enforces the clues.
 
-Archived local-search experiments with this encoding were run on \(50\) Project Euler Problem \(96\) puzzles. Table~\ref{tab:powers-two-results} summarises the outcomes. None of these runs found a valid completion.
+The archived local-search experiments used the \(50\) puzzles from Project Euler Problem \(96\). Table~\ref{tab:powers-two-results} summarises the outcomes. None of these runs found a valid completion.
 
 \begin{table}[H]
 \centering
@@ -1315,9 +1341,8 @@ E2 SA & Simulated annealing on the same \(750\) runs & \(0/750\) & Mean lift \(0
 
 
 \paragraph{Why the encoding defeats local search.}
-The failure recorded in Table~\ref{tab:powers-two-results} is structural,
-and the reason is
-topological. An Archimedean search on the same statistic would see a graded
+The failure recorded in Table~\ref{tab:powers-two-results} is topological.
+An Archimedean search on the same statistic would see a graded
 signal: the deficit $|511 - \sum_{(r,c)\in g}\beta_{r,c}|$ is monotone on
 either side of the target, its sublevel sets are nested intervals, and a
 single-cell change moves the unit sum by at most $255$ --- a
@@ -1329,8 +1354,7 @@ constant on $\mathbb{Z}_p \setminus \{0\}$. Since the attainable residuals
 satisfy $|r_g(\beta)| \le 1793$, each unit term $|r_g(\beta)|_p$ depends on
 the unit sum only through its residue modulo $p^{K}$ with
 $K = \lfloor \log_p 1793 \rfloor + 1$, and takes at most $K+1$ values. The
-loss is therefore constant on large congruence fibres --- ultrametric
-plateaus --- that stand in no monotone relation to the Archimedean deficit:
+loss is therefore constant on ultrametric plateaus:
 at $p=11$ a unit summing to $390$ (residual $121 = 11^2$) receives the
 near-perfect term $11^{-2}$, while a unit summing to $510$ (residual $1$)
 receives the worst possible term $1$.
@@ -1372,7 +1396,7 @@ $v_p(r-\varepsilon) > v_p(r)$, i.e.\ $p^{\,v_p(r)+1} \mid r - \varepsilon$.
 differ.
 \end{proof}
 
-The inversion can be exhibited exactly. For $p = 7$
+The problem can be exhibited exactly. For $p = 7$
 ($\mathrm{ord}_7(2) = 3$), note $511 = 7 \cdot 73$, so the target itself is
 $7$-adically small and any unit whose sum is divisible by $7$ has
 $|r_g|_7 \le 7^{-1}$. Concretely, the near-miss unit holding eight correct
@@ -1380,20 +1404,20 @@ entries and $2^{0}=1$ in place of $2^{8}=256$ has residual
 $255 = 3\cdot 5\cdot 17$ and term $1$, while the scrambled multiset
 $(8,4,2,2,1,1,1,1,1)$ sums to $21$, has residual $490 = 2\cdot 5\cdot 7^{2}$,
 and receives the term $7^{-2}$: eight-ninths of a solved unit is ranked
-forty-nine times worse than noise. The same inversion occurs at $p = 73$.
+forty-nine times worse than noise. The same problem occurs at $p = 73$.
 For the remaining small sweep primes the occasional sub-unit steps reward
 divisibility of the digit gap by $\mathrm{ord}_p(2)$ --- $p=7$ discounts
 gaps $3$ and $6$, $p=17$ the single gap $8$ ($255 = 3\cdot 5\cdot 17$),
 $p=127$ the gap $7$ ($127 = 2^{7}-1$) --- congruences between the exchanged
-digits with no relation to correctness. The even prime is no better: for
-$p=2$ the valuation of $r_g$ counts how many low-order binary digits of the
+digits with no relation to correctness. For $p=2$ the valuation of $r_g$
+counts how many low-order binary digits of the
 unit sum agree with $511 = 111111111_2$, a carry condition on the multiset
 of entries, again independent of how many cells hold their correct values.
 
-The landscape consequences follow. Under the heuristic model that unit sums
-equidistribute modulo powers of $p$, Lemma~\ref{lem:pow2-landscape}(ii) makes the per-unit
-improvement event a leading-digit hit of density about $1/p$, while
-Lemma~\ref{lem:pow2-landscape}(iii) makes all partial progress fragile: a cell lies in three units
+Under the heuristic model that unit sums equidistribute modulo powers of $p$,
+Lemma~\ref{lem:pow2-landscape}(ii) makes the per-unit improvement event a
+leading-digit hit of density about $1/p$. Lemma~\ref{lem:pow2-landscape}(iii)
+makes all partial progress fragile: a cell lies in three units
 whose residuals shift in lockstep, so repairing one unit while protecting
 another requires simultaneous congruences. For $p \ge 43$ one has
 $p^{2} \ge 1849 > 1793$, so the attainable valuations are $0$ or $1$ and
