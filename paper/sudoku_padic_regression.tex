@@ -147,7 +147,7 @@ to the loss; this is the basic term in the signed weighted $p$-adic objective.
 
 Since \(u\in\mathbb Z^n\), \(b\in\mathbb Z\), and \(x\in\mathbb Z_p^n\), each residual lies in \(\mathbb Z_p\) and has norm at most \(1\). Every finite signed objective considered on this domain is therefore bounded. An observation is \emph{positive} when \(\sigma=+1\) and \emph{negative} when \(\sigma=-1\); positive observations will pin coefficients and negative observations will supply bounded rewards.
 
-Over \(\mathbb R\) the same signed move fails for two independent reasons: a sufficiently weighted negative row destroys boundedness, and convex penalties cannot pin a variable to a finite non-singleton set. The precise comparison is deferred to Section~\ref{sec:archimedean-comparison}, after the template theorem whose hypotheses it illuminates.
+Over \(\mathbb R\) we can't do this for two independent reasons: a sufficiently weighted negative row destroys boundedness, and convex penalties cannot pin a variable to a finite non-singleton set.
 
 
 \section{Worked examples}
@@ -215,16 +215,16 @@ $E_2$ & negative & $(-1,e_2-e_3,0,1)$ & reward $x_2\neq x_3$ \\
 \subsection{An example}
 \label{sec:worked-all-different}
 
-Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its displayed domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
+Figure~\ref{fig:list-colouring-example} has three variables. Each variable must take a value from its domain, and adjacent variables must be different. The assignment \(x=(1,2,3)\) is one solution.
 
-For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), while every nonzero integer residual that occurs below has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
+For this example take \(p=5\). The only fact about the \(5\)-adic norm needed at first is that \(|0|_5=0\), and that every nonzero integer residual that occurs has norm \(1\). A dataframe row consists of a feature vector \(u\), target \(b\), and signed weight \(w\); at coefficient vector \(x\) it contributes
 \[
 w\,|u^\top x-b|_5
 \]
-to the objective. Positive rows of weight \(3\) pin each coefficient to its allowed values. Negative rows of weight \(-1\) reward unequal endpoints.
+to the objective. Positive rows of weight \(3\) pin each coefficient, while rows of weight \(-1\) reward unequal endpoints.
 
 
-The eight observations have two equivalent presentations: Table \ref{tab:list-colouring-dataframe} and Figure~\ref{fig:list-colouring-regression}, which uses the compact tuple notation of Definition~\ref{def:signed-dataset}; each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
+Table~\ref{tab:list-colouring-dataframe} and Figure~\ref{fig:list-colouring-regression} show the eight observations; Figure~\ref{fig:list-colouring-regression} uses the compact tuple notation of Definition~\ref{def:signed-dataset}, in which each tuple \((\sigma,u,b,\gamma)\) has signed weight \(w=\sigma\gamma\).
 
 The zero-intercept model is the hyperplane
 \[
@@ -261,7 +261,7 @@ $(2,3,3)$ & $8$ & no \\
 \label{tab:list-colouring-candidates}
 \end{table}
 
-The minimum-loss coefficient vectors are exactly the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.
+The minimum-loss coefficient vectors are the valid assignments of Figure~\ref{fig:list-colouring-example}; in particular, \(x=(1,2,3)\) is recovered as a regression optimum.
 
 \subsection{\texorpdfstring{\(p\)-adic}{p-adic} linear regression can express CNF statements as well}
 \label{sec:worked-cnf}
@@ -319,7 +319,7 @@ The unique minimum has coefficients \(x=(0,0)\), which decode to the satisfying 
 
 The preceding CNF uses \(0\) for true and \(1\) for false for both variables. The false values need not coincide. They could be other \(p\)-adic integers, and they need not be distinct.
 
-Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\). Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information rather than correctness: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The companion browser's \href{https://padic-logic.symmachus.org/\#csp}{Boolean-CSP page} implements both labellings: switching to \(b_i=1+p\,2^{i}\) leaves every displayed loss unchanged, while its row-evaluation table decodes each clause residual into the satisfied literals it names. The general conditions under which labels and clause coefficients preserve the clause-count loss, an encoding of negation by non-negative coefficients, and a polynomial-valued variant of these labels are developed in the author's doctoral thesis.
+Within \(\mathbb Z_p\) itself, the signed clause construction works verbatim for any false labels \(b_i\equiv 1\pmod p\). Because integer norms are at most \(1\), the domination arguments of Section~\ref{construction} are unaffected. Distinct labels add information: with \(b_i=1+p\,2^{i}\), a subset of \(k\) labels sums to \(k+p\sum_{i}2^{i}\), so distinct subsets have distinct sums---a cardinality collision would require \(p\) to divide a nonzero difference of cardinalities smaller than \(p\)---and the residual value then identifies exactly which literals of a clause are satisfied: the count from the residue modulo \(p\), the set from the binary expansion of the quotient. The companion browser's \href{https://padic-logic.symmachus.org/\#csp}{Boolean-CSP page} implements both labellings: switching to \(b_i=1+p\,2^{i}\) leaves every loss unchanged, while its row-evaluation table decodes each clause residual into the satisfied literals it names. The general conditions under which labels and clause coefficients preserve the clause-count loss, an encoding of negation by non-negative coefficients, and a polynomial-valued variant of these labels are developed in the author's doctoral thesis.
 
 \section{A general all-different residual-objective template}
 \label{construction}
@@ -650,7 +650,7 @@ Apply the construction above to a \(3\)-CNF formula, with \(p=5\) and \(\alpha=\
 \end{proof}
 
 \paragraph{Signed versus positive complement encodings.}
-The signed construction is compact rather than uniquely expressive. For the uniform label \(b_i=1\), the same clause can be encoded positively through its failure sum
+The signed construction is more compact rather than uniquely expressive. For the uniform label \(b_i=1\), the same clause can be encoded positively through its failure sum
 \[
 s_C(x):=\sum_{j=1}^{s}\delta(\lambda_j;x)
 \]
@@ -664,14 +664,14 @@ When \(p>s\) and \(t\in\{0,\dots,s\}\), the positive term \(W_{S_C}(t)\) equals 
 \label{sec:archimedean-comparison}
 
 The hypotheses of Theorem~\ref{thm:compiler-template} are genuinely
-non-Archimedean. Transplanting the construction to \(\mathbb{R}\) ---
+non-Archimedean. If we try to transplant the construction to \(\mathbb{R}\) by
 scoring the same signed data with squared residuals,
 \begin{equation*}
 L_{\mathbb{R}}(x) \;=\; \sum_{\ell} \sigma_\ell\,\gamma_\ell\,
 \bigl(u_\ell^{\top}x - b_\ell\bigr)^{2},
 \qquad x \in \mathbb{R}^{n}
 \end{equation*}
---- fails for two independent reasons.
+it fails for two independent reasons.
 
 \paragraph{First obstruction: unboundedness.}
 \(L_{\mathbb{R}}\) is a quadratic function whose leading form is
@@ -707,10 +707,9 @@ Convexity defeats the pinning rows before any negative weight appears.
 Score the pinning rows of a Boolean coordinate, \(D_i=\{0,1\}\), with
 squared residuals: the unary well becomes
 $\lambda\bigl(t^{2}+(t-1)^{2}\bigr)$, minimised at the mean
-$t=\tfrac12$ --- in neither well --- and it remains so however large
-$\lambda$ is taken. Heavily weighted observations at $0$ and $1$ do not
-force the fitted coefficient to be Boolean; they force it to be
-one-half. The same holds for any finite domain: the convex analogue
+$t=\tfrac12$ --- in neither well. Increasing $\lambda$ simply keeps $t$
+closer to $\tfrac12$, as perturbations from other data points have less
+effect. The same holds for any finite domain: the convex analogue
 $\sum_{a\in D_i}(t-a)^{2}$ of the unary well is minimised at the mean
 of $D_i$, rather than precisely on every point of $D_i$. More
 generally, the minimiser set of a convex function is convex, so no
@@ -740,13 +739,9 @@ These two facts are what make the coordinatewise condition of
 Theorem~\ref{thm:compiler-template} an exact penalty: the strong triangle
 inequality caps the effect of any single-coordinate change on every
 interaction row, so a pinning weight above the incident interaction
-weight dominates all rewards simultaneously. The point of the comparison
-is well-posedness rather than complexity: the signed threshold problem is
-itself NP-hard (Corollary~\ref{cor:signed-nphard}), but its objective is
-bounded, its global minimisers are characterised exactly, and the
-domination condition is sound.
+weight dominates all rewards simultaneously.
 
-The same ultrametric geometry has a cost. Away from its zero hyperplane
+Unlike $\mathbb{R}$, away from its zero hyperplane
 the map $x\mapsto|u^{\top}x-b|_p$ is locally constant, so the loss
 offers no gradient and no notion of a residual being ``nearly'' zero;
 this is why Zubarev proposes random-walk rather than gradient dynamics
@@ -756,11 +751,10 @@ of the same non-Archimedean absolute value;
 Appendix~\ref{app:powers-two} analyses a concrete instance of the latter
 for the powers-of-two encoding.
 
-\section{Minimum conflicts}
+\section{Unsatisfiable instances}
 \label{sec:minimum-conflicts-potts}
 
-\subsection{Unsatisfiable instances}
-The characterisation holds even when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
+Consider what happens when the instance has no proper list-colouring: there the global minimisers are the domain-respecting assignments of least conflict count. For example, take the triangle \(K_3\) with all three lists equal to \(\{1,2\}\). No proper \(2\)-colouring of \(K_3\) exists, so every domain-respecting assignment leaves at least one edge monochromatic. Here \(\Delta=2\), so \(\lambda=3\), and by Theorem~\ref{thm:all-different} the global minimisers are exactly the assignments with a single conflict, at loss \(\lambda\sum_i(|D_i|-1)-|E|+1=3\cdot 3-3+1=7\). This Max-CSP regime is distinct from the satisfiable case.
 
 If a best-effort solution should treat some constraints as more important than others, assign them correspondingly higher or lower losses. Replacing the unit reward on an edge \(e\) by a weight \(w_e>0\), and raising each pinning weight \(\lambda_i\) above the total weight incident on coordinate \(i\), gives the weighted minimum-conflict objective by the same domination argument.
 
@@ -909,7 +903,7 @@ Equation \eqref{eq:objective} keeps the nine digit-well residuals visible even o
 
 This expanded form needs an explicit clue-weight assumption. On a clue cell, the first sum in \eqref{eq:objective} has the same value \(8\alpha\) for every digit \(x_i\in D\), so clue fidelity is enforced only by \(\alpha_{\mathrm{clue}}|x_i-g_i|_p\). The same domination argument applies to \eqref{eq:objective} when \(\alpha_{\mathrm{clue}}>20\); the simplest choice is \(\alpha_{\mathrm{clue}}=\alpha=21\). Under that extra condition, \eqref{eq:objective} is a redundant expanded form of \eqref{eq:objective-minimal}.
 
-\paragraph{Design choice: clues as data, not as substitution.}
+\paragraph{Design choice: clues as data.}
 A conventional discrete-optimisation model would substitute the clue digits and optimise over the unclued cells alone. Both objectives instead keep all \(81\) coordinates and enforce clues through heavily weighted unary rows, because the paper frames completion as regression: the coefficient space \(\mathbb Z_p^{81}\) and the row schema are then fixed once for all puzzles, and editing a clue changes observations rather than the variable space, just as changing a dataset does not change a regression model class. Nothing is lost by this choice: the domination theorem absorbs the substitution view as the special case of singleton domains, and on clue-consistent states both formulations induce the same conflict count. The expanded form \eqref{eq:objective} makes the reading visible by separating the puzzle-independent digit wells from the clue rows.
 
 Once \(x\) is digit-valued, the pairwise part is simply
@@ -961,14 +955,14 @@ The greedy solver simply counts integer conflicts: it does not evaluate a \(p\)-
 
 On a small sample of \(18\) randomly carved puzzles, the greedy and Zubarev solvers both completed every puzzle, giving \(36\) successful method--puzzle runs. The row-swap search used fewer steps on \(14\) of the \(18\) paired puzzles. Its median step counts were \(537.5\), \(2784\), and \(7040\) at \(36\), \(30\), and \(26\) clues, versus \(4533.5\), \(8751.5\), and \(9911\) for the Zubarev walk. Appendix~\ref{app:heuristics-results} gives the experimental setup, full table, and a representative loss curve. These proof-of-concept experiments show only that both finite-state procedures can reach completions in this sample; they are not a solver benchmark. The Mihara-inspired solver is not included among the \(36\) solver runs, since it did not successfully solve any of the sample puzzles.
 
-The solver is available at \url{https://padic-logic.symmachus.org/} (with source code at \url{https://github.com/solresol/padic-logic}). The code that ran these experiments is at
+The solver is available at \url{https://padic-logic.symmachus.org/} (with source code at \url{https://github.com/solresol/padic-logic}); a screenshot appears in Figure~\ref{fig:browser-sudoku-solution}. The code that ran these experiments is at
 \url{https://github.com/solresol/sudoku-padic-regression}.
 
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figures/padic_logic_sudoku_solution.png}
-\caption{The Sudoku route after a row-swap run reaches a valid completion. The native \(81\)-cell grid, the \(1{,}299\)-row signed objective summary, the theoretical-floor equality, and the zero-conflict search result remain visible together.}
+\caption{Screenshot of \url{https://padic-logic.symmachus.org/}: the Sudoku route after a row-swap run reaches a valid completion. The native \(81\)-cell grid, the \(1{,}299\)-row signed objective summary, the theoretical-floor equality, and the zero-conflict search result.}
 \label{fig:browser-sudoku-solution}
 \end{figure}
 
@@ -981,7 +975,7 @@ From the constraint-programming side, the finite-domain objective is a valued-CS
 
 Signed \(p\)-adic residuals have a direct finite-domain role. Positive synthetic terms pin variables to a finite set; after that, negative terms are bounded rewards for inequality or clause satisfaction.
 
-Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are exactly the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
+Sudoku is a finite-domain case study in which the variables, domains, and all-different constraints are explicit. All-different systems admit polynomial-time encodings whose global minimisers are the domain-respecting minimum-conflict assignments, and in the satisfiable case exactly the satisfying assignments.
 
 The same signed-residual construction is not limited to pairwise inequality. After Boolean pinning, every clause of width less than \(p\) becomes one forbidden affine equality, so a single signed term rewards its satisfaction. A positive-only affine encoding can represent the same finite-domain penalty by listing all allowed residual values; the signed formulation's advantage is the compact one-row representation of the forbidden complement within that affine class. Section~\ref{sec:general-labels} shows how variables can receive distinct false labels whose residual values identify the satisfied literals without changing the loss landscape. No optimisation or verification advantage is claimed for these labellings.
 
@@ -1341,7 +1335,6 @@ E2 SA & Simulated annealing on the same \(750\) runs & \(0/750\) & Mean lift \(0
 
 
 \paragraph{Why the encoding defeats local search.}
-The failure recorded in Table~\ref{tab:powers-two-results} is topological.
 An Archimedean search on the same statistic would see a graded
 signal: the deficit $|511 - \sum_{(r,c)\in g}\beta_{r,c}|$ is monotone on
 either side of the target, its sublevel sets are nested intervals, and a
