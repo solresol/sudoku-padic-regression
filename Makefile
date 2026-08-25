@@ -30,7 +30,12 @@ KINDLE_NAME := $(PAPER_NAME)_kindle
 KINDLE_TEX := $(TMP_PDF_DIR)/$(KINDLE_NAME).tex
 KINDLE_PDF := $(TMP_PDF_DIR)/$(KINDLE_NAME).pdf
 
-.PHONY: all paper site submission kindle clean distclean help
+RESPONSE_DIR := submission/reviewer-feedback/2026-08-02
+RESPONSE_NAME := response_to_referees
+RESPONSE_TEX := $(RESPONSE_DIR)/$(RESPONSE_NAME).tex
+RESPONSE_PDF := $(RESPONSE_DIR)/$(RESPONSE_NAME).pdf
+
+.PHONY: all paper site submission kindle response clean distclean help
 
 all: paper
 
@@ -40,6 +45,7 @@ help:
 		'make site       Copy the latest paper PDF into site/' \
 		'make submission Build the journal source ZIP in dist/' \
 		'make kindle     Build the small-page Kindle-sized PDF in tmp/pdfs/' \
+		'make response   Build the private response-to-referees PDF' \
 		'make clean      Remove LaTeX auxiliary files' \
 		'make distclean  Remove auxiliary files and latexmk-managed build outputs'
 
@@ -50,6 +56,8 @@ site: $(SITE_PDF) $(SITE_SOURCE_MANIFEST)
 submission: $(SUBMISSION_ZIP)
 
 kindle: $(KINDLE_PDF)
+
+response: $(RESPONSE_PDF)
 
 $(PAPER_PDF): $(PAPER_TEX) $(PAPER_ASSETS)
 	cd $(PAPER_DIR) && $(LATEXMK) $(LATEXMK_FLAGS) $(PAPER_NAME).tex
@@ -79,10 +87,15 @@ $(KINDLE_TEX): $(PAPER_TEX) | $(TMP_PDF_DIR)
 $(KINDLE_PDF): $(KINDLE_TEX) $(PAPER_ASSETS)
 	cd $(TMP_PDF_DIR) && $(LATEXMK) $(LATEXMK_FLAGS) $(KINDLE_NAME).tex
 
+$(RESPONSE_PDF): $(RESPONSE_TEX)
+	cd $(RESPONSE_DIR) && $(LATEXMK) $(LATEXMK_FLAGS) $(RESPONSE_NAME).tex
+
 clean:
 	cd $(PAPER_DIR) && $(LATEXMK) -c $(PAPER_NAME).tex
 	if [[ -f $(KINDLE_TEX) ]]; then cd $(TMP_PDF_DIR) && $(LATEXMK) -c $(KINDLE_NAME).tex; fi
+	if [[ -f $(RESPONSE_TEX) ]]; then cd $(RESPONSE_DIR) && $(LATEXMK) -c $(RESPONSE_NAME).tex; fi
 
 distclean: clean
 	cd $(PAPER_DIR) && $(LATEXMK) -C $(PAPER_NAME).tex
 	if [[ -f $(KINDLE_TEX) ]]; then cd $(TMP_PDF_DIR) && $(LATEXMK) -C $(KINDLE_NAME).tex; fi
+	if [[ -f $(RESPONSE_TEX) ]]; then cd $(RESPONSE_DIR) && $(LATEXMK) -C $(RESPONSE_NAME).tex; fi
