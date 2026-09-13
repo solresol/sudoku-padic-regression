@@ -211,6 +211,8 @@ outputs/
 /output/huggingface/
 /output/submission/
 /output/pdf/Copyright_Transfer_Agreement*.pdf
+/output/pdf/sudoku_padic_regression-eps-figures-preview.pdf
+.DS_Store
 
 # LaTeX build artefacts under paper/ (keep referenced figure PDFs/PNGs)
 paper/*.aux

@@ -35,7 +35,7 @@ RESPONSE_NAME := response_to_referees
 RESPONSE_TEX := $(RESPONSE_DIR)/$(RESPONSE_NAME).tex
 RESPONSE_PDF := $(RESPONSE_DIR)/$(RESPONSE_NAME).pdf
 
-.PHONY: all paper site submission kindle response clean distclean help
+.PHONY: all paper site submission publisher-package publisher-eps-package kindle response clean distclean help
 
 all: paper
 
@@ -44,6 +44,8 @@ help:
 		'make paper      Build paper/sudoku_padic_regression.pdf' \
 		'make site       Copy the latest paper PDF into site/' \
 		'make submission Build the journal source ZIP in dist/' \
+		'make publisher-package Build the macro-free accepted-paper source ZIP' \
+		'make publisher-eps-package Convert the existing publisher package to EPS' \
 		'make kindle     Build the small-page Kindle-sized PDF in tmp/pdfs/' \
 		'make response   Build the private response-to-referees PDF' \
 		'make clean      Remove LaTeX auxiliary files' \
@@ -54,6 +56,12 @@ paper: $(PAPER_PDF)
 site: $(SITE_PDF) $(SITE_SOURCE_MANIFEST)
 
 submission: $(SUBMISSION_ZIP)
+
+publisher-package:
+	python3 scripts/build_publisher_package.py
+
+publisher-eps-package:
+	python3 scripts/build_eps_package.py
 
 kindle: $(KINDLE_PDF)
 
